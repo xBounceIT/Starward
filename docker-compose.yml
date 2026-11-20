@@ -37,6 +37,7 @@ services:
       STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:-dev-starward-auth-secret-change-in-production-32chars}
       STARWARD_MASTER_KEY: ${STARWARD_MASTER_KEY:-dev-starward-master-key-change-in-production-32chars}
       CORS_ORIGIN: ${BETTER_AUTH_URL:-http://0.0.0.0:3000}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       RUST_LOG: ${RUST_LOG:-starward_backend=info,tower_http=info}
     ports:
       - "0.0.0.0:${BACKEND_PORT:-8080}:8080"

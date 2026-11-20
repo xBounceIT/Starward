@@ -15,7 +15,13 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
    - Anche se un utente invitato non si è ancora registrato, l'accesso alla cartella condivisa viene collegato automaticamente al suo primo login (locale o SSO).
    - Tutti i membri vedono la cartella condivisa direttamente nella sidebar (sezione *Condivise con me*) con accesso live alle credenziali e registro attività (*Audit Log*).
 
-3. **Sicurezza & UI Intuitiva**
+3. **RBAC (Admin & User) e Pannello Admin**
+   - Controllo degli accessi basato sui ruoli con ruoli globali **Admin** e **User** (il primo utente registrato diventa automaticamente **Admin**, con supporto opzionale per la variabile d'ambiente `ADMIN_EMAILS`).
+   - **Pannello Admin** integrato nella sidebar (visibile esclusivamente agli utenti con ruolo **Admin**) con:
+     - **Lista utenti**: visualizzazione dettagli utenti, statistiche cartelle/credenziali, modifica del ruolo (`Admin` / `User`) ed eliminazione utenti.
+     - **Audit di sistema**: sezione predisposta (*chi ha fatto cosa e quando*) pronta per il tracciamento globale degli eventi di sistema.
+
+4. **Sicurezza & UI Intuitiva**
    - Password e note cifrate a riposo in Rust con **AES-256-GCM**, nonce casuali a 96-bit per ogni salvataggio e derivazione chiave **HKDF-SHA256**.
    - Interfaccia master-detail ispirata ai moderni password manager: ricerca istantanea (`Ctrl+K`), filtri per categoria, copia rapida in un clic, generatore di password con indicatore di robustezza, tema chiaro/scuro e layout responsive.
 

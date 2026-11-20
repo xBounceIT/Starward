@@ -10,6 +10,7 @@ pub struct UserRecord {
     pub email: String,
     pub name: String,
     pub image: Option<String>,
+    pub role: String,
     pub created_at: DateTime<Utc>,
     pub last_seen_at: DateTime<Utc>,
 }
@@ -20,6 +21,40 @@ pub struct UserSummary {
     pub email: String,
     pub name: String,
     pub image: Option<String>,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct AdminUserDto {
+    pub id: String,
+    pub email: String,
+    pub name: String,
+    pub image: Option<String>,
+    pub role: String,
+    pub vault_count: i64,
+    pub credential_count: i64,
+    pub created_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateUserRoleRequest {
+    pub role: String,
+}
+
+/// Predisposizione modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemAuditEventDto {
+    pub id: String,
+    pub actor_id: String,
+    pub actor_email: String,
+    pub actor_name: String,
+    pub actor_role: String,
+    pub action: String,
+    pub target_type: String,
+    pub target_id: Option<String>,
+    pub details: String,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

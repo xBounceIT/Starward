@@ -8,6 +8,7 @@ pub struct Config {
     pub auth_secret: String,
     pub master_key: String,
     pub cors_origin: String,
+    pub admin_emails: Vec<String>,
 }
 
 impl Config {
@@ -28,6 +29,10 @@ impl Config {
         });
         let cors_origin =
             env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://0.0.0.0:3000".to_string());
+        let raw_admin_emails = env::var("ADMIN_EMAILS")
+            .or_else(|_| env::var("STARWARD_ADMIN_EMAILS"))
+            .unwrap_or_default();
+        let admin_emails = parse_admin_emails(&raw_admin_emails);
 
         Self {
             host,
@@ -36,6 +41,19 @@ impl Config {
             auth_secret,
             master_key,
             cors_origin,
+            admin_emails,
         }
     }
+
+    pub fn is_admin_email(&self, email: &str) -> bool {
+        let normalized = email.trim().to_lowercase();
+        !normalized.is_empty() && self.admin_emails.iter().any(|e| e == &normalized)
+    }
+}
+
+pub fn parse_admin_emails(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect()
 }

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT NOT NULL,
     name_customized BOOLEAN NOT NULL DEFAULT FALSE,
     image TEXT,
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -81,7 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_vault_id ON audit_logs (vault_id);
 
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    theme TEXT NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark')),
+    theme TEXT NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark', 'sync-security')),
     password_generator_length INTEGER NOT NULL DEFAULT 20 CHECK (password_generator_length BETWEEN 8 AND 64),
     password_generator_uppercase BOOLEAN NOT NULL DEFAULT TRUE,
     password_generator_lowercase BOOLEAN NOT NULL DEFAULT TRUE,

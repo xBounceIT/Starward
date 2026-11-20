@@ -66,7 +66,7 @@ import {
   type Vault,
 } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
-import { useTheme } from '@/lib/theme'
+import { useTheme, type Theme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import {
   evaluatePasswordStrength,
@@ -155,7 +155,7 @@ export function UserSettingsDialog({
   const [revokingToken, setRevokingToken] = useState<string | null>(null)
 
   // Preferences tab state
-  const [prefTheme, setPrefTheme] = useState<'light' | 'dark'>(
+  const [prefTheme, setPrefTheme] = useState<Theme>(
     settings?.theme ?? theme,
   )
   const [prefDefaultVaultId, setPrefDefaultVaultId] = useState<string>(
@@ -839,7 +839,7 @@ export function UserSettingsDialog({
                 <form onSubmit={handleSavePreferences} className="space-y-5">
                   <div className="space-y-2">
                     <Label>Tema Interfaccia</Label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -853,11 +853,11 @@ export function UserSettingsDialog({
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
                       >
-                        <Moon className="size-4 text-violet-400" />
+                        <Moon className="size-4 shrink-0 text-violet-400" />
                         <div>
                           <div>Tema Scuro</div>
                           <div className="text-xs font-normal text-muted-foreground">
-                            Ideale per ambienti a bassa luminosità
+                            Bassa luminosità
                           </div>
                         </div>
                       </button>
@@ -875,11 +875,38 @@ export function UserSettingsDialog({
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
                       >
-                        <Sun className="size-4 text-amber-500" />
+                        <Sun className="size-4 shrink-0 text-amber-500" />
                         <div>
                           <div>Tema Chiaro</div>
                           <div className="text-xs font-normal text-muted-foreground">
-                            Contrasto elevato per ambienti luminosi
+                            Contrasto elevato
+                          </div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPrefTheme('sync-security')
+                          setTheme('sync-security')
+                        }}
+                        className={cn(
+                          'flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left text-sm transition-colors',
+                          prefTheme === 'sync-security'
+                            ? 'border-primary bg-primary/10 font-medium text-foreground'
+                            : 'hover:bg-muted/50 text-muted-foreground',
+                        )}
+                      >
+                        <span
+                          className="flex size-4 shrink-0 items-center justify-center rounded-full border border-[#ff9c00] bg-[#000c20]"
+                          aria-hidden="true"
+                        >
+                          <span className="size-1.5 rounded-full bg-[#ff9c00]" />
+                        </span>
+                        <div>
+                          <div>Sync Security</div>
+                          <div className="text-xs font-normal text-muted-foreground">
+                            Navy & Arancio
                           </div>
                         </div>
                       </button>

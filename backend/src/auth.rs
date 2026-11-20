@@ -31,10 +31,25 @@ pub struct AuthenticatedUser {
     pub email: String,
     pub name: String,
     pub image: Option<String>,
+    pub role: String,
     pub api_key: Option<ApiKeyAuthContext>,
 }
 
 impl AuthenticatedUser {
+    pub fn is_admin(&self) -> bool {
+        self.role == "admin"
+    }
+
+    pub fn require_admin(&self) -> Result<(), AppError> {
+        if self.is_admin() {
+            Ok(())
+        } else {
+            Err(AppError::Forbidden(
+                "Accesso riservato agli amministratori".to_string(),
+            ))
+        }
+    }
+
     pub fn require_session_auth(&self) -> Result<(), AppError> {
         if self.api_key.is_some() {
             return Err(AppError::Forbidden(
@@ -91,6 +106,7 @@ struct ApiKeyAuthRow {
     email: String,
     name: String,
     image: Option<String>,
+    role: String,
 }
 
 async fn authenticate_api_key(
@@ -108,7 +124,8 @@ async fn authenticate_api_key(
             u.id AS user_id,
             u.email,
             u.name,
-            u.image
+            u.image,
+            u.role
         FROM api_keys ak
         INNER JOIN users u ON u.id = ak.user_id
         WHERE ak.key_hash = $1
@@ -119,7 +136,8 @@ async fn authenticate_api_key(
     .fetch_optional(&state.db)
     .await?;
 
-    let row = row.ok_or_else(|| AppError::Unauthorized("API Key non valida o revocata".to_string()))?;
+    let row =
+        row.ok_or_else(|| AppError::Unauthorized("API Key non valida o revocata".to_string()))?;
     let now = Utc::now();
 
     if let Some(expires_at) = row.expires_at {
@@ -145,6 +163,7 @@ async fn authenticate_api_key(
         email: row.email,
         name: row.name,
         image: row.image,
+        role: row.role,
         api_key: Some(ApiKeyAuthContext {
             permission: row.permission,
             vault_ids: row.vault_ids,
@@ -197,7 +216,9 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let claims = token_data.claims;
         let email_normalized = claims.email.trim().to_lowercase();
         if claims.sub.trim().is_empty() || email_normalized.is_empty() {
-            return Err(AppError::Unauthorized("Claims utente incompleti".to_string()));
+            return Err(AppError::Unauthorized(
+                "Claims utente incompleti".to_string(),
+            ));
         }
 
         let fallback_name = if claims.name.trim().is_empty() {
@@ -211,18 +232,35 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         };
 
         let now = Utc::now();
+        let is_env_admin = state.config.is_admin_email(&email_normalized);
 
-        // Sync user into the centralized vault directory, preserving custom user display names
-        let synced_user: (String, Option<String>) = sqlx::query_as(
+        // Sync user into the centralized vault directory, preserving custom user display names and resolving RBAC role
+        let synced_user: (String, Option<String>, String) = sqlx::query_as(
             r#"
-            INSERT INTO users (id, email, name, image, created_at, last_seen_at)
-            VALUES ($1, $2, $3, $4, $5, $5)
+            INSERT INTO users (id, email, name, image, role, created_at, last_seen_at)
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                CASE
+                    WHEN $6 OR NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'admin'
+                    ELSE 'user'
+                END,
+                $5,
+                $5
+            )
             ON CONFLICT (id) DO UPDATE SET
                 email = EXCLUDED.email,
                 name = CASE WHEN users.name_customized THEN users.name ELSE EXCLUDED.name END,
                 image = COALESCE(EXCLUDED.image, users.image),
+                role = CASE
+                    WHEN $6 THEN 'admin'
+                    WHEN NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'admin'
+                    ELSE users.role
+                END,
                 last_seen_at = EXCLUDED.last_seen_at
-            RETURNING name, image
+            RETURNING name, image, role
             "#,
         )
         .bind(&claims.sub)
@@ -230,6 +268,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         .bind(&fallback_name)
         .bind(&claims.image)
         .bind(now)
+        .bind(is_env_admin)
         .fetch_one(&state.db)
         .await?;
 
@@ -298,6 +337,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             email: email_normalized,
             name: synced_user.0,
             image: synced_user.1,
+            role: synced_user.2,
             api_key: None,
         })
     }
@@ -313,6 +353,7 @@ mod tests {
             email: "alice@starward.io".to_string(),
             name: "Alice".to_string(),
             image: None,
+            role: "user".to_string(),
             api_key,
         }
     }

@@ -27,6 +27,7 @@ pub async fn get_me(user: AuthenticatedUser) -> Json<UserSummary> {
         email: user.email,
         name: user.name,
         image: user.image,
+        role: user.role,
     })
 }
 
@@ -61,6 +62,7 @@ pub async fn update_me(
         email: user.email,
         name: name.to_string(),
         image: user.image,
+        role: user.role,
     }))
 }
 
@@ -120,9 +122,9 @@ pub async fn update_settings(
     let theme = match payload.theme.as_deref().map(str::trim) {
         Some(t) => {
             let normalized = t.to_lowercase();
-            if normalized != "dark" && normalized != "light" {
+            if normalized != "dark" && normalized != "light" && normalized != "sync-security" {
                 return Err(AppError::BadRequest(
-                    "Il tema deve essere 'dark' o 'light'".to_string(),
+                    "Il tema deve essere 'dark', 'light' o 'sync-security'".to_string(),
                 ));
             }
             normalized
@@ -220,7 +222,7 @@ pub async fn list_users(
 
     let users: Vec<UserRecord> = sqlx::query_as(
         r#"
-        SELECT id, email, name, image, created_at, last_seen_at
+        SELECT id, email, name, image, role, created_at, last_seen_at
         FROM users
         WHERE id != $1
           AND (email ILIKE $2 OR name ILIKE $2)
@@ -240,6 +242,7 @@ pub async fn list_users(
             email: u.email,
             name: u.name,
             image: u.image,
+            role: u.role,
         })
         .collect();
 
