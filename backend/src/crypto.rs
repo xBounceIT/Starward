@@ -4,7 +4,7 @@ use aes_gcm::{
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use hkdf::Hkdf;
-use rand::{rngs::SysRng, TryRng};
+use rand::{rand_core::UnwrapErr, rngs::SysRng, RngExt};
 use sha2::Sha256;
 
 use crate::error::{AppError, AppResult};
@@ -24,21 +24,17 @@ pub struct EncryptedField {
 
 impl VaultCrypto {
     pub fn from_master_key(master_key: &str) -> Self {
-        let hk = Hkdf::<Sha256>::new(Some(SALT), master_key.as_bytes());
-        let mut key = [0u8; 32];
+        let (mut key, hk) = Hkdf::<Sha256>::extract(Some(SALT), master_key.as_bytes());
         hk.expand(INFO, &mut key)
             .expect("32 bytes is a valid HKDF-SHA256 output length");
-        Self { key }
+        Self { key: key.into() }
     }
 
     pub fn encrypt(&self, plaintext: &str) -> AppResult<EncryptedField> {
         let cipher = Aes256Gcm::new_from_slice(&self.key)
             .map_err(|e| AppError::Internal(format!("Cipher init error: {e}")))?;
 
-        let mut nonce_bytes = [0u8; 12];
-        SysRng
-            .try_fill_bytes(&mut nonce_bytes)
-            .map_err(|e| AppError::Internal(format!("Nonce generation failed: {e}")))?;
+        let nonce_bytes: [u8; 12] = UnwrapErr(SysRng).random();
         let nonce = Nonce::from(nonce_bytes);
 
         let ciphertext = cipher
@@ -97,5 +93,15 @@ mod tests {
         let crypto_b = VaultCrypto::from_master_key("key-b");
         let enc = crypto_a.encrypt("classified").unwrap();
         assert!(crypto_b.decrypt(&enc.ciphertext, &enc.nonce).is_err());
+    }
+
+    #[test]
+    fn hkdf_key_derivation_matches_rfc5869_vector() {
+        let crypto = VaultCrypto::from_master_key("super-secret-master-key");
+        let derived_hex: String = crypto.key.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(
+            derived_hex,
+            "6ed3d88af34bef87446a5621d2fe3cbdd4cb2ab1cd09cd7f72cf73eafccee22f"
+        );
     }
 }
