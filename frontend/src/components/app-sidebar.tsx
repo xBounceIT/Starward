@@ -60,6 +60,14 @@ import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
 import { APP_VERSION } from '@/lib/version'
 
+// Geometria condivisa per gli elementi in coda alle righe della sidebar:
+// badge e pulsante "..." occupano la stessa area (right-1, 24px di lato) così
+// il loro centro cade sulla stessa verticale; le azioni di gruppo usano
+// right-3 rispetto al gruppo (che ha p-2), cioè la stessa colonna delle "...".
+const menuTrailingBadgeClass =
+  'top-1/2! right-1 h-6 min-w-6 -translate-y-1/2 text-xs'
+const groupActionClass = 'top-3 right-3 h-6 w-6'
+
 export type VaultSelection =
   | { type: 'all' }
   | { type: 'favorites' }
@@ -395,7 +403,7 @@ export function AppSidebar({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className="text-muted-foreground hover:text-foreground"
+                className="-mr-1.5 text-muted-foreground hover:text-foreground"
                 title="Cambia tema"
                 aria-label="Cambia tema"
               >
@@ -472,7 +480,9 @@ export function AppSidebar({
                   />
                   <span>Tutte le credenziali</span>
                 </SidebarMenuButton>
-                <SidebarMenuBadge className="text-xs text-muted-foreground">
+                <SidebarMenuBadge
+                  className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
+                >
                   {totalCredentialsCount}
                 </SidebarMenuBadge>
               </SidebarMenuItem>
@@ -486,7 +496,9 @@ export function AppSidebar({
                   <Star className="size-4 text-amber-400 sync-security:text-[#ff9c00]" />
                   <span>Preferiti</span>
                 </SidebarMenuButton>
-                <SidebarMenuBadge className="text-xs text-muted-foreground">
+                <SidebarMenuBadge
+                  className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
+                >
                   {favoritesCount}
                 </SidebarMenuBadge>
               </SidebarMenuItem>
@@ -501,6 +513,7 @@ export function AppSidebar({
             Le mie cartelle
           </SidebarGroupLabel>
           <SidebarGroupAction
+            className={groupActionClass}
             title="Nuova cartella"
             onClick={() => {
               setOpenMobile(false)
@@ -557,6 +570,7 @@ export function AppSidebar({
             Gruppi
           </SidebarGroupLabel>
           <SidebarGroupAction
+            className={groupActionClass}
             title="Nuovo gruppo"
             onClick={() => {
               setOpenMobile(false)
@@ -663,17 +677,23 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <SidebarMenuItem>
-                <div className="flex h-9 items-center justify-between px-2 text-sm text-muted-foreground sync-security:text-[#ff9c00]">
-                  <div className="flex items-center gap-2">
-                    <Share2 className="size-4 shrink-0" />
-                    <span className="text-xs font-medium sync-security:text-[11px] sync-security:font-bold sync-security:tracking-[0.14em] sync-security:uppercase">
-                      Condivise con me
-                    </span>
-                  </div>
-                  <span className="text-xs font-medium sync-security:text-white/75">
-                    {sharedWithMe.length}
+                <div className="flex h-9 items-center gap-2 px-2 pr-8 text-sm text-muted-foreground sync-security:text-[#ff9c00]">
+                  <Share2 className="size-4 shrink-0" />
+                  <span className="truncate text-xs font-medium sync-security:text-[11px] sync-security:font-bold sync-security:tracking-[0.14em] sync-security:uppercase">
+                    Condivise con me
                   </span>
                 </div>
+                <SidebarMenuBadge
+                  className={cn(
+                    menuTrailingBadgeClass,
+                    'text-muted-foreground sync-security:text-white/75',
+                  )}
+                  title={`${sharedWithMe.length} ${
+                    sharedWithMe.length === 1 ? 'cartella condivisa' : 'cartelle condivise'
+                  }`}
+                >
+                  {sharedWithMe.length}
+                </SidebarMenuBadge>
               </SidebarMenuItem>
 
               {sharedWithMe.map((vault) => {
