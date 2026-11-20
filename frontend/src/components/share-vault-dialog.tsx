@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Crown, MailPlus, Trash2, UserCheck, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Crown, Trash2, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -41,57 +40,90 @@ export function ShareVaultDialog({
   onVaultUpdated,
   onLeftVault,
 }: ShareVaultDialogProps) {
-  const [email, setEmail] = useState('')
+  const [selectedUserId, setSelectedUserId] = useState('')
   const [role, setRole] = useState<'editor' | 'viewer'>('editor')
-  const [suggestions, setSuggestions] = useState<UserSummary[]>([])
+  const [users, setUsers] = useState<UserSummary[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
 
   const isOwner = vault?.role === 'owner'
 
   useEffect(() => {
+    setSelectedUserId('')
     if (!open || !isOwner) return
+
     let active = true
-    const timer = setTimeout(async () => {
-      try {
-        const users = await vaultApi.searchUsers(email)
+    setLoadingUsers(true)
+    vaultApi
+      .searchUsers()
+      .then((list) => {
         if (!active) return
-        const memberEmails = new Set(
-          (vault?.members ?? []).map((m) => m.email.toLowerCase()),
-        )
-        setSuggestions(
-          users.filter((u) => !memberEmails.has(u.email.toLowerCase())),
-        )
-      } catch {
-        // ignore autocomplete errors
-      }
-    }, 150)
+        setUsers(list)
+      })
+      .catch(() => {
+        if (!active) return
+        setUsers([])
+        toast.error('Errore nel caricamento degli utenti')
+      })
+      .finally(() => {
+        if (active) setLoadingUsers(false)
+      })
 
     return () => {
       active = false
-      clearTimeout(timer)
     }
-  }, [email, open, isOwner, vault?.members])
+  }, [open, isOwner, vault?.id])
+
+  const availableUsers = useMemo(() => {
+    const memberUserIds = new Set(
+      (vault?.members ?? [])
+        .map((m) => m.user_id)
+        .filter((id): id is string => Boolean(id)),
+    )
+    const memberEmails = new Set(
+      (vault?.members ?? []).map((m) => m.email.toLowerCase()),
+    )
+
+    return users.filter(
+      (u) =>
+        u.id !== currentUserId &&
+        !memberUserIds.has(u.id) &&
+        !memberEmails.has(u.email.toLowerCase()),
+    )
+  }, [users, vault?.members, currentUserId])
+
+  useEffect(() => {
+    if (
+      selectedUserId &&
+      !availableUsers.some((u) => u.id === selectedUserId)
+    ) {
+      setSelectedUserId('')
+    }
+  }, [availableUsers, selectedUserId])
 
   if (!vault) return null
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault()
-    const cleanEmail = email.trim().toLowerCase()
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      toast.error('Inserisci un indirizzo email valido')
+    const targetUser = availableUsers.find((u) => u.id === selectedUserId)
+    if (!targetUser) {
+      toast.error('Seleziona un utente con cui condividere la cartella')
       return
     }
 
     setSubmitting(true)
     try {
       const updated = await vaultApi.shareVault(vault.id, {
-        email: cleanEmail,
+        user_id: targetUser.id,
+        email: targetUser.email,
         role,
       })
       onVaultUpdated(updated)
-      setEmail('')
-      toast.success(`Cartella condivisa con ${cleanEmail}`)
+      setSelectedUserId('')
+      toast.success(
+        `Cartella condivisa con ${targetUser.name || targetUser.email}`,
+      )
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Errore durante la condivisione',
@@ -167,21 +199,52 @@ export function ShareVaultDialog({
         {isOwner && (
           <form onSubmit={handleShare} className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="share-email">Aggiungi utente tramite email</Label>
+              <Label htmlFor="share-user">Seleziona utente</Label>
               <div className="flex gap-2">
-                <Input
-                  id="share-email"
-                  type="email"
-                  placeholder="collega@azienda.it"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1"
-                />
+                <Select
+                  value={selectedUserId}
+                  onValueChange={setSelectedUserId}
+                  disabled={loadingUsers || availableUsers.length === 0}
+                >
+                  <SelectTrigger
+                    id="share-user"
+                    className="min-w-0 flex-1 *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:overflow-hidden"
+                  >
+                    <SelectValue
+                      placeholder={
+                        loadingUsers
+                          ? 'Caricamento utenti...'
+                          : availableUsers.length === 0
+                            ? 'Nessun utente disponibile'
+                            : 'Seleziona un utente...'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-h-64 max-w-sm">
+                    {availableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Avatar className="size-5 shrink-0">
+                            <AvatarFallback className="text-[10px]">
+                              {getInitials(user.name || user.email)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="truncate font-medium">
+                            {user.name}
+                          </span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            ({user.email})
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Select
                   value={role}
                   onValueChange={(v) => setRole(v as 'editor' | 'viewer')}
                 >
-                  <SelectTrigger className="w-36">
+                  <SelectTrigger className="w-36 shrink-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -189,43 +252,27 @@ export function ShareVaultDialog({
                     <SelectItem value="viewer">Sola lettura</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button type="submit" disabled={submitting}>
-                  <MailPlus className="size-4" />
+                <Button
+                  type="submit"
+                  disabled={
+                    submitting || !selectedUserId || availableUsers.length === 0
+                  }
+                  className="shrink-0"
+                >
+                  <UserPlus className="size-4" />
                   Condividi
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                {role === 'editor'
-                  ? 'Editor: può visualizzare, copiare, aggiungere e modificare le credenziali nella cartella.'
-                  : 'Sola lettura: può visualizzare e copiare le credenziali senza modificarle.'}
+                {!loadingUsers && availableUsers.length === 0
+                  ? users.length === 0
+                    ? 'Non ci sono altri utenti registrati disponibili da aggiungere.'
+                    : 'Tutti gli utenti registrati hanno già accesso a questa cartella.'
+                  : role === 'editor'
+                    ? 'Editor: può visualizzare, copiare, aggiungere e modificare le credenziali nella cartella.'
+                    : 'Sola lettura: può visualizzare e copiare le credenziali senza modificarle.'}
               </p>
             </div>
-
-            {suggestions.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 p-2">
-                <p className="mb-1.5 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Utenti registrati in Starward
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {suggestions.slice(0, 6).map((user) => (
-                    <Button
-                      key={user.id}
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      className="rounded-full"
-                      onClick={() => setEmail(user.email)}
-                    >
-                      <UserCheck className="size-3" />
-                      <span className="font-medium">{user.name}</span>
-                      <span className="text-muted-foreground">
-                        ({user.email})
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
           </form>
         )}
 

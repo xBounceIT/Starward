@@ -275,6 +275,21 @@ mod tests {
         assert!(!cfg.is_admin_email(""));
     }
 
+    #[test]
+    fn share_vault_request_deserializes_user_id_and_email() {
+        let by_id: crate::models::ShareVaultRequest =
+            serde_json::from_value(json!({ "user_id": "user-123", "role": "editor" })).unwrap();
+        assert_eq!(by_id.user_id.as_deref(), Some("user-123"));
+        assert_eq!(by_id.email, None);
+        assert_eq!(by_id.role, "editor");
+
+        let by_email: crate::models::ShareVaultRequest =
+            serde_json::from_value(json!({ "email": "bob@starward.io" })).unwrap();
+        assert_eq!(by_email.user_id, None);
+        assert_eq!(by_email.email.as_deref(), Some("bob@starward.io"));
+        assert_eq!(by_email.role, "viewer");
+    }
+
     #[tokio::test]
     async fn shared_folder_workflow_and_permissions_postgres() {
         let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
@@ -484,6 +499,30 @@ mod tests {
             .collect();
         assert_eq!(personal_vaults.len(), 1);
         let charlie_personal_id = personal_vaults[0]["id"].as_str().unwrap().to_string();
+
+        // 7b. Alice shares "Produzione" with Charlie via user_id selection
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{prod_id}/members"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "user_id": charlie_id, "role": "editor" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let updated_prod = read_json(res).await;
+        assert!(updated_prod["members"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|m| m["user_id"] == charlie_id && m["role"] == "editor" && m["is_pending"] == false));
 
         // 8. Database credential encrypts extra fields at rest and returns decrypted fields
         let res = app

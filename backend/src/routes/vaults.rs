@@ -400,19 +400,6 @@ pub async fn share_vault(
 ) -> AppResult<(StatusCode, Json<VaultDto>)> {
     require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
 
-    let target_email = payload.email.trim().to_lowercase();
-    if target_email.is_empty() || !target_email.contains('@') {
-        return Err(AppError::BadRequest(
-            "Inserisci un indirizzo email valido".to_string(),
-        ));
-    }
-
-    if target_email == user.email.to_lowercase() {
-        return Err(AppError::BadRequest(
-            "Sei già il proprietario di questa cartella".to_string(),
-        ));
-    }
-
     let role = payload.role.trim().to_lowercase();
     if role != "editor" && role != "viewer" {
         return Err(AppError::BadRequest(
@@ -420,11 +407,75 @@ pub async fn share_vault(
         ));
     }
 
+    let requested_user_id = payload
+        .user_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    let (target_user_id, target_email) = if let Some(uid) = requested_user_id {
+        if uid == user.id {
+            return Err(AppError::BadRequest(
+                "Sei già il proprietario di questa cartella".to_string(),
+            ));
+        }
+
+        let target_user: Option<(String, String)> =
+            sqlx::query_as("SELECT id, email FROM users WHERE id = $1")
+                .bind(uid)
+                .fetch_optional(&state.db)
+                .await?;
+
+        let (found_id, found_email) = target_user
+            .ok_or_else(|| AppError::NotFound("Utente selezionato non trovato".to_string()))?;
+
+        let normalized_email = found_email.trim().to_lowercase();
+        if normalized_email == user.email.to_lowercase() {
+            return Err(AppError::BadRequest(
+                "Sei già il proprietario di questa cartella".to_string(),
+            ));
+        }
+
+        (Some(found_id), normalized_email)
+    } else {
+        let target_email = payload
+            .email
+            .as_deref()
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase();
+        if target_email.is_empty() || !target_email.contains('@') {
+            return Err(AppError::BadRequest(
+                "Seleziona un utente valido".to_string(),
+            ));
+        }
+
+        if target_email == user.email.to_lowercase() {
+            return Err(AppError::BadRequest(
+                "Sei già il proprietario di questa cartella".to_string(),
+            ));
+        }
+
+        let existing_user: Option<(String,)> =
+            sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = LOWER($1)")
+                .bind(&target_email)
+                .fetch_optional(&state.db)
+                .await?;
+
+        (existing_user.map(|(id,)| id), target_email)
+    };
+
     let existing: Option<(String,)> = sqlx::query_as(
-        "SELECT id FROM vault_members WHERE vault_id = $1 AND LOWER(member_email) = LOWER($2)",
+        r#"
+        SELECT id
+        FROM vault_members
+        WHERE vault_id = $1
+          AND (LOWER(member_email) = LOWER($2) OR ($3::TEXT IS NOT NULL AND user_id = $3))
+        "#,
     )
     .bind(&vault_id)
     .bind(&target_email)
+    .bind(&target_user_id)
     .fetch_optional(&state.db)
     .await?;
 
@@ -433,12 +484,6 @@ pub async fn share_vault(
             "Questo utente ha già accesso alla cartella".to_string(),
         ));
     }
-
-    let existing_user: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = LOWER($1)")
-            .bind(&target_email)
-            .fetch_optional(&state.db)
-            .await?;
 
     let member_id = Uuid::new_v4().to_string();
     let now = Utc::now();
@@ -451,7 +496,7 @@ pub async fn share_vault(
     )
     .bind(&member_id)
     .bind(&vault_id)
-    .bind(existing_user.map(|(id,)| id))
+    .bind(&target_user_id)
     .bind(&target_email)
     .bind(&role)
     .bind(&user.id)

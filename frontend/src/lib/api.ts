@@ -228,8 +228,8 @@ export const vaultApi = {
       method: 'DELETE',
     }),
 
-  searchUsers: (q: string) =>
-    request<UserSummary[]>(`/users?q=${encodeURIComponent(q)}`),
+  searchUsers: (q = '') =>
+    request<UserSummary[]>(`/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 
   listAdminUsers: (params?: { q?: string; role?: string }) => {
     const search = new URLSearchParams()
@@ -298,7 +298,7 @@ export const vaultApi = {
 
   shareVault: (
     vaultId: string,
-    payload: { email: string; role: 'editor' | 'viewer' },
+    payload: { user_id?: string; email?: string; role: 'editor' | 'viewer' },
   ) =>
     request<Vault>(`/vaults/${vaultId}/members`, {
       method: 'POST',

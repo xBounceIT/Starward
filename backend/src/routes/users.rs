@@ -256,7 +256,7 @@ pub async fn list_users(
         WHERE id != $1
           AND (email ILIKE $2 OR name ILIKE $2)
         ORDER BY LOWER(name) ASC
-        LIMIT 25
+        LIMIT 100
         "#,
     )
     .bind(&user.id)
