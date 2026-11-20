@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+backend/target/
+frontend/dist/
+frontend/.output/
+frontend/.vinxi/
+frontend/src/routeTree.gen.ts
+
+# Local databases & env secrets
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+backend/data/
+frontend/data/
+.env
+backend/.env
+frontend/.env

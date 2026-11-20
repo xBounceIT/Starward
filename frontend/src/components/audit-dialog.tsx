@@ -1,0 +1,89 @@
+import { useEffect, useState } from 'react'
+import { History } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { vaultApi, type AuditLog, type Vault } from '@/lib/api'
+import { formatRelativeDate } from '@/lib/utils'
+
+interface AuditDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  vault: Vault | null
+}
+
+export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!open || !vault) return
+    let active = true
+    setLoading(true)
+    vaultApi
+      .getVaultAudit(vault.id)
+      .then((data) => {
+        if (active) setLogs(data)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [open, vault])
+
+  if (!vault) return null
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="size-5 text-primary" />
+            Registro attività — {vault.name}
+          </DialogTitle>
+          <DialogDescription>
+            Cronologia delle modifiche e condivisioni su questa cartella.
+          </DialogDescription>
+        </DialogHeader>
+
+        <ScrollArea className="max-h-80 pr-3">
+          {loading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Caricamento attività...
+            </p>
+          ) : logs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Nessuna attività registrata finora.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="rounded-lg border bg-card px-3 py-2.5 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium">{log.actor_name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatRelativeDate(log.created_at)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {log.details}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
+}

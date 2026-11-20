@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: starward-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-starward}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-starward}
+      POSTGRES_DB: ${POSTGRES_DB:-starward}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - starward_pgdata:/var/lib/postgresql/data
+    networks:
+      - starward-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-starward} -d ${POSTGRES_DB:-starward}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: starward-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD:-starward}@postgres:5432/${POSTGRES_DB:-starward}
+      STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:-dev-starward-auth-secret-change-in-production-32chars}
+      STARWARD_MASTER_KEY: ${STARWARD_MASTER_KEY:-dev-starward-master-key-change-in-production-32chars}
+      CORS_ORIGIN: ${BETTER_AUTH_URL:-http://localhost:3000}
+      RUST_LOG: ${RUST_LOG:-starward_backend=info,tower_http=info}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - starward-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: starward-frontend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production-32chars}
+      DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD:-starward}@postgres:5432/${POSTGRES_DB:-starward}
+      RUST_BACKEND_URL: http://backend:8080
+      STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:-dev-starward-auth-secret-change-in-production-32chars}
+      SSO_OIDC_NAME: ${SSO_OIDC_NAME:-SSO Aziendale (OIDC)}
+      SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
+      SSO_OIDC_CLIENT_SECRET: ${SSO_OIDC_CLIENT_SECRET:-}
+      SSO_OIDC_DISCOVERY_URL: ${SSO_OIDC_DISCOVERY_URL:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    networks:
+      - starward-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+networks:
+  starward-net:
+    driver: bridge
+
+volumes:
+  starward_pgdata:

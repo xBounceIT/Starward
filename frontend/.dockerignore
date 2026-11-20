@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.output/
+.vinxi/
+data/
+.env
+*.sqlite
+*.db
+src/routeTree.gen.ts
