@@ -506,13 +506,17 @@ export function AppSidebar({
     // dedicata di 3rem che contiene il toggle, così il contenuto della
     // pagina non va mai sotto il pulsante.
     <Sidebar collapsible="icon">
-      <SidebarHeader className="gap-3.5 border-b p-3.5 group-data-[collapsible=icon]:p-2 sync-security:border-white/20">
-        <div className="flex items-center justify-start group-data-[collapsible=icon]:justify-center">
+      <SidebarHeader className="gap-3.5 border-b p-3.5 group-data-[collapsible=icon]:border-b-0 sync-security:border-white/20">
+        {/* mt-1 allinea il centro del toggle (p-3.5 + mt-1 + size-8/2 = 34px)
+            al centro dell'icona del titolo pagina (pt-5 + 28/2 = 34px);
+            stessa posizione in modalità espansa e collassata, così il
+            pulsante non si sposta durante l'animazione */}
+        <div className="mt-1 flex items-center justify-start">
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="-ml-1.5 text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:ml-0"
+            className="-ml-1.5 text-muted-foreground hover:text-foreground"
             onClick={toggleSidebar}
             title={toggleLabel}
             aria-label={toggleLabel}
