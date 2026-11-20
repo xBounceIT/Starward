@@ -3,6 +3,7 @@ pub mod api_keys;
 pub mod credentials;
 pub mod groups;
 pub mod health;
+pub mod service_accounts;
 pub mod users;
 pub mod vaults;
 
@@ -20,6 +21,18 @@ pub async fn get_user_vault_role(
     vault_id: &str,
     user: &AuthenticatedUser,
 ) -> AppResult<Option<String>> {
+    if let Some(sa_role) = user.service_account_vault_role() {
+        if !user.can_access_vault(vault_id) {
+            return Ok(None);
+        }
+        let exists: Option<(String,)> =
+            sqlx::query_as("SELECT id FROM vaults WHERE id = $1 LIMIT 1")
+                .bind(vault_id)
+                .fetch_optional(db)
+                .await?;
+        return Ok(exists.map(|_| sa_role.to_string()));
+    }
+
     let row: Option<(String,)> = sqlx::query_as(
         r#"
         SELECT
@@ -83,6 +96,28 @@ pub async fn require_vault_role(
     user: &AuthenticatedUser,
     allowed_roles: &[&str],
 ) -> AppResult<String> {
+    if let Some(sa_role) = user.service_account_vault_role() {
+        user.ensure_vault_allowed(vault_id)?;
+        if !allowed_roles.contains(&"viewer") {
+            user.require_write_permission()?;
+        }
+        let exists: Option<(String,)> =
+            sqlx::query_as("SELECT id FROM vaults WHERE id = $1 LIMIT 1")
+                .bind(vault_id)
+                .fetch_optional(db)
+                .await?;
+        if exists.is_none() {
+            return Err(AppError::NotFound("Cartella non trovata".to_string()));
+        }
+        if !allowed_roles.contains(&sa_role) {
+            return Err(AppError::Forbidden(
+                "Questo Service Account non ha i permessi necessari per questa operazione"
+                    .to_string(),
+            ));
+        }
+        return Ok(sa_role.to_string());
+    }
+
     let role = get_user_vault_role(db, vault_id, user)
         .await?
         .ok_or_else(|| AppError::NotFound("Cartella non trovata o accesso negato".to_string()))?;

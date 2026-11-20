@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Bot,
   Check,
   ChevronDown,
   FileClock,
@@ -775,6 +776,33 @@ export function AppSidebar({
                         )}
                       />
                       <span>Gruppi</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={
+                        selection.type === 'admin' &&
+                        selection.tab === 'service-accounts'
+                      }
+                      onClick={() =>
+                        handleSelect({
+                          type: 'admin',
+                          tab: 'service-accounts',
+                        })
+                      }
+                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                    >
+                      <Bot
+                        className={cn(
+                          'size-4',
+                          selection.type === 'admin' &&
+                            selection.tab === 'service-accounts'
+                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
+                            : 'text-muted-foreground',
+                        )}
+                      />
+                      <span>Service Account</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 

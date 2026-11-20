@@ -22,6 +22,8 @@ pub struct UserSummary {
     pub name: String,
     pub image: Option<String>,
     pub role: String,
+    #[serde(default)]
+    pub is_service_account: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -212,6 +214,116 @@ pub struct UpdateVaultGroupRoleRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAccountKeyDto {
+    pub id: String,
+    pub name: String,
+    pub key_prefix: String,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub is_expired: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatedServiceAccountKeyDto {
+    pub key: ServiceAccountKeyDto,
+    pub secret_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ServiceAccountScopedVaultDto {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub icon: String,
+    pub color: String,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub owner_email: String,
+    pub is_personal: bool,
+    pub credential_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ServiceAccountScopedCredentialDto {
+    pub id: String,
+    pub vault_id: String,
+    pub vault_name: String,
+    pub vault_color: String,
+    pub title: String,
+    pub username: String,
+    pub url: String,
+    pub category: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAccountResourcesDto {
+    pub vaults: Vec<ServiceAccountScopedVaultDto>,
+    pub credentials: Vec<ServiceAccountScopedCredentialDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAccountDto {
+    pub id: String,
+    pub name: String,
+    pub email: String,
+    pub description: String,
+    pub permission: String,
+    pub is_active: bool,
+    pub vault_ids: Vec<String>,
+    pub credential_ids: Vec<String>,
+    pub vaults: Vec<ServiceAccountScopedVaultDto>,
+    pub credentials: Vec<ServiceAccountScopedCredentialDto>,
+    pub keys: Vec<ServiceAccountKeyDto>,
+    pub created_by: Option<String>,
+    pub created_by_name: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatedServiceAccountDto {
+    pub service_account: ServiceAccountDto,
+    pub initial_key: Option<CreatedServiceAccountKeyDto>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateServiceAccountRequest {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_api_key_permission")]
+    pub permission: String,
+    #[serde(default)]
+    pub vault_ids: Vec<String>,
+    #[serde(default)]
+    pub credential_ids: Vec<String>,
+    #[serde(default = "default_true")]
+    pub generate_initial_key: bool,
+    pub initial_key_name: Option<String>,
+    pub initial_key_expires_in_days: Option<i64>,
+    pub initial_key_expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateServiceAccountRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub permission: Option<String>,
+    pub is_active: Option<bool>,
+    pub vault_ids: Option<Vec<String>>,
+    pub credential_ids: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateServiceAccountKeyRequest {
+    pub name: String,
+    pub expires_in_days: Option<i64>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultMemberDto {
     pub id: String,
     pub vault_id: String,
@@ -377,4 +489,8 @@ fn default_api_key_permission() -> String {
 
 fn default_group_member_role() -> String {
     "member".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }

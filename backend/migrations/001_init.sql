@@ -5,11 +5,13 @@ CREATE TABLE IF NOT EXISTS users (
     name_customized BOOLEAN NOT NULL DEFAULT FALSE,
     image TEXT,
     role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+    is_service_account BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_users_is_service_account ON users (is_service_account);
 
 CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY NOT NULL,
@@ -170,3 +172,34 @@ CREATE TABLE IF NOT EXISTS api_keys (
 
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys (user_id);
 CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys (key_hash);
+
+CREATE TABLE IF NOT EXISTS service_accounts (
+    id TEXT PRIMARY KEY NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    description TEXT NOT NULL DEFAULT '',
+    permission TEXT NOT NULL DEFAULT 'read' CHECK (permission IN ('read', 'read_write')),
+    vault_ids TEXT[] NOT NULL DEFAULT '{}',
+    credential_ids TEXT[] NOT NULL DEFAULT '{}',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_accounts_is_active ON service_accounts (is_active);
+CREATE INDEX IF NOT EXISTS idx_service_accounts_created_by ON service_accounts (created_by);
+
+CREATE TABLE IF NOT EXISTS service_account_keys (
+    id TEXT PRIMARY KEY NOT NULL,
+    service_account_id TEXT NOT NULL REFERENCES service_accounts(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    key_prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ,
+    last_used_at TIMESTAMPTZ,
+    created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_account_keys_sa_id ON service_account_keys (service_account_id);
+CREATE INDEX IF NOT EXISTS idx_service_account_keys_key_hash ON service_account_keys (key_hash);

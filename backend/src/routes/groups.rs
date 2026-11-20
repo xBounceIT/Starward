@@ -242,6 +242,7 @@ pub async fn list_groups(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> AppResult<Json<Vec<GroupDto>>> {
+    user.require_non_service_account()?;
     let rows: Vec<GroupRow> = sqlx::query_as(
         r#"
         SELECT
@@ -287,6 +288,7 @@ pub async fn search_groups_directory(
     user: AuthenticatedUser,
     Query(query): Query<SearchGroupsQuery>,
 ) -> AppResult<Json<Vec<GroupSummaryDto>>> {
+    user.require_non_service_account()?;
     let search = query.q.unwrap_or_default().trim().to_lowercase();
     let pattern = format!("%{}%", search);
 
@@ -402,6 +404,7 @@ pub async fn get_group(
     user: AuthenticatedUser,
     Path(group_id): Path<String>,
 ) -> AppResult<Json<GroupDto>> {
+    user.require_non_service_account()?;
     let dto = fetch_single_group(&state.db, &group_id, &user).await?;
     Ok(Json(dto))
 }
@@ -411,6 +414,7 @@ pub async fn create_group(
     user: AuthenticatedUser,
     Json(payload): Json<CreateGroupRequest>,
 ) -> AppResult<(StatusCode, Json<GroupDto>)> {
+    user.require_non_service_account()?;
     user.require_write_permission()?;
     if user.is_vault_restricted_api_key() {
         return Err(AppError::Forbidden(

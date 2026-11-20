@@ -6,6 +6,7 @@ export interface UserSummary {
   name: string
   image: string | null
   role: UserRole
+  is_service_account?: boolean
 }
 
 export interface AdminUser {
@@ -200,6 +201,74 @@ export interface CreatedApiKey {
   secret_key: string
 }
 
+export interface ServiceAccountKey {
+  id: string
+  name: string
+  key_prefix: string
+  expires_at: string | null
+  last_used_at: string | null
+  is_expired: boolean
+  created_at: string
+}
+
+export interface CreatedServiceAccountKey {
+  key: ServiceAccountKey
+  secret_key: string
+}
+
+export interface ServiceAccountScopedVault {
+  id: string
+  name: string
+  description: string
+  icon: string
+  color: string
+  owner_id: string
+  owner_name: string
+  owner_email: string
+  is_personal: boolean
+  credential_count: number
+}
+
+export interface ServiceAccountScopedCredential {
+  id: string
+  vault_id: string
+  vault_name: string
+  vault_color: string
+  title: string
+  username: string
+  url: string
+  category: string
+}
+
+export interface ServiceAccountResources {
+  vaults: ServiceAccountScopedVault[]
+  credentials: ServiceAccountScopedCredential[]
+}
+
+export interface ServiceAccount {
+  id: string
+  name: string
+  email: string
+  description: string
+  permission: ApiKeyPermission
+  is_active: boolean
+  vault_ids: string[]
+  credential_ids: string[]
+  vaults: ServiceAccountScopedVault[]
+  credentials: ServiceAccountScopedCredential[]
+  keys: ServiceAccountKey[]
+  created_by: string | null
+  created_by_name: string | null
+  created_at: string
+  updated_at: string
+  last_used_at: string | null
+}
+
+export interface CreatedServiceAccount {
+  service_account: ServiceAccount
+  initial_key: CreatedServiceAccountKey | null
+}
+
 export class ApiError extends Error {
   status: number
   code: string
@@ -383,6 +452,71 @@ export const vaultApi = {
 
   removeGroupMember: (groupId: string, memberId: string) =>
     request<void>(`/groups/${groupId}/members/${memberId}`, {
+      method: 'DELETE',
+    }),
+
+  listServiceAccountResources: () =>
+    request<ServiceAccountResources>('/admin/service-accounts/resources'),
+
+  listServiceAccounts: (params?: { q?: string }) => {
+    const search = new URLSearchParams()
+    if (params?.q) search.set('q', params.q)
+    const qs = search.toString()
+    return request<ServiceAccount[]>(
+      `/admin/service-accounts${qs ? `?${qs}` : ''}`,
+    )
+  },
+
+  createServiceAccount: (payload: {
+    name: string
+    description?: string
+    permission: ApiKeyPermission
+    vault_ids: string[]
+    credential_ids: string[]
+    generate_initial_key?: boolean
+    initial_key_name?: string
+    initial_key_expires_in_days?: number | null
+  }) =>
+    request<CreatedServiceAccount>('/admin/service-accounts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateServiceAccount: (
+    saId: string,
+    payload: {
+      name?: string
+      description?: string
+      permission?: ApiKeyPermission
+      is_active?: boolean
+      vault_ids?: string[]
+      credential_ids?: string[]
+    },
+  ) =>
+    request<ServiceAccount>(`/admin/service-accounts/${saId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteServiceAccount: (saId: string) =>
+    request<void>(`/admin/service-accounts/${saId}`, {
+      method: 'DELETE',
+    }),
+
+  createServiceAccountKey: (
+    saId: string,
+    payload: {
+      name: string
+      expires_in_days?: number | null
+    },
+  ) =>
+    request<CreatedServiceAccountKey>(`/admin/service-accounts/${saId}/keys`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteServiceAccountKey: (saId: string, keyId: string) =>
+    request<void>(`/admin/service-accounts/${saId}/keys/${keyId}`, {
       method: 'DELETE',
     }),
 

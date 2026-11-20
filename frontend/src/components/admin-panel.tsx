@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
+  Bot,
   Calendar,
   ChevronDown,
   ChevronUp,
@@ -26,6 +27,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { GroupDialog } from '@/components/group-dialog'
+import { ServiceAccountsSection } from '@/components/service-accounts-section'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,7 +69,7 @@ import {
   getVaultColor,
 } from '@/lib/vault-utils'
 
-export type AdminPanelTab = 'users' | 'groups' | 'audit'
+export type AdminPanelTab = 'users' | 'groups' | 'service-accounts' | 'audit'
 type AuditPeriodFilter = 'all' | '24h' | '7d' | '30d'
 
 interface AuditActionMeta {
@@ -212,6 +214,36 @@ const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
     tone: 'violet',
     icon: KeyRound,
   },
+  'service_account.created': {
+    label: 'Service Account creato',
+    tone: 'emerald',
+    icon: Bot,
+  },
+  'service_account.updated': {
+    label: 'Service Account aggiornato',
+    tone: 'sky',
+    icon: Bot,
+  },
+  'service_account.deleted': {
+    label: 'Service Account eliminato',
+    tone: 'rose',
+    icon: Trash2,
+  },
+  'service_account.key_created': {
+    label: 'Chiave Service Account generata',
+    tone: 'emerald',
+    icon: KeyRound,
+  },
+  'service_account.key_revoked': {
+    label: 'Chiave Service Account revocata',
+    tone: 'rose',
+    icon: Trash2,
+  },
+  'auth.service_account_key_used': {
+    label: 'Accesso Service Account',
+    tone: 'violet',
+    icon: Bot,
+  },
 }
 
 const TARGET_TYPE_LABELS: Record<string, string> = {
@@ -221,6 +253,7 @@ const TARGET_TYPE_LABELS: Record<string, string> = {
   vault: 'Cartella',
   credential: 'Credenziale',
   api_key: 'API Key',
+  service_account: 'Service Account',
 }
 
 function getAuditActionMeta(action: string): AuditActionMeta {
@@ -286,6 +319,7 @@ export function AdminPanel({
 }: AdminPanelProps) {
   const [users, setUsers] = useState<AdminUser[]>([])
   const [adminGroups, setAdminGroups] = useState<Group[]>([])
+  const [serviceAccountsCount, setServiceAccountsCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -324,12 +358,16 @@ export function AdminPanel({
       setLoading(true)
     }
     try {
-      const [userList, groupList] = await Promise.all([
+      const [userList, groupList, saList] = await Promise.all([
         vaultApi.listAdminUsers(),
         vaultApi.listAdminGroups(),
+        vaultApi.listServiceAccounts().catch(() => null),
       ])
       setUsers(userList)
       setAdminGroups(groupList)
+      if (saList) {
+        setServiceAccountsCount(saList.length)
+      }
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -362,6 +400,14 @@ export function AdminPanel({
       setAuditRefreshing(false)
     }
   }, [])
+
+  const handleServiceAccountsChanged = useCallback(
+    (list: { id: string }[]) => {
+      setServiceAccountsCount(list.length)
+      loadAudit(true)
+    },
+    [loadAudit],
+  )
 
   useEffect(() => {
     loadData()
@@ -599,6 +645,11 @@ export function AdminPanel({
           return act.startsWith('credential.')
         if (auditTargetType === 'api_key')
           return act.startsWith('api_key.') || act === 'auth.api_key_used'
+        if (auditTargetType === 'service_account')
+          return (
+            act.startsWith('service_account.') ||
+            act === 'auth.service_account_key_used'
+          )
         return true
       })
       .sort()
@@ -685,13 +736,13 @@ export function AdminPanel({
               </Badge>
             </div>
             <p className="mt-1 truncate pl-10 text-xs text-muted-foreground">
-              Gestione centralizzata degli utenti, controllo accessi basato sui
-              ruoli (Admin / User) e audit di sistema.
+              Gestione centralizzata degli utenti, Service Account di sistema
+              con API Key granulari e audit.
             </p>
           </div>
 
           {/* Section Switcher Tabs */}
-          <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
             <button
               type="button"
               onClick={() => onTabChange('users')}
@@ -713,16 +764,33 @@ export function AdminPanel({
               type="button"
               onClick={() => onTabChange('groups')}
               className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
+                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
                 activeTab === 'groups'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
               <Users className="size-3.5" />
               <span>Gruppi</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px]">
+              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
                 {adminGroups.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onTabChange('service-accounts')}
+              className={cn(
+                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
+                activeTab === 'service-accounts'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
+              )}
+            >
+              <Bot className="size-3.5" />
+              <span>Service Account</span>
+              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
+                {serviceAccountsCount}
               </span>
             </button>
 
@@ -746,7 +814,7 @@ export function AdminPanel({
         </div>
 
         {/* Summary KPI Cards */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <User className="size-4.5" />
@@ -785,6 +853,20 @@ export function AdminPanel({
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 Gruppi attivi
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
+              <Bot className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-lg font-bold leading-none tracking-tight">
+                {serviceAccountsCount}
+              </p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                Service Account
               </p>
             </div>
           </div>
@@ -1374,8 +1456,12 @@ export function AdminPanel({
             )}
           </ScrollArea>
         </div>
+      ) : activeTab === 'service-accounts' ? (
+        <ServiceAccountsSection
+          onAccountsChanged={handleServiceAccountsChanged}
+        />
       ) : (
-        /* Tab 3: Audit di sistema (Chi ha fatto cosa e quando) */
+        /* Tab 4: Audit di sistema (Chi ha fatto cosa e quando) */
         <div className="flex min-h-0 flex-1 flex-col">
           {/* Top Search & Action Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-3 sm:px-6">
@@ -1520,6 +1606,9 @@ export function AdminPanel({
                         <SelectItem value="vault">Cartelle</SelectItem>
                         <SelectItem value="credential">Credenziali</SelectItem>
                         <SelectItem value="api_key">API Key</SelectItem>
+                        <SelectItem value="service_account">
+                          Service Account
+                        </SelectItem>
                       </SelectContent>
                     </Select>
 

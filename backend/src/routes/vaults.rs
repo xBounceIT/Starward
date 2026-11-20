@@ -319,6 +319,74 @@ pub async fn list_vaults(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> AppResult<Json<Vec<VaultDto>>> {
+    if let Some(ref sa) = user.service_account {
+        if sa.vault_ids.is_empty() {
+            return Ok(Json(Vec::new()));
+        }
+
+        let sa_role = user.service_account_vault_role().unwrap_or("viewer");
+        let rows: Vec<VaultRow> = sqlx::query_as(
+            r#"
+            SELECT
+                v.id,
+                v.name,
+                v.description,
+                v.icon,
+                v.color,
+                v.owner_id,
+                owner.name AS owner_name,
+                owner.email AS owner_email,
+                v.owner_group_id,
+                og.name AS owner_group_name,
+                og.color AS owner_group_color,
+                v.is_personal,
+                $2::TEXT AS role,
+                (SELECT COUNT(*) FROM credentials c WHERE c.vault_id = v.id) AS credential_count,
+                v.created_at,
+                v.updated_at
+            FROM vaults v
+            INNER JOIN users owner ON owner.id = v.owner_id
+            LEFT JOIN groups og ON og.id = v.owner_group_id
+            WHERE v.id = ANY($1)
+            ORDER BY LOWER(v.name) ASC
+            "#,
+        )
+        .bind(&sa.vault_ids)
+        .bind(sa_role)
+        .fetch_all(&state.db)
+        .await?;
+
+        let vaults = rows
+            .into_iter()
+            .map(|row| VaultDto {
+                id: row.id,
+                name: row.name,
+                description: row.description,
+                icon: row.icon,
+                color: row.color,
+                owner_id: row.owner_id,
+                owner_name: row.owner_name,
+                owner_email: row.owner_email,
+                owner_group_id: row.owner_group_id,
+                owner_group_name: row.owner_group_name,
+                owner_group_color: row.owner_group_color,
+                is_personal: row.is_personal,
+                role: row.role,
+                is_shared: false,
+                is_shared_with_me: true,
+                member_count: 0,
+                group_count: 0,
+                credential_count: row.credential_count,
+                members: Vec::new(),
+                shared_groups: Vec::new(),
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+            })
+            .collect();
+
+        return Ok(Json(vaults));
+    }
+
     let rows: Vec<VaultRow> = sqlx::query_as(
         r#"
         WITH user_vault_roles AS (
@@ -413,6 +481,7 @@ pub async fn create_vault(
     user: AuthenticatedUser,
     Json(payload): Json<CreateVaultRequest>,
 ) -> AppResult<(StatusCode, Json<VaultDto>)> {
+    user.require_non_service_account()?;
     user.require_write_permission()?;
     if user.is_vault_restricted_api_key() {
         return Err(AppError::Forbidden(
@@ -557,6 +626,7 @@ pub async fn update_vault(
     Path(vault_id): Path<String>,
     Json(payload): Json<UpdateVaultRequest>,
 ) -> AppResult<Json<VaultDto>> {
+    user.require_non_service_account()?;
     require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
 
     let existing: Option<(String, String, String, String)> = sqlx::query_as(
@@ -636,6 +706,7 @@ pub async fn delete_vault(
     user: AuthenticatedUser,
     Path(vault_id): Path<String>,
 ) -> AppResult<StatusCode> {
+    user.require_non_service_account()?;
     require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
 
     let row: Option<(String, bool)> =
@@ -653,10 +724,36 @@ pub async fn delete_vault(
         ));
     }
 
+    let mut tx = state.db.begin().await?;
+
+    sqlx::query(
+        r#"
+        UPDATE service_accounts
+        SET vault_ids = array_remove(vault_ids, $1),
+            credential_ids = ARRAY(
+                SELECT cid
+                FROM unnest(credential_ids) AS cid
+                WHERE cid NOT IN (SELECT id FROM credentials WHERE vault_id = $1)
+            )
+        WHERE $1 = ANY(vault_ids)
+           OR EXISTS (
+                SELECT 1
+                FROM credentials c
+                WHERE c.vault_id = $1
+                  AND c.id = ANY(service_accounts.credential_ids)
+           )
+        "#,
+    )
+    .bind(&vault_id)
+    .execute(&mut *tx)
+    .await?;
+
     sqlx::query("DELETE FROM vaults WHERE id = $1")
         .bind(&vault_id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
 
     record_system_audit(
         &state.db,
@@ -677,6 +774,7 @@ pub async fn share_vault(
     Path(vault_id): Path<String>,
     Json(payload): Json<ShareVaultRequest>,
 ) -> AppResult<(StatusCode, Json<VaultDto>)> {
+    user.require_non_service_account()?;
     require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
 
     let role = payload.role.trim().to_lowercase();
@@ -699,11 +797,12 @@ pub async fn share_vault(
             ));
         }
 
-        let target_user: Option<(String, String)> =
-            sqlx::query_as("SELECT id, email FROM users WHERE id = $1")
-                .bind(uid)
-                .fetch_optional(&state.db)
-                .await?;
+        let target_user: Option<(String, String)> = sqlx::query_as(
+            "SELECT id, email FROM users WHERE id = $1 AND is_service_account = FALSE",
+        )
+        .bind(uid)
+        .fetch_optional(&state.db)
+        .await?;
 
         let (found_id, found_email) = target_user
             .ok_or_else(|| AppError::NotFound("Utente selezionato non trovato".to_string()))?;
@@ -735,11 +834,12 @@ pub async fn share_vault(
             ));
         }
 
-        let existing_user: Option<(String,)> =
-            sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = LOWER($1)")
-                .bind(&target_email)
-                .fetch_optional(&state.db)
-                .await?;
+        let existing_user: Option<(String,)> = sqlx::query_as(
+            "SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND is_service_account = FALSE",
+        )
+        .bind(&target_email)
+        .fetch_optional(&state.db)
+        .await?;
 
         (existing_user.map(|(id,)| id), target_email)
     };
@@ -803,6 +903,7 @@ pub async fn update_member_role(
     Path((vault_id, member_id)): Path<(String, String)>,
     Json(payload): Json<UpdateMemberRoleRequest>,
 ) -> AppResult<Json<VaultDto>> {
+    user.require_non_service_account()?;
     require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
 
     let new_role = payload.role.trim().to_lowercase();
@@ -855,6 +956,7 @@ pub async fn remove_member(
     user: AuthenticatedUser,
     Path((vault_id, member_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
+    user.require_non_service_account()?;
     user.require_write_permission()?;
     let caller_role =
         require_vault_role(&state.db, &vault_id, &user, &["owner", "editor", "viewer"]).await?;

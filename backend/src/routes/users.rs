@@ -28,6 +28,7 @@ pub async fn get_me(user: AuthenticatedUser) -> Json<UserSummary> {
         name: user.name,
         image: user.image,
         role: user.role,
+        is_service_account: user.is_service_account,
     })
 }
 
@@ -79,6 +80,7 @@ pub async fn update_me(
         name: name.to_string(),
         image: user.image,
         role: user.role,
+        is_service_account: false,
     }))
 }
 
@@ -122,6 +124,7 @@ pub async fn get_settings(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> AppResult<Json<UserSettingsDto>> {
+    user.require_non_service_account()?;
     let settings = ensure_user_settings(&state.db, &user.id).await?;
     Ok(Json(settings))
 }
@@ -247,6 +250,7 @@ pub async fn list_users(
     user: AuthenticatedUser,
     Query(query): Query<SearchUsersQuery>,
 ) -> AppResult<Json<Vec<UserSummary>>> {
+    user.require_non_service_account()?;
     let pattern = format!("%{}%", query.q.unwrap_or_default().trim());
 
     let users: Vec<UserRecord> = sqlx::query_as(
@@ -254,6 +258,7 @@ pub async fn list_users(
         SELECT id, email, name, image, role, created_at, last_seen_at
         FROM users
         WHERE id != $1
+          AND is_service_account = FALSE
           AND (email ILIKE $2 OR name ILIKE $2)
         ORDER BY LOWER(name) ASC
         LIMIT 100
@@ -272,6 +277,7 @@ pub async fn list_users(
             name: u.name,
             image: u.image,
             role: u.role,
+            is_service_account: false,
         })
         .collect();
 

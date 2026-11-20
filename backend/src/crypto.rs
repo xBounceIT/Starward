@@ -15,9 +15,17 @@ pub fn hash_api_key(raw_key: &str) -> String {
 }
 
 pub fn generate_api_key() -> (String, String, String) {
+    generate_prefixed_api_key("sw_live_")
+}
+
+pub fn generate_service_account_api_key() -> (String, String, String) {
+    generate_prefixed_api_key("sw_sa_")
+}
+
+fn generate_prefixed_api_key(prefix: &str) -> (String, String, String) {
     let random_bytes: [u8; 24] = UnwrapErr(SysRng).random();
     let hex_secret: String = random_bytes.iter().map(|b| format!("{b:02x}")).collect();
-    let raw_key = format!("sw_live_{hex_secret}");
+    let raw_key = format!("{prefix}{hex_secret}");
     let key_prefix = raw_key[..16].to_string();
     let key_hash = hash_api_key(&raw_key);
     (raw_key, key_prefix, key_hash)
@@ -126,6 +134,23 @@ mod tests {
 
         assert!(key1.starts_with("sw_live_"));
         assert_eq!(key1.len(), 56);
+        assert_eq!(prefix1.len(), 16);
+        assert_eq!(prefix1, &key1[..16]);
+        assert_eq!(hash1, hash_api_key(&key1));
+        assert_eq!(hash1.len(), 64);
+
+        assert_ne!(key1, key2);
+        assert_ne!(prefix1, prefix2);
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn service_account_api_key_generation_uses_sa_prefix() {
+        let (key1, prefix1, hash1) = generate_service_account_api_key();
+        let (key2, prefix2, hash2) = generate_service_account_api_key();
+
+        assert!(key1.starts_with("sw_sa_"));
+        assert_eq!(key1.len(), 54);
         assert_eq!(prefix1.len(), 16);
         assert_eq!(prefix1, &key1[..16]);
         assert_eq!(hash1, hash_api_key(&key1));

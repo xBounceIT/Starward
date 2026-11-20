@@ -55,6 +55,7 @@ async fn fetch_admin_user_dto(
             u.last_seen_at
         FROM users u
         WHERE u.id = $1
+          AND u.is_service_account = FALSE
         LIMIT 1
         "#,
     )
@@ -94,7 +95,8 @@ pub async fn list_admin_users(
             u.created_at,
             u.last_seen_at
         FROM users u
-        WHERE ($1 = '%%' OR u.email ILIKE $1 OR u.name ILIKE $1)
+        WHERE u.is_service_account = FALSE
+          AND ($1 = '%%' OR u.email ILIKE $1 OR u.name ILIKE $1)
           AND ($2 = '' OR LOWER(u.role) = $2)
         ORDER BY
             CASE u.role WHEN 'admin' THEN 0 ELSE 1 END,
@@ -135,10 +137,11 @@ pub async fn update_user_role(
         .ok_or_else(|| AppError::NotFound("Utente non trovato".to_string()))?;
 
     if existing.role == "admin" && new_role == "user" {
-        let (admin_count,): (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-                .fetch_one(&state.db)
-                .await?;
+        let (admin_count,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_service_account = FALSE",
+        )
+        .fetch_one(&state.db)
+        .await?;
         if admin_count <= 1 {
             return Err(AppError::BadRequest(
                 "Deve rimanere almeno un amministratore nel sistema".to_string(),
@@ -187,20 +190,27 @@ pub async fn delete_user(
         ));
     }
 
-    let existing: Option<(String, String, String)> =
-        sqlx::query_as("SELECT name, email, role FROM users WHERE id = $1")
+    let existing: Option<(String, String, String, bool)> =
+        sqlx::query_as("SELECT name, email, role, is_service_account FROM users WHERE id = $1")
             .bind(&target_user_id)
             .fetch_optional(&state.db)
             .await?;
 
-    let (target_name, target_email, target_role) =
+    let (target_name, target_email, target_role, is_service_account) =
         existing.ok_or_else(|| AppError::NotFound("Utente non trovato".to_string()))?;
 
+    if is_service_account {
+        return Err(AppError::BadRequest(
+            "Usa la sezione Service Account per eliminare un account di sistema".to_string(),
+        ));
+    }
+
     if target_role == "admin" {
-        let (admin_count,): (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-                .fetch_one(&state.db)
-                .await?;
+        let (admin_count,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_service_account = FALSE",
+        )
+        .fetch_one(&state.db)
+        .await?;
         if admin_count <= 1 {
             return Err(AppError::BadRequest(
                 "Non è possibile eliminare l'ultimo amministratore del sistema".to_string(),

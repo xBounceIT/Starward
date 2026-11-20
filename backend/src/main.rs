@@ -152,6 +152,28 @@ pub fn build_app(state: AppState) -> Router {
                 .delete(routes::groups::remove_group_member),
         )
         .route(
+            "/api/admin/service-accounts/resources",
+            get(routes::service_accounts::list_selectable_resources),
+        )
+        .route(
+            "/api/admin/service-accounts",
+            get(routes::service_accounts::list_service_accounts)
+                .post(routes::service_accounts::create_service_account),
+        )
+        .route(
+            "/api/admin/service-accounts/{sa_id}",
+            patch(routes::service_accounts::update_service_account)
+                .delete(routes::service_accounts::delete_service_account),
+        )
+        .route(
+            "/api/admin/service-accounts/{sa_id}/keys",
+            post(routes::service_accounts::create_service_account_key),
+        )
+        .route(
+            "/api/admin/service-accounts/{sa_id}/keys/{key_id}",
+            delete(routes::service_accounts::delete_service_account_key),
+        )
+        .route(
             "/api/vaults",
             get(routes::vaults::list_vaults).post(routes::vaults::create_vault),
         )
@@ -1289,6 +1311,601 @@ mod tests {
             .bind(&bob_id)
             .bind(&charlie_id)
             .bind(&dave_id)
+            .execute(&db)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn service_accounts_workflow_and_scoping_postgres() {
+        let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
+            eprintln!("Skipping PostgreSQL service account integration test: TEST_DATABASE_URL not set");
+            return;
+        };
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let admin_id = format!("test-sa-admin-{suffix}");
+        let user_id = format!("test-sa-user-{suffix}");
+        let admin_email = format!("sa-admin-{suffix}@starward.io");
+        let user_email = format!("sa-user-{suffix}@starward.io");
+
+        let config = Config {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            database_url,
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            cors_origin: "http://localhost:3000".to_string(),
+            admin_emails: vec![admin_email.clone()],
+        };
+
+        let db = init_db(&config.database_url).await.unwrap();
+        let crypto = VaultCrypto::from_master_key(&config.master_key);
+        let app = build_app(AppState {
+            db: db.clone(),
+            config: config.clone(),
+            crypto,
+        });
+
+        let admin_token = make_token(&config.auth_secret, &admin_id, &admin_email, "Admin");
+        let user_token = make_token(&config.auth_secret, &user_id, &user_email, "Standard User");
+
+        // Bootstrap both users
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {user_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Create two folders: "Produzione" (full folder grant) and "Billing" (single credential grant)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "name": "Produzione" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let prod_vault_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "name": "Billing" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let billing_vault_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        // Create credentials in both folders
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": prod_vault_id,
+                            "title": "Prod DB",
+                            "username": "dbuser",
+                            "password": "ProdDbPassword!1"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let prod_cred_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": billing_vault_id,
+                            "title": "Stripe Live Key",
+                            "category": "api_key",
+                            "password": "sk_live_billing_allowed"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let allowed_billing_cred_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": billing_vault_id,
+                            "title": "Corporate Card",
+                            "category": "card",
+                            "password": "4242-secret-card"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let hidden_billing_cred_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        // 1. Standard non-admin user CANNOT list or create service accounts
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/service-accounts")
+                    .header("Authorization", format!("Bearer {user_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/admin/service-accounts")
+                    .header("Authorization", format!("Bearer {user_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "name": "Unauthorized Bot" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // 2. Admin can inspect selectable resources without secrets
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/service-accounts/resources")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let resources = read_json(res).await;
+        assert!(resources["vaults"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["id"] == prod_vault_id));
+        assert!(resources["credentials"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["id"] == allowed_billing_cred_id && c.get("password").is_none()));
+
+        // 3. Admin creates a read-only Service Account with 1 folder + 1 specific credential
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/admin/service-accounts")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "CI/CD Deploy Bot",
+                            "description": "Accesso automatico pipeline",
+                            "permission": "read",
+                            "vault_ids": [prod_vault_id],
+                            "credential_ids": [allowed_billing_cred_id],
+                            "generate_initial_key": true,
+                            "initial_key_name": "Chiave primaria",
+                            "initial_key_expires_in_days": 90
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let created_sa = read_json(res).await;
+        let sa_id = created_sa["service_account"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let key1_id = created_sa["initial_key"]["key"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let key1_secret = created_sa["initial_key"]["secret_key"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(key1_secret.starts_with("sw_sa_"));
+
+        // 4. Service Account authenticates with Bearer & X-API-Key
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {key1_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let sa_me = read_json(res).await;
+        assert_eq!(sa_me["is_service_account"], true);
+        assert_eq!(sa_me["role"], "user");
+
+        // GET /api/vaults returns only explicitly assigned folders
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("X-API-Key", &key1_secret)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let sa_vaults = read_json(res).await;
+        assert_eq!(sa_vaults.as_array().unwrap().len(), 1);
+        assert_eq!(sa_vaults[0]["id"], prod_vault_id);
+
+        // GET /api/credentials returns folder credentials + specific credential, excluding hidden one
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {key1_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let sa_creds = read_json(res).await;
+        let cred_ids: Vec<&str> = sa_creds
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["id"].as_str().unwrap())
+            .collect();
+        assert_eq!(cred_ids.len(), 2);
+        assert!(cred_ids.contains(&prod_cred_id.as_str()));
+        assert!(cred_ids.contains(&allowed_billing_cred_id.as_str()));
+        assert!(!cred_ids.contains(&hidden_billing_cred_id.as_str()));
+
+        // Direct fetch of allowed specific credential succeeds and decrypts password
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials/{allowed_billing_cred_id}"))
+                    .header("X-API-Key", &key1_secret)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            read_json(res).await["password"],
+            "sk_live_billing_allowed"
+        );
+
+        // Direct fetch of hidden credential in same vault is forbidden
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials/{hidden_billing_cred_id}"))
+                    .header("X-API-Key", &key1_secret)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // Read-only SA cannot update or create credentials
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{allowed_billing_cred_id}"))
+                    .header("Authorization", format!("Bearer {key1_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "title": "Hacked" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // 5. Admin upgrades SA to read_write and rotates API key
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "permission": "read_write" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}/keys"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "name": "Chiave rotazione", "expires_in_days": 30 }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let key2_secret = read_json(res).await["secret_key"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // SA with read_write can create credential inside assigned folder "Produzione"
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {key2_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": prod_vault_id,
+                            "title": "Rotated Token",
+                            "password": "GeneratedByServiceAccount!"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let sa_created_cred_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        // SA cannot create credential inside "Billing" (not in vault_ids, only single credential granted)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {key2_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": billing_vault_id,
+                            "title": "Unauthorized Billing Cred",
+                            "password": "Nope!"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // SA can update its specific granted credential in place
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{allowed_billing_cred_id}"))
+                    .header("Authorization", format!("Bearer {key2_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "password": "sk_live_billing_rotated" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            read_json(res).await["password"],
+            "sk_live_billing_rotated"
+        );
+
+        // Revoke key1 -> key1 rejected, key2 still works
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}/keys/{key1_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {key1_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        // Disable SA -> key2 rejected with FORBIDDEN
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "is_active": false }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {key2_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // Delete SA -> succeeds, preserves credential created by SA, key2 returns UNAUTHORIZED
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials/{sa_created_cred_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {key2_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        // Clean up test users
+        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
+            .bind(&admin_id)
+            .bind(&user_id)
             .execute(&db)
             .await;
     }

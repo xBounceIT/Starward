@@ -98,6 +98,50 @@ async fn fetch_credential_dto(
     credential_id: &str,
     user: &AuthenticatedUser,
 ) -> AppResult<CredentialDto> {
+    if let Some(sa_role) = user.service_account_vault_role() {
+        let row: Option<CredentialRow> = sqlx::query_as(
+            r#"
+            SELECT
+                c.id,
+                c.vault_id,
+                v.name AS vault_name,
+                v.color AS vault_color,
+                $2::TEXT AS vault_role,
+                c.title,
+                c.username,
+                c.url,
+                c.category,
+                c.password_ciphertext,
+                c.password_nonce,
+                c.notes_ciphertext,
+                c.notes_nonce,
+                c.extra_fields_ciphertext,
+                c.extra_fields_nonce,
+                c.favorite,
+                c.created_by,
+                cb.name AS created_by_name,
+                c.updated_by,
+                ub.name AS updated_by_name,
+                c.created_at,
+                c.updated_at
+            FROM credentials c
+            INNER JOIN vaults v ON v.id = c.vault_id
+            INNER JOIN users cb ON cb.id = c.created_by
+            INNER JOIN users ub ON ub.id = c.updated_by
+            WHERE c.id = $1
+            LIMIT 1
+            "#,
+        )
+        .bind(credential_id)
+        .bind(sa_role)
+        .fetch_optional(&state.db)
+        .await?;
+
+        let row = row.ok_or_else(|| AppError::NotFound("Credenziale non trovata".to_string()))?;
+        user.ensure_credential_allowed(&row.id, &row.vault_id)?;
+        return decrypt_credential_row(state, row);
+    }
+
     let row: Option<CredentialRow> = sqlx::query_as(
         r#"
         WITH user_vault_roles AS (
@@ -195,14 +239,103 @@ pub async fn list_credentials(
     user: AuthenticatedUser,
     Query(query): Query<ListCredentialsQuery>,
 ) -> AppResult<Json<Vec<CredentialDto>>> {
-    if let Some(ref vault_id) = query.vault_id {
-        require_vault_role(&state.db, vault_id, &user, &["owner", "editor", "viewer"]).await?;
-    }
-
     let search = query.q.unwrap_or_default().trim().to_lowercase();
     let search_pattern = format!("%{}%", search);
     let fav_only = query.favorite.unwrap_or(false);
     let category = query.category.unwrap_or_default().trim().to_lowercase();
+
+    if let Some(ref sa) = user.service_account {
+        if let Some(ref req_vault_id) = query.vault_id {
+            let has_vault_scope = sa.vault_ids.iter().any(|vid| vid == req_vault_id);
+            let has_cred_in_vault = if !has_vault_scope && !sa.credential_ids.is_empty() {
+                let found: Option<(String,)> = sqlx::query_as(
+                    "SELECT id FROM credentials WHERE vault_id = $1 AND id = ANY($2) LIMIT 1",
+                )
+                .bind(req_vault_id)
+                .bind(&sa.credential_ids)
+                .fetch_optional(&state.db)
+                .await?;
+                found.is_some()
+            } else {
+                false
+            };
+
+            if !has_vault_scope && !has_cred_in_vault {
+                return Err(AppError::Forbidden(
+                    "Questo Service Account non è autorizzato ad accedere a questa cartella"
+                        .to_string(),
+                ));
+            }
+        }
+
+        if sa.vault_ids.is_empty() && sa.credential_ids.is_empty() {
+            return Ok(Json(Vec::new()));
+        }
+
+        let sa_role = user.service_account_vault_role().unwrap_or("viewer");
+        let rows: Vec<CredentialRow> = sqlx::query_as(
+            r#"
+            SELECT
+                c.id,
+                c.vault_id,
+                v.name AS vault_name,
+                v.color AS vault_color,
+                $3::TEXT AS vault_role,
+                c.title,
+                c.username,
+                c.url,
+                c.category,
+                c.password_ciphertext,
+                c.password_nonce,
+                c.notes_ciphertext,
+                c.notes_nonce,
+                c.extra_fields_ciphertext,
+                c.extra_fields_nonce,
+                c.favorite,
+                c.created_by,
+                cb.name AS created_by_name,
+                c.updated_by,
+                ub.name AS updated_by_name,
+                c.created_at,
+                c.updated_at
+            FROM credentials c
+            INNER JOIN vaults v ON v.id = c.vault_id
+            INNER JOIN users cb ON cb.id = c.created_by
+            INNER JOIN users ub ON ub.id = c.updated_by
+            WHERE (c.vault_id = ANY($1) OR c.id = ANY($2))
+              AND ($4::TEXT IS NULL OR c.vault_id = $4)
+              AND (NOT $5 OR c.favorite = TRUE)
+              AND ($6 = '' OR LOWER(c.category) = $6)
+              AND (
+                $7 = '%%'
+                OR c.title ILIKE $7
+                OR c.username ILIKE $7
+                OR c.url ILIKE $7
+                OR v.name ILIKE $7
+              )
+            ORDER BY c.favorite DESC, c.updated_at DESC
+            "#,
+        )
+        .bind(&sa.vault_ids)
+        .bind(&sa.credential_ids)
+        .bind(sa_role)
+        .bind(&query.vault_id)
+        .bind(fav_only)
+        .bind(&category)
+        .bind(&search_pattern)
+        .fetch_all(&state.db)
+        .await?;
+
+        let mut credentials = Vec::with_capacity(rows.len());
+        for row in rows {
+            credentials.push(decrypt_credential_row(&state, row)?);
+        }
+        return Ok(Json(credentials));
+    }
+
+    if let Some(ref vault_id) = query.vault_id {
+        require_vault_role(&state.db, vault_id, &user, &["owner", "editor", "viewer"]).await?;
+    }
 
     let rows: Vec<CredentialRow> = sqlx::query_as(
         r#"
@@ -414,7 +547,11 @@ pub async fn update_credential(
     Json(payload): Json<UpdateCredentialRequest>,
 ) -> AppResult<Json<CredentialDto>> {
     let existing = fetch_credential_dto(&state, &credential_id, &user).await?;
-    require_vault_role(&state.db, &existing.vault_id, &user, &["owner", "editor"]).await?;
+    if user.service_account.is_some() {
+        user.require_write_permission()?;
+    } else {
+        require_vault_role(&state.db, &existing.vault_id, &user, &["owner", "editor"]).await?;
+    }
 
     let target_vault_id = payload
         .vault_id
@@ -533,12 +670,31 @@ pub async fn delete_credential(
     Path(credential_id): Path<String>,
 ) -> AppResult<StatusCode> {
     let existing = fetch_credential_dto(&state, &credential_id, &user).await?;
-    require_vault_role(&state.db, &existing.vault_id, &user, &["owner", "editor"]).await?;
+    if user.service_account.is_some() {
+        user.require_write_permission()?;
+    } else {
+        require_vault_role(&state.db, &existing.vault_id, &user, &["owner", "editor"]).await?;
+    }
+
+    let mut tx = state.db.begin().await?;
+
+    sqlx::query(
+        r#"
+        UPDATE service_accounts
+        SET credential_ids = array_remove(credential_ids, $1)
+        WHERE $1 = ANY(credential_ids)
+        "#,
+    )
+    .bind(&credential_id)
+    .execute(&mut *tx)
+    .await?;
 
     sqlx::query("DELETE FROM credentials WHERE id = $1")
         .bind(&credential_id)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
+
+    tx.commit().await?;
 
     record_audit(
         &state.db,
