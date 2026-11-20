@@ -128,6 +128,7 @@ export function CredentialList({
   const searchInputRef = useRef<HTMLInputElement>(null)
   const categoryScrollRef = useRef<HTMLDivElement>(null)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
+  const [openMenuCredId, setOpenMenuCredId] = useState<string | null>(null)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -208,7 +209,10 @@ export function CredentialList({
       : ''
 
     return (
-      <DropdownMenu>
+      <DropdownMenu
+        open={openMenuCredId === cred.id}
+        onOpenChange={(open) => setOpenMenuCredId(open ? cred.id : null)}
+      >
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
@@ -359,31 +363,50 @@ export function CredentialList({
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48">
+                  {canCreateInCurrent && (
+                    <DropdownMenuItem onClick={onNewCredential}>
+                      <Plus className="size-4" />
+                      Nuova credenziale
+                    </DropdownMenuItem>
+                  )}
+                  {activeVault.role === 'owner' && (
+                    <DropdownMenuItem onClick={() => onEditVault(activeVault)}>
+                      <Pencil className="size-4" />
+                      Rinomina
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => onShareVault(activeVault)}>
+                    {activeVault.role === 'owner' ? (
+                      <>
+                        <Share2 className="size-4" />
+                        Condividi
+                      </>
+                    ) : (
+                      <>
+                        <Users className="size-4" />
+                        Membri ({activeVault.member_count})
+                      </>
+                    )}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => onOpenAudit(activeVault)}>
                     <History className="size-4" />
                     Registro attività
                   </DropdownMenuItem>
                   {activeVault.role === 'owner' && (
                     <>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        onClick={() => onEditVault(activeVault)}
+                        variant="destructive"
+                        disabled={activeVault.is_personal}
+                        onClick={() => {
+                          if (!activeVault.is_personal)
+                            onDeleteVault(activeVault)
+                        }}
                       >
-                        <Pencil className="size-4" />
-                        Modifica cartella
+                        <Trash2 className="size-4" />
+                        Cancella
                       </DropdownMenuItem>
-                      {!activeVault.is_personal && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={() => onDeleteVault(activeVault)}
-                          >
-                            <Trash2 className="size-4" />
-                            Elimina cartella
-                          </DropdownMenuItem>
-                        </>
-                      )}
                     </>
                   )}
                 </DropdownMenuContent>
@@ -648,6 +671,10 @@ export function CredentialList({
                   role="button"
                   tabIndex={0}
                   onClick={() => onSelectCredential(cred)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setOpenMenuCredId(cred.id)
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()
@@ -743,6 +770,10 @@ export function CredentialList({
                   role="button"
                   tabIndex={0}
                   onClick={() => onSelectCredential(cred)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    setOpenMenuCredId(cred.id)
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault()

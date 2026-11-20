@@ -74,6 +74,9 @@ function VaultWorkspace() {
 
   // Modals & confirmation dialogs state
   const [credDialogOpen, setCredDialogOpen] = useState(false)
+  const [credDefaultVaultId, setCredDefaultVaultId] = useState<
+    string | undefined
+  >(undefined)
   const [editingCredential, setEditingCredential] =
     useState<Credential | null>(null)
   const [vaultDialogOpen, setVaultDialogOpen] = useState(false)
@@ -310,7 +313,8 @@ function VaultWorkspace() {
         favoritesCount={favoritesCount}
         selection={selection}
         onSelect={handleSelectNavigation}
-        onNewCredential={() => {
+        onNewCredential={(vaultId) => {
+          setCredDefaultVaultId(vaultId)
           setEditingCredential(null)
           setCredDialogOpen(true)
         }}
@@ -318,6 +322,13 @@ function VaultWorkspace() {
           setEditingVault(null)
           setVaultDialogOpen(true)
         }}
+        onEditVault={(vault) => {
+          setEditingVault(vault)
+          setVaultDialogOpen(true)
+        }}
+        onShareVault={(vault) => setShareVaultTarget(vault)}
+        onOpenAudit={(vault) => setAuditVaultTarget(vault)}
+        onDeleteVault={(vault) => setPendingDeleteVault(vault)}
         onSignOut={handleSignOut}
       />
 
@@ -444,10 +455,14 @@ function VaultWorkspace() {
       {/* Dialogs */}
       <CredentialDialog
         open={credDialogOpen}
-        onOpenChange={setCredDialogOpen}
+        onOpenChange={(open) => {
+          setCredDialogOpen(open)
+          if (!open) setCredDefaultVaultId(undefined)
+        }}
         vaults={vaults}
         defaultVaultId={
-          selection.type === 'vault' ? selection.vaultId : undefined
+          credDefaultVaultId ??
+          (selection.type === 'vault' ? selection.vaultId : undefined)
         }
         editingCredential={editingCredential}
         onSaved={async (saved) => {
