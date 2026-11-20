@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Check,
   ChevronDown,
   FileClock,
   FolderPlus,
@@ -8,6 +9,7 @@ import {
   LogOut,
   Moon,
   MoreHorizontal,
+  Palette,
   Pencil,
   Plus,
   Share2,
@@ -116,7 +118,7 @@ function VaultSidebarMenuItem({
       <SidebarMenuButton
         isActive={active}
         className={cn(
-          'h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground',
+          'h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15',
           indented && 'pl-4',
         )}
         onClick={onSelect}
@@ -125,7 +127,9 @@ function VaultSidebarMenuItem({
           icon={vault.icon}
           className={cn(
             'size-4 shrink-0',
-            active ? 'text-violet-400' : palette.text,
+            active
+              ? 'text-violet-400 sync-security:text-[#ff9c00]'
+              : palette.text,
           )}
         />
         <span className="truncate">{vault.name}</span>
@@ -233,7 +237,7 @@ export function AppSidebar({
   onDeleteVault,
   onSignOut,
 }: AppSidebarProps) {
-  const { theme, toggleTheme } = useTheme()
+  const { theme, setTheme } = useTheme()
   const { setOpenMobile } = useSidebar()
 
   const myVaults = vaults.filter((v) => !v.is_shared_with_me)
@@ -249,7 +253,7 @@ export function AppSidebar({
       <SidebarHeader className="gap-3.5 p-3.5">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/50 text-foreground">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/50 text-foreground sync-security:border-[#ff9c00]/30 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
               <ShieldCheck className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -261,20 +265,54 @@ export function AppSidebar({
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={toggleTheme}
-            className="text-muted-foreground hover:text-foreground"
-            title={theme === 'dark' ? 'Tema chiaro' : 'Tema scuro'}
-          >
-            {theme === 'dark' ? (
-              <Sun className="size-4" />
-            ) : (
-              <Moon className="size-4" />
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-foreground"
+                title="Cambia tema"
+                aria-label="Cambia tema"
+              >
+                {theme === 'light' ? (
+                  <Sun className="size-4" />
+                ) : theme === 'sync-security' ? (
+                  <Palette className="size-4 text-[#ff9c00]" />
+                ) : (
+                  <Moon className="size-4" />
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">
+                Tema
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setTheme('light')}>
+                <Sun className="size-4" />
+                <span>Chiaro</span>
+                {theme === 'light' && <Check className="ml-auto size-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme('dark')}>
+                <Moon className="size-4" />
+                <span>Scuro</span>
+                {theme === 'dark' && <Check className="ml-auto size-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setTheme('sync-security')}>
+                <span
+                  className="flex size-4 shrink-0 items-center justify-center rounded-full border border-[#ff9c00] bg-[#000c20]"
+                  aria-hidden="true"
+                >
+                  <span className="size-1.5 rounded-full bg-[#ff9c00]" />
+                </span>
+                <span>Sync Security</span>
+                {theme === 'sync-security' && (
+                  <Check className="ml-auto size-4" />
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Button
@@ -298,13 +336,13 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={selection.type === 'all'}
                   onClick={() => handleSelect({ type: 'all' })}
-                  className="h-9 rounded-lg pr-8 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground"
+                  className="h-9 rounded-lg pr-8 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
                 >
                   <Layers
                     className={cn(
                       'size-4',
                       selection.type === 'all'
-                        ? 'text-violet-400'
+                        ? 'text-violet-400 sync-security:text-[#ff9c00]'
                         : 'text-muted-foreground',
                     )}
                   />
@@ -319,7 +357,7 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={selection.type === 'favorites'}
                   onClick={() => handleSelect({ type: 'favorites' })}
-                  className="h-9 rounded-lg pr-8 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground"
+                  className="h-9 rounded-lg pr-8 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
                 >
                   <Star className="size-4 text-amber-400" />
                   <span>Preferiti</span>
@@ -455,7 +493,7 @@ export function AppSidebar({
                 <span>Pannello Admin</span>
                 <Badge
                   variant="outline"
-                  className="h-4 border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[9px] font-semibold text-violet-300"
+                  className="h-4 border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[9px] font-semibold text-violet-300 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                 >
                   Admin
                 </Badge>
@@ -470,14 +508,14 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'users' })
                       }
-                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground"
+                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
                     >
                       <Users
                         className={cn(
                           'size-4',
                           selection.type === 'admin' &&
                             selection.tab === 'users'
-                            ? 'text-violet-400'
+                            ? 'text-violet-400 sync-security:text-[#ff9c00]'
                             : 'text-muted-foreground',
                         )}
                       />
@@ -493,14 +531,14 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'audit' })
                       }
-                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground"
+                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
                     >
                       <FileClock
                         className={cn(
                           'size-4',
                           selection.type === 'admin' &&
                             selection.tab === 'audit'
-                            ? 'text-violet-400'
+                            ? 'text-violet-400 sync-security:text-[#ff9c00]'
                             : 'text-muted-foreground',
                         )}
                       />
@@ -594,7 +632,7 @@ export function AppSidebar({
                         handleSelect({ type: 'admin', tab: 'users' })
                       }
                     >
-                      <ShieldCheck className="size-4 text-violet-400" />
+                      <ShieldCheck className="size-4 text-violet-400 sync-security:text-[#ff9c00]" />
                       Pannello Admin
                     </DropdownMenuItem>
                   </>

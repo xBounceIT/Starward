@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-export type Theme = 'light' | 'dark'
+export type Theme = 'light' | 'dark' | 'sync-security'
+
+export const THEME_OPTIONS: { value: Theme; label: string }[] = [
+  { value: 'light', label: 'Chiaro' },
+  { value: 'dark', label: 'Scuro' },
+  { value: 'sync-security', label: 'Sync Security' },
+]
 
 interface ThemeContextValue {
   theme: Theme
@@ -12,25 +18,37 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 const STORAGE_KEY = 'starward-theme'
 
+function isValidTheme(value: string | null): value is Theme {
+  return value === 'light' || value === 'dark' || value === 'sync-security'
+}
+
+function applyThemeClasses(theme: Theme) {
+  const root = document.documentElement
+  root.classList.toggle('dark', theme === 'dark' || theme === 'sync-security')
+  root.classList.toggle('sync-security', theme === 'sync-security')
+  root.dataset.theme = theme
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark')
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
-    const resolved: Theme =
-      saved === 'dark' || saved === 'light' ? saved : 'dark'
+    const resolved: Theme = isValidTheme(saved) ? saved : 'dark'
     setThemeState(resolved)
-    document.documentElement.classList.toggle('dark', resolved === 'dark')
+    applyThemeClasses(resolved)
   }, [])
 
   const setTheme = (next: Theme) => {
     setThemeState(next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
+    applyThemeClasses(next)
     localStorage.setItem(STORAGE_KEY, next)
   }
 
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark')
+    const order: Theme[] = ['dark', 'light', 'sync-security']
+    const nextIndex = (order.indexOf(theme) + 1) % order.length
+    setTheme(order[nextIndex])
   }
 
   return (

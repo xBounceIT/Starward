@@ -176,7 +176,7 @@ export function AdminPanel({
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex lg:hidden" />
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                 <ShieldCheck className="size-4.5" />
               </div>
               <h2 className="truncate text-xl font-bold tracking-tight">
@@ -184,7 +184,7 @@ export function AdminPanel({
               </h2>
               <Badge
                 variant="secondary"
-                className="border-violet-500/30 bg-violet-500/15 text-[11px] font-semibold text-violet-300"
+                className="border-violet-500/30 bg-violet-500/15 text-[11px] font-semibold text-violet-300 sync-security:border-[#ff9c00]/30 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
               >
                 RBAC · Admin
               </Badge>
@@ -203,7 +203,7 @@ export function AdminPanel({
               className={cn(
                 'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
                 activeTab === 'users'
-                  ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30'
+                  ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30 sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -220,7 +220,7 @@ export function AdminPanel({
               className={cn(
                 'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
                 activeTab === 'audit'
-                  ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30'
+                  ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30 sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -239,7 +239,7 @@ export function AdminPanel({
         {/* Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
               <Users className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -341,7 +341,7 @@ export function AdminPanel({
                       className={cn(
                         'inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors',
                         active
-                          ? 'bg-foreground text-background shadow-xs'
+                          ? 'bg-foreground text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
@@ -388,7 +388,7 @@ export function AdminPanel({
               </div>
             ) : filteredUsers.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                   <Users className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
@@ -411,7 +411,7 @@ export function AdminPanel({
                       className={cn(
                         'flex flex-col justify-between gap-4 rounded-xl border px-4 py-3.5 transition-colors sm:flex-row sm:items-center',
                         isSelf
-                          ? 'border-violet-500/40 bg-violet-500/[0.04]'
+                          ? 'border-violet-500/40 bg-violet-500/[0.04] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/[0.05]'
                           : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/75',
                       )}
                     >
@@ -431,7 +431,7 @@ export function AdminPanel({
                             {isSelf && (
                               <Badge
                                 variant="outline"
-                                className="border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[10px] text-violet-300"
+                                className="border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[10px] text-violet-300 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                               >
                                 Tu
                               </Badge>
@@ -470,7 +470,7 @@ export function AdminPanel({
                             <Folder className="size-3.5 text-sky-400" />
                             <span>{u.vault_count} cartelle</span>
                             <span className="text-border">·</span>
-                            <KeyRound className="size-3.5 text-violet-400" />
+                            <KeyRound className="size-3.5 text-violet-400 sync-security:text-[#ff9c00]" />
                             <span>{u.credential_count} credenziali</span>
                           </div>
 
@@ -576,7 +576,7 @@ export function AdminPanel({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-border/70 bg-card/40 p-3.5 opacity-75">
                 <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                  <User className="size-3.5 text-violet-400" />
+                  <User className="size-3.5 text-violet-400 sync-security:text-[#ff9c00]" />
                   <span>CHI (Attore)</span>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
@@ -617,7 +617,7 @@ export function AdminPanel({
               </div>
 
               <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                   <FileClock className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
