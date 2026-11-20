@@ -58,7 +58,7 @@ import {
   type ServiceAccountKey,
   type ServiceAccountResources,
 } from '@/lib/api'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import {
   formatRelativeDate,
   formatShortDate,
@@ -351,12 +351,11 @@ export function ServiceAccountsSection({
     label: string,
     onFlag?: (v: boolean) => void,
   ) => {
-    try {
-      await navigator.clipboard.writeText(text)
+    if (await copyToClipboard(text)) {
       onFlag?.(true)
       setTimeout(() => onFlag?.(false), 2000)
       toast.success(`${label} copiato negli appunti`)
-    } catch {
+    } else {
       toast.error('Impossibile copiare negli appunti')
     }
   }

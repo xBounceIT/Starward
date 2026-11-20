@@ -67,7 +67,7 @@ import {
 } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
 import { useTheme, type Theme } from '@/lib/theme'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import {
   evaluatePasswordStrength,
   formatRelativeDate,
@@ -485,12 +485,11 @@ export function UserSettingsDialog({
     label: string,
     onFlag?: (v: boolean) => void,
   ) => {
-    try {
-      await navigator.clipboard.writeText(text)
+    if (await copyToClipboard(text)) {
       onFlag?.(true)
       setTimeout(() => onFlag?.(false), 2000)
       toast.success(`${label} copiato negli appunti`)
-    } catch {
+    } else {
       toast.error('Impossibile copiare negli appunti')
     }
   }

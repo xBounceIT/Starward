@@ -52,7 +52,7 @@ import {
   getCredentialListColumns,
   getCredentialQuickCopy,
 } from '@/lib/credential-types'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import {
   formatModifiedRelative,
   getInitials,
@@ -166,10 +166,9 @@ export function CredentialList({
     label: string,
   ) => {
     e.stopPropagation()
-    try {
-      await navigator.clipboard.writeText(text)
+    if (await copyToClipboard(text)) {
       toast.success(`${label} copiato negli appunti`)
-    } catch {
+    } else {
       toast.error('Impossibile copiare negli appunti')
     }
   }

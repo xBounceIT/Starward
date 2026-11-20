@@ -38,7 +38,7 @@ import {
   parseCredentialTags,
   type CredentialFieldDef,
 } from '@/lib/credential-types'
-import { cn } from '@/lib/utils'
+import { cn, copyToClipboard } from '@/lib/utils'
 import {
   formatAccessTimestamp,
   formatShortDate,
@@ -159,12 +159,11 @@ export function CredentialDetail({
 
   const copyField = async (field: string, value: string, label: string) => {
     if (!value) return
-    try {
-      await navigator.clipboard.writeText(value)
+    if (await copyToClipboard(value)) {
       setCopiedField(field)
       toast.success(`${label} copiato negli appunti`)
       setTimeout(() => setCopiedField(null), 1800)
-    } catch {
+    } else {
       toast.error('Impossibile copiare negli appunti')
     }
   }
