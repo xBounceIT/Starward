@@ -189,7 +189,7 @@ function getToneBadgeClasses(tone: AuditActionMeta['tone']): string {
     case 'rose':
       return 'border-rose-500/35 bg-rose-500/12 text-rose-300'
     case 'violet':
-      return 'border-violet-500/35 bg-violet-500/12 text-violet-300 sync-security:border-[#ff9c00]/35 sync-security:bg-[#ff9c00]/12 sync-security:text-[#ff9c00]'
+      return 'border-border bg-secondary text-secondary-foreground sync-security:border-[#ff9c00]/35 sync-security:bg-[#ff9c00]/12 sync-security:text-[#ff9c00]'
     case 'sky':
     default:
       return 'border-sky-500/35 bg-sky-500/12 text-sky-300'
@@ -479,7 +479,7 @@ export function AdminPanel({
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex lg:hidden" />
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                 <ShieldCheck className="size-4.5" />
               </div>
               <h2 className="truncate text-xl font-bold tracking-tight">
@@ -487,7 +487,7 @@ export function AdminPanel({
               </h2>
               <Badge
                 variant="secondary"
-                className="border-violet-500/30 bg-violet-500/15 text-[11px] font-semibold text-violet-300 sync-security:border-[#ff9c00]/30 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                className="text-[11px] font-semibold sync-security:border-[#ff9c00]/30 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
               >
                 RBAC · Admin
               </Badge>
@@ -506,7 +506,7 @@ export function AdminPanel({
               className={cn(
                 'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
                 activeTab === 'users'
-                  ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30 sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -523,7 +523,7 @@ export function AdminPanel({
               className={cn(
                 'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
                 activeTab === 'audit'
-                  ? 'bg-violet-500/20 text-violet-300 ring-1 ring-violet-500/30 sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -539,7 +539,7 @@ export function AdminPanel({
         {/* Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
               <Users className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -688,7 +688,7 @@ export function AdminPanel({
               </div>
             ) : filteredUsers.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                   <Users className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
@@ -711,7 +711,7 @@ export function AdminPanel({
                       className={cn(
                         'flex flex-col justify-between gap-4 rounded-xl border px-4 py-3.5 transition-colors sm:flex-row sm:items-center',
                         isSelf
-                          ? 'border-violet-500/40 bg-violet-500/[0.04] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/[0.05]'
+                          ? 'border-primary/40 bg-accent/50 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/[0.05]'
                           : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/75',
                       )}
                     >
@@ -730,8 +730,8 @@ export function AdminPanel({
                             </p>
                             {isSelf && (
                               <Badge
-                                variant="outline"
-                                className="border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[10px] text-violet-300 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                                variant="secondary"
+                                className="px-1.5 py-0 text-[10px] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                               >
                                 Tu
                               </Badge>
@@ -770,7 +770,7 @@ export function AdminPanel({
                             <Folder className="size-3.5 text-sky-400" />
                             <span>{u.vault_count} cartelle</span>
                             <span className="text-border">·</span>
-                            <KeyRound className="size-3.5 text-violet-400 sync-security:text-[#ff9c00]" />
+                            <KeyRound className="size-3.5 text-muted-foreground sync-security:text-[#ff9c00]" />
                             <span>{u.credential_count} credenziali</span>
                           </div>
 
@@ -905,7 +905,7 @@ export function AdminPanel({
                 <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <User className="size-3.5 text-violet-400 sync-security:text-[#ff9c00]" />
+                      <User className="size-3.5 text-foreground sync-security:text-[#ff9c00]" />
                       <span>CHI (Attore & Ruolo)</span>
                     </div>
                     <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5">
@@ -1091,7 +1091,7 @@ export function AdminPanel({
                   </div>
                 ) : filteredAuditEvents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+                    <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                       <FileClock className="size-6" />
                     </div>
                     <p className="mt-3 text-sm font-semibold">
@@ -1150,8 +1150,8 @@ export function AdminPanel({
                                 </span>
                                 {isSelf && (
                                   <Badge
-                                    variant="outline"
-                                    className="border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[10px] text-violet-300 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                                    variant="secondary"
+                                    className="px-1.5 py-0 text-[10px] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                                   >
                                     Tu
                                   </Badge>
