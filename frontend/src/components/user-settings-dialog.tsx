@@ -853,7 +853,7 @@ export function UserSettingsDialog({
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
                       >
-                        <Moon className="size-4 shrink-0 text-violet-400" />
+                        <Moon className="size-4 shrink-0 text-foreground" />
                         <div>
                           <div>Tema Scuro</div>
                           <div className="text-xs font-normal text-muted-foreground">

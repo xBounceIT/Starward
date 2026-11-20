@@ -42,8 +42,8 @@ pub struct UpdateUserRoleRequest {
     pub role: String,
 }
 
-/// Predisposizione modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SystemAuditEventDto {
     pub id: String,
     pub actor_id: String,
@@ -273,7 +273,10 @@ pub struct UpdateVaultRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ShareVaultRequest {
-    pub email: String,
+    #[serde(default)]
+    pub user_id: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
     #[serde(default = "default_share_role")]
     pub role: String,
 }

@@ -21,7 +21,7 @@ export interface AdminUser {
 }
 
 /**
- * Predisposizione modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
+ * Modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
  */
 export interface SystemAuditEvent {
   id: string
@@ -34,6 +34,17 @@ export interface SystemAuditEvent {
   target_id: string | null
   details: string
   created_at: string
+}
+
+export interface SystemAuditQueryParams {
+  q?: string
+  actor_id?: string
+  actor_role?: UserRole
+  action?: string
+  target_type?: string
+  from?: string
+  to?: string
+  limit?: number
 }
 
 export type GroupRole = 'owner' | 'member'
@@ -274,8 +285,8 @@ export const vaultApi = {
       method: 'DELETE',
     }),
 
-  searchUsers: (q: string) =>
-    request<UserSummary[]>(`/users?q=${encodeURIComponent(q)}`),
+  searchUsers: (q = '') =>
+    request<UserSummary[]>(`/users${q ? `?q=${encodeURIComponent(q)}` : ''}`),
 
   listAdminUsers: (params?: { q?: string; role?: string }) => {
     const search = new URLSearchParams()
@@ -296,7 +307,19 @@ export const vaultApi = {
       method: 'DELETE',
     }),
 
-  listSystemAudit: () => request<SystemAuditEvent[]>('/admin/audit'),
+  listSystemAudit: (params?: SystemAuditQueryParams) => {
+    const search = new URLSearchParams()
+    if (params?.q) search.set('q', params.q)
+    if (params?.actor_id) search.set('actor_id', params.actor_id)
+    if (params?.actor_role) search.set('actor_role', params.actor_role)
+    if (params?.action) search.set('action', params.action)
+    if (params?.target_type) search.set('target_type', params.target_type)
+    if (params?.from) search.set('from', params.from)
+    if (params?.to) search.set('to', params.to)
+    if (params?.limit) search.set('limit', String(params.limit))
+    const qs = search.toString()
+    return request<SystemAuditEvent[]>(`/admin/audit${qs ? `?${qs}` : ''}`)
+  },
 
   listAdminGroups: (q?: string) => {
     const qs = q ? `?q=${encodeURIComponent(q)}` : ''
@@ -399,7 +422,7 @@ export const vaultApi = {
 
   shareVault: (
     vaultId: string,
-    payload: { email: string; role: 'editor' | 'viewer' },
+    payload: { user_id?: string; email?: string; role: 'editor' | 'viewer' },
   ) =>
     request<Vault>(`/vaults/${vaultId}/members`, {
       method: 'POST',

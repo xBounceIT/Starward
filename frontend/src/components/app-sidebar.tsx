@@ -129,7 +129,7 @@ function VaultSidebarMenuItem({
       <SidebarMenuButton
         isActive={active}
         className={cn(
-          'h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15',
+          'h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 sync-security:data-[active=true]:bg-[#ff9c00]/15',
           indented && 'pl-4',
         )}
         onClick={onSelect}
@@ -139,7 +139,7 @@ function VaultSidebarMenuItem({
           className={cn(
             'size-4 shrink-0',
             active
-              ? 'text-violet-400 sync-security:text-[#ff9c00]'
+              ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
               : palette.text,
           )}
         />
@@ -263,14 +263,14 @@ function GroupSidebarMenuItem({
     >
       <SidebarMenuButton
         isActive={active}
-        className="h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+        className="h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 sync-security:data-[active=true]:bg-[#ff9c00]/15"
         onClick={onSelect}
       >
         <Users
           className={cn(
             'size-4 shrink-0',
             active
-              ? 'text-violet-400 sync-security:text-[#ff9c00]'
+              ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
               : palette.text,
           )}
         />
@@ -461,13 +461,13 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={selection.type === 'all'}
                   onClick={() => handleSelect({ type: 'all' })}
-                  className="h-9 rounded-lg pr-8 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                  className="h-9 rounded-lg pr-8 sync-security:data-[active=true]:bg-[#ff9c00]/15"
                 >
                   <Layers
                     className={cn(
                       'size-4',
                       selection.type === 'all'
-                        ? 'text-violet-400 sync-security:text-[#ff9c00]'
+                        ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
                         : 'text-muted-foreground',
                     )}
                   />
@@ -482,7 +482,7 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={selection.type === 'favorites'}
                   onClick={() => handleSelect({ type: 'favorites' })}
-                  className="h-9 rounded-lg pr-8 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                  className="h-9 rounded-lg pr-8 sync-security:data-[active=true]:bg-[#ff9c00]/15"
                 >
                   <Star className="size-4 text-amber-400" />
                   <span>Preferiti</span>
@@ -724,8 +724,8 @@ export function AppSidebar({
               <SidebarGroupLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                 <span>Pannello Admin</span>
                 <Badge
-                  variant="outline"
-                  className="h-4 border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[9px] font-semibold text-violet-300 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                  variant="secondary"
+                  className="h-4 px-1.5 py-0 text-[9px] font-semibold sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                 >
                   Admin
                 </Badge>
@@ -740,14 +740,14 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'users' })
                       }
-                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
                     >
                       <User
                         className={cn(
                           'size-4',
                           selection.type === 'admin' &&
                             selection.tab === 'users'
-                            ? 'text-violet-400 sync-security:text-[#ff9c00]'
+                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
                             : 'text-muted-foreground',
                         )}
                       />
@@ -763,14 +763,14 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'groups' })
                       }
-                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
                     >
                       <Users
                         className={cn(
                           'size-4',
                           selection.type === 'admin' &&
                             selection.tab === 'groups'
-                            ? 'text-violet-400 sync-security:text-[#ff9c00]'
+                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
                             : 'text-muted-foreground',
                         )}
                       />
@@ -786,14 +786,14 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'audit' })
                       }
-                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
                     >
                       <FileClock
                         className={cn(
                           'size-4',
                           selection.type === 'admin' &&
                             selection.tab === 'audit'
-                            ? 'text-violet-400 sync-security:text-[#ff9c00]'
+                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
                             : 'text-muted-foreground',
                         )}
                       />
@@ -887,7 +887,7 @@ export function AppSidebar({
                         handleSelect({ type: 'admin', tab: 'users' })
                       }
                     >
-                      <ShieldCheck className="size-4 text-violet-400 sync-security:text-[#ff9c00]" />
+                      <ShieldCheck className="size-4 sync-security:text-[#ff9c00]" />
                       Pannello Admin
                     </DropdownMenuItem>
                   </>

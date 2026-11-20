@@ -303,7 +303,7 @@ export function GroupDetailPanel({
         {/* KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
               <Users className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -389,7 +389,7 @@ export function GroupDetailPanel({
 
             {ownedVaults.length === 0 && sharedVaults.length === 0 ? (
               <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-10 text-center">
-                <div className="flex size-11 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+                <div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
                   <Folder className="size-5" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">

@@ -15,6 +15,7 @@ use crate::{
         AddGroupMemberRequest, CreateGroupRequest, GroupDto, GroupMemberDto, GroupSummaryDto,
         UpdateGroupMemberRoleRequest, UpdateGroupRequest,
     },
+    routes::record_system_audit,
     AppState,
 };
 
@@ -511,6 +512,16 @@ pub async fn create_group(
 
     tx.commit().await?;
 
+    record_system_audit(
+        &state.db,
+        &user,
+        "group.created",
+        "group",
+        Some(&group_id),
+        &format!("Gruppo '{}' creato", name),
+    )
+    .await?;
+
     let dto = fetch_single_group(&state.db, &group_id, &user).await?;
     Ok((StatusCode::CREATED, Json(dto)))
 }
@@ -587,6 +598,16 @@ pub async fn update_group(
     .execute(&state.db)
     .await?;
 
+    record_system_audit(
+        &state.db,
+        &user,
+        "group.updated",
+        "group",
+        Some(&group_id),
+        &format!("Gruppo '{}' aggiornato", new_name),
+    )
+    .await?;
+
     let dto = fetch_single_group(&state.db, &group_id, &user).await?;
     Ok(Json(dto))
 }
@@ -597,6 +618,12 @@ pub async fn delete_group(
     Path(group_id): Path<String>,
 ) -> AppResult<StatusCode> {
     require_group_manager(&state.db, &group_id, &user).await?;
+
+    let group_name: String = sqlx::query_scalar("SELECT name FROM groups WHERE id = $1")
+        .bind(&group_id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Gruppo non trovato".to_string()))?;
 
     let mut tx = state.db.begin().await?;
 
@@ -639,6 +666,16 @@ pub async fn delete_group(
         .await?;
 
     tx.commit().await?;
+
+    record_system_audit(
+        &state.db,
+        &user,
+        "group.deleted",
+        "group",
+        Some(&group_id),
+        &format!("Gruppo '{}' eliminato", group_name),
+    )
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -710,6 +747,16 @@ pub async fn add_group_member(
         .execute(&state.db)
         .await?;
 
+    record_system_audit(
+        &state.db,
+        &user,
+        "group.member_added",
+        "group",
+        Some(&group_id),
+        &format!("Utente {} aggiunto al gruppo (ruolo: {})", target_email, role),
+    )
+    .await?;
+
     let dto = fetch_single_group(&state.db, &group_id, &user).await?;
     Ok((StatusCode::CREATED, Json(dto)))
 }
@@ -759,6 +806,16 @@ pub async fn update_group_member_role(
         .bind(&group_id)
         .execute(&state.db)
         .await?;
+
+    record_system_audit(
+        &state.db,
+        &user,
+        "group.member_updated",
+        "group",
+        Some(&group_id),
+        &format!("Ruolo membro {} nel gruppo aggiornato a {}", member_id, new_role),
+    )
+    .await?;
 
     let dto = fetch_single_group(&state.db, &group_id, &user).await?;
     Ok(Json(dto))
@@ -827,6 +884,16 @@ pub async fn remove_group_member(
         .bind(&group_id)
         .execute(&state.db)
         .await?;
+
+    record_system_audit(
+        &state.db,
+        &user,
+        "group.member_removed",
+        "group",
+        Some(&group_id),
+        &format!("Utente {} rimosso dal gruppo", target_email),
+    )
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

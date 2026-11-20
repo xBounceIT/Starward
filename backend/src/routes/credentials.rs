@@ -320,6 +320,20 @@ pub async fn get_credential(
     Path(credential_id): Path<String>,
 ) -> AppResult<Json<CredentialDto>> {
     let dto = fetch_credential_dto(&state, &credential_id, &user).await?;
+
+    record_audit(
+        &state.db,
+        &dto.vault_id,
+        Some(&dto.id),
+        &user,
+        "credential.accessed",
+        &format!(
+            "Credenziale '{}' consultata nella cartella '{}'",
+            dto.title, dto.vault_name
+        ),
+    )
+    .await?;
+
     Ok(Json(dto))
 }
 

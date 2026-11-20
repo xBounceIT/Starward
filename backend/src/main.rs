@@ -308,6 +308,21 @@ mod tests {
         assert!(!cfg.is_admin_email(""));
     }
 
+    #[test]
+    fn share_vault_request_deserializes_user_id_and_email() {
+        let by_id: crate::models::ShareVaultRequest =
+            serde_json::from_value(json!({ "user_id": "user-123", "role": "editor" })).unwrap();
+        assert_eq!(by_id.user_id.as_deref(), Some("user-123"));
+        assert_eq!(by_id.email, None);
+        assert_eq!(by_id.role, "editor");
+
+        let by_email: crate::models::ShareVaultRequest =
+            serde_json::from_value(json!({ "email": "bob@starward.io" })).unwrap();
+        assert_eq!(by_email.user_id, None);
+        assert_eq!(by_email.email.as_deref(), Some("bob@starward.io"));
+        assert_eq!(by_email.role, "viewer");
+    }
+
     #[tokio::test]
     async fn shared_folder_workflow_and_permissions_postgres() {
         let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
@@ -517,6 +532,30 @@ mod tests {
             .collect();
         assert_eq!(personal_vaults.len(), 1);
         let charlie_personal_id = personal_vaults[0]["id"].as_str().unwrap().to_string();
+
+        // 7b. Alice shares "Produzione" with Charlie via user_id selection
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{prod_id}/members"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "user_id": charlie_id, "role": "editor" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let updated_prod = read_json(res).await;
+        assert!(updated_prod["members"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|m| m["user_id"] == charlie_id && m["role"] == "editor" && m["is_pending"] == false));
 
         // 8. Database credential encrypts extra fields at rest and returns decrypted fields
         let res = app
@@ -971,7 +1010,63 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
-        // 13. Groups: create group, share existing vault with group, create vault on behalf of group, dynamic membership
+        // 13. System Audit Log: verify recorded events and filtering (Chi / Cosa / Quando)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/admin/audit?actor_id={alice_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let alice_audit = read_json(res).await;
+        let alice_events = alice_audit.as_array().unwrap();
+        let recorded_actions: Vec<&str> = alice_events
+            .iter()
+            .filter_map(|e| e["action"].as_str())
+            .collect();
+
+        assert!(recorded_actions.contains(&"auth.login"));
+        assert!(recorded_actions.contains(&"vault.created"));
+        assert!(recorded_actions.contains(&"vault.shared"));
+        assert!(recorded_actions.contains(&"credential.created"));
+        assert!(recorded_actions.contains(&"rbac.role_changed"));
+        assert!(recorded_actions.contains(&"user.deleted"));
+        assert!(recorded_actions.contains(&"user.settings_updated"));
+        assert!(recorded_actions.contains(&"user.profile_updated"));
+        assert!(recorded_actions.contains(&"api_key.created"));
+        assert!(recorded_actions.contains(&"auth.api_key_used"));
+        assert!(recorded_actions.contains(&"credential.accessed"));
+        assert!(recorded_actions.contains(&"api_key.revoked"));
+
+        // Filter system audit by action & actor_id
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!(
+                        "/api/admin/audit?actor_id={alice_id}&action=user.deleted&target_type=user"
+                    ))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let deleted_audit = read_json(res).await;
+        let deleted_events = deleted_audit.as_array().unwrap();
+        assert_eq!(deleted_events.len(), 1);
+        assert_eq!(deleted_events[0]["target_id"], charlie_id);
+        assert_eq!(deleted_events[0]["actor_role"], "admin");
+
+        // 14. Groups: create group, share existing vault with group, create vault on behalf of group, dynamic membership
         let dave_id = format!("test-dave-{suffix}");
         let dave_email = format!("dave-{suffix}@starward.io");
         let dave_token = make_token(&config.auth_secret, &dave_id, &dave_email, "Dave");
@@ -1181,8 +1276,15 @@ mod tests {
             .iter()
             .any(|v| v["id"] == group_vault_id));
 
-        // Clean up test users (cascades vaults, members, credentials, audit logs)
+        // Clean up test users and system audit logs
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3, $4)")
+            .bind(&alice_id)
+            .bind(&bob_id)
+            .bind(&charlie_id)
+            .bind(&dave_id)
+            .execute(&db)
+            .await;
+        let _ = sqlx::query("DELETE FROM system_audit_logs WHERE actor_id IN ($1, $2, $3, $4)")
             .bind(&alice_id)
             .bind(&bob_id)
             .bind(&charlie_id)

@@ -12,7 +12,7 @@ use crate::{
     models::{
         UpdateProfileRequest, UpdateUserSettingsRequest, UserRecord, UserSettingsDto, UserSummary,
     },
-    routes::require_vault_role,
+    routes::{record_system_audit, require_vault_role},
     AppState,
 };
 
@@ -55,6 +55,22 @@ pub async fn update_me(
     .bind(name)
     .bind(&user.id)
     .execute(&state.db)
+    .await?;
+
+    let mut updated_actor = user.clone();
+    updated_actor.name = name.to_string();
+
+    record_system_audit(
+        &state.db,
+        &updated_actor,
+        "user.profile_updated",
+        "user",
+        Some(&user.id),
+        &format!(
+            "Nome visualizzato aggiornato da '{}' a '{}'",
+            user.name, name
+        ),
+    )
     .await?;
 
     Ok(Json(UserSummary {
@@ -210,6 +226,19 @@ pub async fn update_settings(
     .fetch_one(&state.db)
     .await?;
 
+    record_system_audit(
+        &state.db,
+        &user,
+        "user.settings_updated",
+        "user",
+        Some(&user.id),
+        &format!(
+            "Preferenze utente aggiornate (tema: {}, lunghezza password: {})",
+            updated.theme, updated.password_generator_length
+        ),
+    )
+    .await?;
+
     Ok(Json(updated))
 }
 
@@ -227,7 +256,7 @@ pub async fn list_users(
         WHERE id != $1
           AND (email ILIKE $2 OR name ILIKE $2)
         ORDER BY LOWER(name) ASC
-        LIMIT 25
+        LIMIT 100
         "#,
     )
     .bind(&user.id)

@@ -12,7 +12,7 @@ use crate::{
     crypto::generate_api_key,
     error::{AppError, AppResult},
     models::{ApiKeyDto, CreateApiKeyRequest, CreatedApiKeyDto},
-    routes::get_user_vault_role,
+    routes::{get_user_vault_role, record_system_audit},
     AppState,
 };
 
@@ -161,6 +161,20 @@ pub async fn create_api_key(
     .await?;
 
     let api_key = row_to_dto(row, now);
+
+    record_system_audit(
+        &state.db,
+        &user,
+        "api_key.created",
+        "api_key",
+        Some(&id),
+        &format!(
+            "API Key '{}' ({}...) generata con permesso '{}'",
+            name, key_prefix, permission
+        ),
+    )
+    .await?;
+
     Ok((
         StatusCode::CREATED,
         Json(CreatedApiKeyDto {
@@ -177,15 +191,26 @@ pub async fn delete_api_key(
 ) -> AppResult<StatusCode> {
     user.require_session_auth()?;
 
-    let res = sqlx::query("DELETE FROM api_keys WHERE id = $1 AND user_id = $2")
-        .bind(&key_id)
-        .bind(&user.id)
-        .execute(&state.db)
-        .await?;
+    let deleted: Option<(String, String)> = sqlx::query_as(
+        "DELETE FROM api_keys WHERE id = $1 AND user_id = $2 RETURNING name, key_prefix",
+    )
+    .bind(&key_id)
+    .bind(&user.id)
+    .fetch_optional(&state.db)
+    .await?;
 
-    if res.rows_affected() == 0 {
-        return Err(AppError::NotFound("API Key non trovata".to_string()));
-    }
+    let (deleted_name, deleted_prefix) =
+        deleted.ok_or_else(|| AppError::NotFound("API Key non trovata".to_string()))?;
+
+    record_system_audit(
+        &state.db,
+        &user,
+        "api_key.revoked",
+        "api_key",
+        Some(&key_id),
+        &format!("API Key '{}' ({}...) revocata", deleted_name, deleted_prefix),
+    )
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

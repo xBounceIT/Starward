@@ -99,9 +99,12 @@ impl AuthenticatedUser {
 #[derive(Debug, FromRow)]
 struct ApiKeyAuthRow {
     api_key_id: String,
+    api_key_name: String,
+    key_prefix: String,
     permission: String,
     vault_ids: Vec<String>,
     expires_at: Option<DateTime<Utc>>,
+    last_used_at: Option<DateTime<Utc>>,
     user_id: String,
     email: String,
     name: String,
@@ -118,9 +121,12 @@ async fn authenticate_api_key(
         r#"
         SELECT
             ak.id AS api_key_id,
+            ak.name AS api_key_name,
+            ak.key_prefix,
             ak.permission,
             ak.vault_ids,
             ak.expires_at,
+            ak.last_used_at,
             u.id AS user_id,
             u.email,
             u.name,
@@ -146,6 +152,8 @@ async fn authenticate_api_key(
         }
     }
 
+    let is_first_use = row.last_used_at.is_none();
+
     sqlx::query("UPDATE api_keys SET last_used_at = $1 WHERE id = $2")
         .bind(now)
         .bind(&row.api_key_id)
@@ -158,7 +166,7 @@ async fn authenticate_api_key(
         .execute(&state.db)
         .await?;
 
-    Ok(AuthenticatedUser {
+    let auth_user = AuthenticatedUser {
         id: row.user_id,
         email: row.email,
         name: row.name,
@@ -168,7 +176,24 @@ async fn authenticate_api_key(
             permission: row.permission,
             vault_ids: row.vault_ids,
         }),
-    })
+    };
+
+    if is_first_use {
+        let _ = crate::routes::record_system_audit(
+            &state.db,
+            &auth_user,
+            "auth.api_key_used",
+            "api_key",
+            Some(&row.api_key_id),
+            &format!(
+                "Primo accesso programmatico effettuato tramite API Key '{}' ({}...)",
+                row.api_key_name, row.key_prefix
+            ),
+        )
+        .await;
+    }
+
+    Ok(auth_user)
 }
 
 impl FromRequestParts<AppState> for AuthenticatedUser {
@@ -306,6 +331,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         .fetch_optional(&state.db)
         .await?;
 
+        let mut is_first_login = false;
         if personal_exists.is_none() {
             let vault_id = Uuid::new_v4().to_string();
             let member_id = Uuid::new_v4().to_string();
@@ -326,6 +352,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .await?;
 
             if let Some((created_vault_id,)) = inserted_vault {
+                is_first_login = true;
                 sqlx::query(
                     r#"
                     INSERT INTO vault_members (id, vault_id, user_id, member_email, role, shared_by, created_at)
@@ -345,14 +372,31 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             tx.commit().await?;
         }
 
-        Ok(AuthenticatedUser {
+        let auth_user = AuthenticatedUser {
             id: claims.sub,
             email: email_normalized,
             name: synced_user.0,
             image: synced_user.1,
             role: synced_user.2,
             api_key: None,
-        })
+        };
+
+        if is_first_login {
+            let _ = crate::routes::record_system_audit(
+                &state.db,
+                &auth_user,
+                "auth.login",
+                "auth",
+                Some(&auth_user.id),
+                &format!(
+                    "Accesso utente registrato e vault Personale inizializzato (ruolo assegnato: {})",
+                    auth_user.role
+                ),
+            )
+            .await;
+        }
+
+        Ok(auth_user)
     }
 }
 

@@ -125,6 +125,24 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_vault_id ON audit_logs (vault_id);
 
+CREATE TABLE IF NOT EXISTS system_audit_logs (
+    id TEXT PRIMARY KEY NOT NULL,
+    actor_id TEXT NOT NULL,
+    actor_email TEXT NOT NULL,
+    actor_name TEXT NOT NULL,
+    actor_role TEXT NOT NULL DEFAULT 'user' CHECK (actor_role IN ('admin', 'user')),
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT,
+    details TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_created_at ON system_audit_logs (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_actor_id ON system_audit_logs (actor_id);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_action ON system_audit_logs (action);
+CREATE INDEX IF NOT EXISTS idx_system_audit_logs_target_type ON system_audit_logs (target_type);
+
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     theme TEXT NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark', 'sync-security')),

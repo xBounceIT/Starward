@@ -130,7 +130,7 @@ export function CredentialDetail({
           </div>
         )}
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
             <ShieldCheck className="size-7" />
           </div>
           <h3 className="mt-4 text-base font-semibold">
@@ -295,12 +295,12 @@ export function CredentialDetail({
               </span>
             ) : externalHref ? (
               <div className="flex min-w-0 items-center gap-2">
-                <Link2 className="size-3.5 shrink-0 text-violet-400 sync-security:text-[#ff9c00]" />
+                <Link2 className="size-3.5 shrink-0 text-muted-foreground sync-security:text-[#ff9c00]" />
                 <a
                   href={externalHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="truncate text-sm text-violet-400 hover:underline sync-security:text-[#ff9c00]"
+                  className="truncate text-sm text-primary underline-offset-4 hover:underline sync-security:text-[#ff9c00]"
                 >
                   {displayValue}
                 </a>
@@ -607,7 +607,7 @@ export function CredentialDetail({
                       }
                     }}
                     placeholder="Nuovo tag..."
-                    className="h-7 w-28 rounded-lg border border-violet-500/60 bg-card px-2.5 text-xs text-foreground outline-none sync-security:border-[#ff9c00]/60"
+                    className="h-7 w-28 rounded-lg border border-ring bg-card px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sync-security:border-[#ff9c00]/60"
                   />
                 ) : (
                   <button
@@ -702,7 +702,7 @@ export function CredentialDetail({
             href={normalizedUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-400 px-3.5 text-xs font-semibold text-zinc-950 shadow-xs transition-colors hover:bg-violet-300 sync-security:bg-[#ff9c00] sync-security:text-[#000c20] sync-security:hover:bg-[#ff9c00]/90"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 sync-security:bg-[#ff9c00] sync-security:text-[#000c20] sync-security:hover:bg-[#ff9c00]/90"
           >
             <ExternalLink className="size-3.5 shrink-0" />
             <span>Apri URL</span>
@@ -711,7 +711,7 @@ export function CredentialDetail({
           <button
             type="button"
             disabled
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-violet-400/40 px-3.5 text-xs font-semibold text-zinc-950/60 opacity-50 sync-security:bg-[#ff9c00]/40 sync-security:text-[#000c20]/60"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground opacity-50 sync-security:bg-[#ff9c00]/40 sync-security:text-[#000c20]/60"
           >
             <ExternalLink className="size-3.5 shrink-0" />
             <span>Apri URL</span>

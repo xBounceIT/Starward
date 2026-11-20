@@ -436,7 +436,7 @@ export function CredentialList({
         {/* 4 Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
               <KeyRound className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -558,7 +558,7 @@ export function CredentialList({
               className={cn(
                 'flex size-8 items-center justify-center rounded-lg transition-colors',
                 viewMode === 'list'
-                  ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/30 dark:text-violet-300 sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -572,7 +572,7 @@ export function CredentialList({
               className={cn(
                 'flex size-8 items-center justify-center rounded-lg transition-colors',
                 viewMode === 'grid'
-                  ? 'bg-violet-500/20 text-violet-400 ring-1 ring-violet-500/30 dark:text-violet-300 sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -653,7 +653,7 @@ export function CredentialList({
           </div>
         ) : credentials.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
               <KeyRound className="size-6" />
             </div>
             <p className="mt-3 text-sm font-semibold">
@@ -702,7 +702,7 @@ export function CredentialList({
                   className={cn(
                     'group relative flex cursor-pointer flex-col justify-between gap-3 rounded-xl border p-4 text-left transition-all',
                     isSelected
-                      ? 'border-violet-500/70 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(139,92,246,0.2)] sync-security:border-[#ff9c00]/70 sync-security:bg-[#ff9c00]/[0.08] sync-security:shadow-[0_0_0_1px_rgba(255,156,0,0.2)]'
+                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00]/70 sync-security:bg-[#ff9c00]/[0.08] sync-security:ring-0 sync-security:shadow-[0_0_0_1px_rgba(255,156,0,0.2)]'
                       : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80',
                   )}
                 >
@@ -801,7 +801,7 @@ export function CredentialList({
                   className={cn(
                     'group relative flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all',
                     isSelected
-                      ? 'border-violet-500/70 bg-violet-500/[0.08] shadow-[0_0_0_1px_rgba(139,92,246,0.2)] sync-security:border-[#ff9c00]/70 sync-security:bg-[#ff9c00]/[0.08] sync-security:shadow-[0_0_0_1px_rgba(255,156,0,0.2)]'
+                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00]/70 sync-security:bg-[#ff9c00]/[0.08] sync-security:ring-0 sync-security:shadow-[0_0_0_1px_rgba(255,156,0,0.2)]'
                       : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80',
                   )}
                 >
