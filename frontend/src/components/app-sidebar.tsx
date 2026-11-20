@@ -129,7 +129,7 @@ function VaultSidebarMenuItem({
       <SidebarMenuButton
         isActive={active}
         className={cn(
-          'h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 sync-security:data-[active=true]:bg-[#ff9c00]/15',
+          'h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 sync-security:rounded-md sync-security:data-[active=true]:border-l-2 sync-security:data-[active=true]:border-[#ff9c00] sync-security:data-[active=true]:bg-[#0e1b33] sync-security:data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]',
           indented && 'pl-4',
         )}
         onClick={onSelect}
@@ -375,17 +375,17 @@ export function AppSidebar({
 
   return (
     <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="gap-3.5 p-3.5">
+      <SidebarHeader className="gap-3.5 p-3.5 sync-security:border-b sync-security:border-white/20">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/50 text-foreground sync-security:border-[#ff9c00]/30 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-muted/50 text-foreground sync-security:rounded-full sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <ShieldCheck className="size-4.5" />
             </div>
             <div className="min-w-0">
-              <h1 className="truncate text-sm font-semibold leading-none tracking-tight">
+              <h1 className="truncate text-sm font-semibold leading-none tracking-tight sync-security:text-[13px] sync-security:tracking-normal">
                 Starward Vault
               </h1>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground">
+              <p className="mt-1 truncate text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
                 Vault · v{APP_VERSION}
               </p>
             </div>
@@ -461,7 +461,7 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={selection.type === 'all'}
                   onClick={() => handleSelect({ type: 'all' })}
-                  className="h-9 rounded-lg pr-8 sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                  className="h-9 rounded-lg pr-8 sync-security:rounded-md sync-security:data-[active=true]:border-l-2 sync-security:data-[active=true]:border-[#ff9c00] sync-security:data-[active=true]:bg-[#0e1b33] sync-security:data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
                 >
                   <Layers
                     className={cn(
@@ -482,9 +482,9 @@ export function AppSidebar({
                 <SidebarMenuButton
                   isActive={selection.type === 'favorites'}
                   onClick={() => handleSelect({ type: 'favorites' })}
-                  className="h-9 rounded-lg pr-8 sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                  className="h-9 rounded-lg pr-8 sync-security:rounded-md sync-security:data-[active=true]:border-l-2 sync-security:data-[active=true]:border-[#ff9c00] sync-security:data-[active=true]:bg-[#0e1b33] sync-security:data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
                 >
-                  <Star className="size-4 text-amber-400" />
+                  <Star className="size-4 text-amber-400 sync-security:text-[#ff9c00]" />
                   <span>Preferiti</span>
                 </SidebarMenuButton>
                 <SidebarMenuBadge className="text-xs text-muted-foreground">
@@ -664,14 +664,14 @@ export function AppSidebar({
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <SidebarMenuItem>
-                <div className="flex h-9 items-center justify-between px-2 text-sm text-muted-foreground">
+                <div className="flex h-9 items-center justify-between px-2 text-sm text-muted-foreground sync-security:text-[#ff9c00]">
                   <div className="flex items-center gap-2">
                     <Share2 className="size-4 shrink-0" />
-                    <span className="text-xs font-medium">
+                    <span className="text-xs font-medium sync-security:text-[11px] sync-security:font-bold sync-security:tracking-[0.14em] sync-security:uppercase">
                       Condivise con me
                     </span>
                   </div>
-                  <span className="text-xs font-medium">
+                  <span className="text-xs font-medium sync-security:text-white/75">
                     {sharedWithMe.length}
                   </span>
                 </div>
@@ -740,7 +740,7 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'users' })
                       }
-                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      className="h-9 rounded-lg sync-security:rounded-md sync-security:data-[active=true]:border-l-2 sync-security:data-[active=true]:border-[#ff9c00] sync-security:data-[active=true]:bg-[#0e1b33] sync-security:data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
                     >
                       <User
                         className={cn(
@@ -786,7 +786,7 @@ export function AppSidebar({
                       onClick={() =>
                         handleSelect({ type: 'admin', tab: 'audit' })
                       }
-                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      className="h-9 rounded-lg sync-security:rounded-md sync-security:data-[active=true]:border-l-2 sync-security:data-[active=true]:border-[#ff9c00] sync-security:data-[active=true]:bg-[#0e1b33] sync-security:data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
                     >
                       <FileClock
                         className={cn(

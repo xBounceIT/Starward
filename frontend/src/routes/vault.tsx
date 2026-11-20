@@ -459,7 +459,7 @@ function VaultWorkspace() {
 
       <SidebarInset className="flex h-svh min-h-0 flex-col overflow-hidden">
         {/* Mobile & Tablet Header */}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b px-3 lg:hidden">
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-3 sync-security:border-white/20 sync-security:bg-[#000c20] lg:hidden">
           <div className="flex items-center gap-2">
             {selection.type !== 'admin' &&
             selection.type !== 'group' &&
@@ -481,7 +481,7 @@ function VaultWorkspace() {
                 />
               </>
             )}
-            <span className="text-sm font-semibold">
+            <span className="text-sm font-semibold sync-security:font-['Michroma',sans-serif] sync-security:text-xs sync-security:font-normal">
               {selection.type === 'admin'
                 ? 'Pannello Admin'
                 : selection.type === 'group' && activeGroup

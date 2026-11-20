@@ -112,18 +112,22 @@ function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-muted/40 p-6 md:p-10">
+    <div className="flex min-h-svh flex-col items-center justify-center bg-muted/40 p-6 sync-security:bg-[#000c20] sync-security:bg-[radial-gradient(ellipse_at_top,rgba(26,44,75,0.45),#000c20_65%)] md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
-        <div className="flex items-center gap-2 self-center font-medium">
-          <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <ShieldCheck className="size-4" />
+        <div className="flex items-center gap-2.5 self-center font-medium">
+          <div className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground sync-security:size-8 sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+            <ShieldCheck className="size-4 sync-security:size-4.5" />
           </div>
-          <span className="font-semibold tracking-tight">Starward</span>
+          <span className="font-semibold tracking-tight sync-security:font-['Michroma',sans-serif] sync-security:text-base sync-security:font-normal sync-security:tracking-wide">
+            Starward
+          </span>
         </div>
 
-        <Card>
+        <Card className="sync-security:border-white/20 sync-security:border-t-2 sync-security:border-t-[#ff9c00]">
           <CardHeader className="text-center">
-            <CardTitle className="text-xl">Accedi al tuo Vault</CardTitle>
+            <CardTitle className="text-xl sync-security:text-lg sync-security:text-[#ff9c00]">
+              Accedi al tuo Vault
+            </CardTitle>
             <CardDescription>
               {ssoProviders.length > 0
                 ? 'Accedi con le tue credenziali o tramite SSO.'

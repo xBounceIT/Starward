@@ -301,9 +301,9 @@ export function CredentialList({
             <div className="flex items-center gap-2.5">
               <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex lg:hidden" />
               {selection.type === 'all' ? (
-                <Layers className="size-5 shrink-0 text-muted-foreground" />
+                <Layers className="size-5 shrink-0 text-muted-foreground sync-security:text-[#ff9c00]" />
               ) : selection.type === 'favorites' ? (
-                <Star className="size-5 shrink-0 fill-amber-400 text-amber-400" />
+                <Star className="size-5 shrink-0 fill-amber-400 text-amber-400 sync-security:fill-[#ff9c00] sync-security:text-[#ff9c00]" />
               ) : activeVault ? (
                 <VaultIcon
                   icon={activeVault.icon}
@@ -313,7 +313,7 @@ export function CredentialList({
                   )}
                 />
               ) : null}
-              <h2 className="truncate text-xl font-bold tracking-tight">
+              <h2 className="truncate text-xl font-bold tracking-tight sync-security:text-lg sync-security:tracking-normal">
                 {headerTitle}
               </h2>
               {activeVault?.owner_group_name && (
@@ -435,12 +435,12 @@ export function CredentialList({
 
         {/* 4 Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <KeyRound className="size-4.5" />
             </div>
             <div className="min-w-0">
-              <p className="text-lg font-bold leading-none tracking-tight">
+              <p className="text-lg font-bold leading-none tracking-tight sync-security:text-[#ff9c00]">
                 {stats.total}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -449,8 +449,8 @@ export function CredentialList({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 sync-security:rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
               <Star className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -463,8 +463,8 @@ export function CredentialList({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 sync-security:rounded-full">
               <Folder className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -477,8 +477,8 @@ export function CredentialList({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 sync-security:rounded-full">
               <Clock className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -501,7 +501,7 @@ export function CredentialList({
               placeholder="Cerca titolo, username, URL..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-10 rounded-xl border-border/70 bg-card/50 pr-24 pl-10 text-sm"
+              className="h-10 rounded-xl border-border/70 bg-card/50 pr-24 pl-10 text-sm sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
             />
             <div className="absolute top-1/2 right-2.5 flex -translate-y-1/2 items-center gap-1.5">
               {searchQuery && (
@@ -516,7 +516,7 @@ export function CredentialList({
                   <X className="size-3.5" />
                 </Button>
               )}
-              <kbd className="pointer-events-none hidden rounded-md border border-border/80 bg-muted/60 px-2 py-0.5 font-sans text-[11px] font-medium text-muted-foreground sm:inline-block">
+              <kbd className="pointer-events-none hidden rounded-md border border-border/80 bg-muted/60 px-2 py-0.5 font-sans text-[11px] font-medium text-muted-foreground sync-security:border-[#ff9c00]/35 sync-security:bg-[#1a2c4b] sync-security:text-[#ff9c00] sm:inline-block">
                 Ctrl + K
               </kbd>
             </div>
@@ -527,7 +527,7 @@ export function CredentialList({
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs font-medium hover:bg-card"
+                className="h-10 gap-2 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs font-medium hover:bg-card sync-security:rounded-lg"
               >
                 <ArrowUpDown className="size-3.5 text-muted-foreground" />
                 <span>{currentSortLabel}</span>
@@ -549,17 +549,17 @@ export function CredentialList({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-border/70 bg-card/50 p-1">
+          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
             <button
               type="button"
               onClick={() => setViewMode('list')}
               title="Vista lista"
               aria-label="Vista lista"
               className={cn(
-                'flex size-8 items-center justify-center rounded-lg transition-colors',
+                'flex size-8 items-center justify-center rounded-lg transition-colors sync-security:rounded-[5px]',
                 viewMode === 'list'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
               <List className="size-4" />
@@ -570,10 +570,10 @@ export function CredentialList({
               title="Vista griglia"
               aria-label="Vista griglia"
               className={cn(
-                'flex size-8 items-center justify-center rounded-lg transition-colors',
+                'flex size-8 items-center justify-center rounded-lg transition-colors sync-security:rounded-[5px]',
                 viewMode === 'grid'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
               <LayoutGrid className="size-4" />
@@ -591,10 +591,10 @@ export function CredentialList({
               type="button"
               onClick={() => onCategoryFilterChange('')}
               className={cn(
-                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs transition-colors',
+                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs transition-colors sync-security:rounded-[5px]',
                 categoryFilter === ''
-                  ? 'bg-foreground font-semibold text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
-                  : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground',
+                  ? 'bg-foreground font-semibold text-background shadow-xs sync-security:border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                  : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
               )}
             >
               Tutte
@@ -609,10 +609,10 @@ export function CredentialList({
                     onCategoryFilterChange(active ? '' : cat.value)
                   }
                   className={cn(
-                    'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs transition-colors',
+                    'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs transition-colors sync-security:rounded-[5px]',
                     active
-                      ? 'bg-foreground font-semibold text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
-                      : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground',
+                      ? 'bg-foreground font-semibold text-background shadow-xs sync-security:border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                      : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
                   )}
                 >
                   <CategoryIcon category={cat.value} className="size-3.5" />
@@ -652,8 +652,8 @@ export function CredentialList({
             ))}
           </div>
         ) : credentials.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <KeyRound className="size-6" />
             </div>
             <p className="mt-3 text-sm font-semibold">
@@ -700,21 +700,21 @@ export function CredentialList({
                     }
                   }}
                   className={cn(
-                    'group relative flex cursor-pointer flex-col justify-between gap-3 rounded-xl border p-4 text-left transition-all',
+                    'group relative flex cursor-pointer flex-col justify-between gap-3 rounded-xl border p-4 text-left transition-all sync-security:rounded-lg',
                     isSelected
-                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00]/70 sync-security:bg-[#ff9c00]/[0.08] sync-security:ring-0 sync-security:shadow-[0_0_0_1px_rgba(255,156,0,0.2)]'
-                      : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80',
+                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00] sync-security:border-l-2 sync-security:bg-[#132442] sync-security:ring-0 sync-security:shadow-none'
+                      : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
                   )}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                       <CredentialBrandIcon
                         credential={cred}
-                        className="size-10 rounded-xl"
+                        className="size-10 rounded-xl sync-security:rounded-lg"
                         iconClassName="size-5"
                       />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground">
+                        <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
                           {cred.title}
                         </p>
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -799,21 +799,21 @@ export function CredentialList({
                     }
                   }}
                   className={cn(
-                    'group relative flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all',
+                    'group relative flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all sync-security:rounded-lg',
                     isSelected
-                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00]/70 sync-security:bg-[#ff9c00]/[0.08] sync-security:ring-0 sync-security:shadow-[0_0_0_1px_rgba(255,156,0,0.2)]'
-                      : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80',
+                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00] sync-security:border-l-2 sync-security:bg-[#132442] sync-security:ring-0 sync-security:shadow-none'
+                      : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
                   )}
                 >
                   <CredentialBrandIcon
                     credential={cred}
-                    className="size-10 rounded-xl"
+                    className="size-10 rounded-xl sync-security:rounded-lg"
                     iconClassName="size-5"
                   />
 
                   {/* Title & Category Column */}
                   <div className="min-w-0 flex-1 sm:w-44 sm:flex-none xl:w-52">
-                    <p className="truncate text-sm font-semibold text-foreground">
+                    <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
                       {cred.title}
                     </p>
                     <p className="mt-0.5 truncate text-xs text-muted-foreground">

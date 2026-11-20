@@ -21,7 +21,19 @@ export const Route = createRootRoute({
           'Vault centralizzato con cartelle condivise, cifratura AES-256-GCM e autenticazione locale o SSO.',
       },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossOrigin: 'anonymous',
+      },
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@400;500;600;700&family=Michroma&display=swap',
+      },
+      { rel: 'stylesheet', href: appCss },
+    ],
   }),
   component: RootDocument,
 })

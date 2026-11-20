@@ -316,7 +316,7 @@ export function CredentialBrandIcon({
       return (
         <div
           className={cn(
-            'flex shrink-0 items-center justify-center border border-violet-500/25 bg-violet-500/15 text-violet-400',
+            'flex shrink-0 items-center justify-center border border-violet-500/25 bg-violet-500/15 text-violet-400 sync-security:border-[#ff9c00]/35 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]',
             className,
           )}
         >

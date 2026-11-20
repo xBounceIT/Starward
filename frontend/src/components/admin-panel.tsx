@@ -666,20 +666,20 @@ export function AdminPanel({
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col bg-background">
       {/* Top Header & Navigation Tabs */}
-      <div className="space-y-4 border-b border-border/70 px-5 pt-5 pb-4 sm:px-6">
+      <div className="space-y-4 border-b border-border/70 px-5 pt-5 pb-4 sync-security:border-white/20 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex lg:hidden" />
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
                 <ShieldCheck className="size-4.5" />
               </div>
-              <h2 className="truncate text-xl font-bold tracking-tight">
+              <h2 className="truncate text-xl font-bold tracking-tight sync-security:text-lg sync-security:tracking-normal">
                 Pannello Admin
               </h2>
               <Badge
                 variant="secondary"
-                className="text-[11px] font-semibold sync-security:border-[#ff9c00]/30 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                className="text-[11px] font-semibold sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
               >
                 RBAC · Admin
               </Badge>
@@ -691,20 +691,20 @@ export function AdminPanel({
           </div>
 
           {/* Section Switcher Tabs */}
-          <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1">
+          <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
             <button
               type="button"
               onClick={() => onTabChange('users')}
               className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
+                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
                 activeTab === 'users'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
               <User className="size-3.5" />
               <span>Lista utenti</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px]">
+              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
                 {users.length}
               </span>
             </button>
@@ -730,15 +730,15 @@ export function AdminPanel({
               type="button"
               onClick={() => onTabChange('audit')}
               className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors',
+                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
                 activeTab === 'audit'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00] sync-security:ring-[#ff9c00]/40'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
               <FileClock className="size-3.5" />
               <span>Audit di sistema</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px]">
+              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
                 {auditEvents.length}
               </span>
             </button>
@@ -747,12 +747,12 @@ export function AdminPanel({
 
         {/* Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <User className="size-4.5" />
             </div>
             <div className="min-w-0">
-              <p className="text-lg font-bold leading-none tracking-tight">
+              <p className="text-lg font-bold leading-none tracking-tight sync-security:text-[#ff9c00]">
                 {stats.total}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -761,8 +761,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 sync-security:rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
               <ShieldCheck className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -775,8 +775,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 sync-security:rounded-full">
               <Users className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -789,8 +789,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
+          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 sync-security:rounded-full">
               <Folder className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -833,7 +833,7 @@ export function AdminPanel({
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1">
+              <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
                 {(
                   [
                     { value: '', label: 'Tutti' },
@@ -848,10 +848,10 @@ export function AdminPanel({
                       type="button"
                       onClick={() => setRoleFilter(pill.value)}
                       className={cn(
-                        'inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors',
+                        'inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors sync-security:rounded-[5px]',
                         active
-                          ? 'bg-foreground text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
-                          : 'text-muted-foreground hover:text-foreground',
+                          ? 'bg-foreground text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                          : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
                       )}
                     >
                       {pill.label}
@@ -896,8 +896,8 @@ export function AdminPanel({
                 ))}
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+                <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
                   <Users className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
@@ -918,10 +918,10 @@ export function AdminPanel({
                     <div
                       key={u.id}
                       className={cn(
-                        'flex flex-col justify-between gap-4 rounded-xl border px-4 py-3.5 transition-colors sm:flex-row sm:items-center',
+                        'flex flex-col justify-between gap-4 rounded-xl border px-4 py-3.5 transition-colors sync-security:rounded-lg sm:flex-row sm:items-center',
                         isSelf
-                          ? 'border-primary/40 bg-accent/50 sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/[0.05]'
-                          : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/75',
+                          ? 'border-primary/40 bg-accent/50 sync-security:border-[#ff9c00]/70 sync-security:border-l-2 sync-security:bg-[#132442]'
+                          : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/75 sync-security:border-white/15 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/50 sync-security:hover:bg-[#132442]',
                       )}
                     >
                       {/* User Identity */}
@@ -1385,7 +1385,7 @@ export function AdminPanel({
                 placeholder="Cerca evento per utente, email, codice azione o dettagli..."
                 value={auditSearchQuery}
                 onChange={(e) => setAuditSearchQuery(e.target.value)}
-                className="h-10 rounded-xl border-border/70 bg-card/50 pr-10 pl-10 text-sm"
+                className="h-10 rounded-xl border-border/70 bg-card/50 pr-10 pl-10 text-sm sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
               />
               {auditSearchQuery && (
                 <Button
@@ -1408,7 +1408,7 @@ export function AdminPanel({
                   variant="ghost"
                   size="sm"
                   onClick={resetAuditFilters}
-                  className="h-10 gap-1.5 rounded-xl px-3 text-xs text-muted-foreground hover:text-foreground"
+                  className="h-10 gap-1.5 rounded-xl px-3 text-xs text-muted-foreground hover:text-foreground sync-security:rounded-lg"
                 >
                   <FilterX className="size-3.5" />
                   <span>Reset filtri</span>
@@ -1421,7 +1421,7 @@ export function AdminPanel({
                 size="sm"
                 disabled={auditRefreshing}
                 onClick={() => loadAudit(true)}
-                className="h-10 gap-1.5 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs"
+                className="h-10 gap-1.5 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs sync-security:rounded-lg"
               >
                 <RefreshCw
                   className={cn('size-3.5', auditRefreshing && 'animate-spin')}
@@ -1436,13 +1436,13 @@ export function AdminPanel({
               {/* Interactive Filter Controls (Chi / Cosa / Quando) */}
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                 {/* 1. CHI (Attore & Ruolo) */}
-                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5">
+                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                       <User className="size-3.5 text-foreground sync-security:text-[#ff9c00]" />
                       <span>CHI (Attore & Ruolo)</span>
                     </div>
-                    <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5">
+                    <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5 sync-security:border-white/15 sync-security:bg-[#000c20]">
                       {(
                         [
                           { value: '', label: 'Tutti' },
@@ -1457,10 +1457,10 @@ export function AdminPanel({
                             type="button"
                             onClick={() => setAuditActorRole(pill.value)}
                             className={cn(
-                              'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors',
+                              'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors sync-security:rounded-[4px]',
                               active
-                                ? 'bg-foreground text-background sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
-                                : 'text-muted-foreground hover:text-foreground',
+                                ? 'bg-foreground text-background sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                                : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
                             )}
                           >
                             {pill.label}
@@ -1489,7 +1489,7 @@ export function AdminPanel({
                 </div>
 
                 {/* 2. COSA (Azione & Risorsa) */}
-                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5">
+                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                       <Activity className="size-3.5 text-sky-400" />
@@ -1546,7 +1546,7 @@ export function AdminPanel({
                 </div>
 
                 {/* 3. QUANDO (Timestamp) */}
-                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5">
+                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                       <Clock className="size-3.5 text-emerald-400" />
@@ -1558,7 +1558,7 @@ export function AdminPanel({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-1 rounded-lg border border-border/60 bg-background/50 p-1">
+                  <div className="grid grid-cols-4 gap-1 rounded-lg border border-border/60 bg-background/50 p-1 sync-security:border-white/15 sync-security:bg-[#000c20]">
                     {(
                       [
                         { value: 'all', label: 'Tutto' },
@@ -1574,10 +1574,10 @@ export function AdminPanel({
                           type="button"
                           onClick={() => setAuditPeriod(period.value)}
                           className={cn(
-                            'inline-flex h-6 items-center justify-center rounded-md px-2 text-[11px] font-medium transition-colors',
+                            'inline-flex h-6 items-center justify-center rounded-md px-2 text-[11px] font-medium transition-colors sync-security:rounded-[4px]',
                             active
-                              ? 'bg-foreground text-background shadow-2xs sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
-                              : 'text-muted-foreground hover:text-foreground',
+                              ? 'bg-foreground text-background shadow-2xs sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                              : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
                           )}
                         >
                           {period.label}
@@ -1589,8 +1589,8 @@ export function AdminPanel({
               </div>
 
               {/* System Audit Events Table */}
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/30">
-                <div className="hidden grid-cols-12 border-b border-border/70 bg-muted/40 px-4 py-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase md:grid">
+              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/30 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+                <div className="hidden grid-cols-12 border-b border-border/70 bg-muted/40 px-4 py-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase sync-security:border-white/15 sync-security:bg-[#1a2c4b]/60 sync-security:tracking-[0.14em] sync-security:text-[#ff9c00] md:grid">
                   <div className="col-span-4">Chi (Attore & Ruolo)</div>
                   <div className="col-span-5">Cosa (Azione & Dettagli)</div>
                   <div className="col-span-3 text-right">
@@ -1625,7 +1625,7 @@ export function AdminPanel({
                   </div>
                 ) : filteredAuditEvents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]">
+                    <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
                       <FileClock className="size-6" />
                     </div>
                     <p className="mt-3 text-sm font-semibold">

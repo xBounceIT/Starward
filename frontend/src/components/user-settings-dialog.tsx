@@ -891,22 +891,22 @@ export function UserSettingsDialog({
                           setTheme('sync-security')
                         }}
                         className={cn(
-                          'flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left text-sm transition-colors',
+                          'flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left text-sm transition-colors sync-security:rounded-lg',
                           prefTheme === 'sync-security'
-                            ? 'border-primary bg-primary/10 font-medium text-foreground'
+                            ? 'border-primary bg-primary/10 font-medium text-foreground sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00]/15'
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
                       >
                         <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full border border-[#ff9c00] bg-[#000c20]"
+                          className="flex size-5 shrink-0 items-center justify-center rounded-full border border-[#ff9c00] bg-[#000c20] shadow-[inset_0_0_0_2px_#0e1b33]"
                           aria-hidden="true"
                         >
-                          <span className="size-1.5 rounded-full bg-[#ff9c00]" />
+                          <span className="size-2 rounded-full bg-[#ff9c00]" />
                         </span>
                         <div>
                           <div>Sync Security</div>
                           <div className="text-xs font-normal text-muted-foreground">
-                            Navy & Arancio
+                            Stile syncsecurity.it
                           </div>
                         </div>
                       </button>
