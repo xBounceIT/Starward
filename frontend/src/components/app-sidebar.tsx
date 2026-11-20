@@ -6,7 +6,6 @@ import {
   FileClock,
   FolderPlus,
   History,
-  KeyRound,
   Layers,
   LogOut,
   Moon,
@@ -17,7 +16,6 @@ import {
   Settings,
   Share2,
   ShieldCheck,
-  Sparkles,
   Star,
   Sun,
   Trash2,
@@ -907,19 +905,6 @@ export function AppSidebar({
                     </span>
                   </div>
                 </DropdownMenuLabel>
-                {user.role === 'admin' && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleSelect({ type: 'admin', tab: 'users' })
-                      }
-                    >
-                      <ShieldCheck className="size-4 sync-security:text-[#ff9c00]" />
-                      Pannello Admin
-                    </DropdownMenuItem>
-                  </>
-                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
@@ -929,24 +914,6 @@ export function AppSidebar({
                 >
                   <Settings className="size-4" />
                   Impostazioni account
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setOpenMobile(false)
-                    onOpenSettings('preferences')
-                  }}
-                >
-                  <Sparkles className="size-4" />
-                  Preferenze vault
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setOpenMobile(false)
-                    onOpenSettings('api-keys')
-                  }}
-                >
-                  <KeyRound className="size-4" />
-                  API Key
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={onSignOut}>

@@ -307,14 +307,12 @@ function formatExactAuditDateTime(iso: string): string {
 interface AdminPanelProps {
   currentUser: UserSummary
   activeTab: AdminPanelTab
-  onTabChange: (tab: AdminPanelTab) => void
   onUsersChanged?: () => void
 }
 
 export function AdminPanel({
   currentUser,
   activeTab,
-  onTabChange,
   onUsersChanged,
 }: AdminPanelProps) {
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -739,7 +737,7 @@ export function AdminPanel({
 
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col bg-background">
-      {/* Top Header & Navigation Tabs */}
+      {/* Top Header */}
       <div className="space-y-4 border-b border-border/70 px-5 pt-5 pb-4 sync-security:border-white/20 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -762,77 +760,6 @@ export function AdminPanel({
               Gestione centralizzata degli utenti, Service Account di sistema
               con API Key granulari e audit.
             </p>
-          </div>
-
-          {/* Section Switcher Tabs */}
-          <div className="flex flex-wrap items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
-            <button
-              type="button"
-              onClick={() => onTabChange('users')}
-              className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
-                activeTab === 'users'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
-                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
-              )}
-            >
-              <User className="size-3.5" />
-              <span>Lista utenti</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
-                {users.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onTabChange('groups')}
-              className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
-                activeTab === 'groups'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
-                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
-              )}
-            >
-              <Users className="size-3.5" />
-              <span>Gruppi</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
-                {adminGroups.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onTabChange('service-accounts')}
-              className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
-                activeTab === 'service-accounts'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
-                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
-              )}
-            >
-              <Bot className="size-3.5" />
-              <span>Service Account</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
-                {serviceAccountsCount}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onTabChange('audit')}
-              className={cn(
-                'inline-flex h-8 items-center gap-2 rounded-lg px-3.5 text-xs font-medium transition-colors sync-security:rounded-[5px]',
-                activeTab === 'audit'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:ring-0'
-                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
-              )}
-            >
-              <FileClock className="size-3.5" />
-              <span>Audit di sistema</span>
-              <span className="rounded-full bg-background/60 px-1.5 py-0.2 text-[10px] sync-security:bg-[#1a2c4b]/20 sync-security:text-current">
-                {auditEvents.length}
-              </span>
-            </button>
           </div>
         </div>
 

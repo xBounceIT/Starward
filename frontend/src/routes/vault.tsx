@@ -507,7 +507,6 @@ function VaultWorkspace() {
             <AdminPanel
               currentUser={currentUser}
               activeTab={selection.tab}
-              onTabChange={(tab) => setSelection({ type: 'admin', tab })}
               onUsersChanged={refreshData}
             />
           </div>
