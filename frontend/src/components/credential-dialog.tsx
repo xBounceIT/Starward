@@ -351,16 +351,13 @@ export function CredentialDialog({
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => setFieldValue(field, e.target.value)}
-            className={cn(
-              field.rowsClass ?? 'min-h-20',
-              field.mono && 'font-mono text-xs',
-            )}
+            className={field.rowsClass ?? 'min-h-20'}
             required={field.required}
           />
         ) : field.type === 'secret-textarea' ? (
           editingCredential && value && !isRevealed ? (
             <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              <span className="font-mono">
+              <span>
                 ••••••••••••••••••••••••••••••••
               </span>
               <Button
@@ -379,10 +376,7 @@ export function CredentialDialog({
               placeholder={field.placeholder}
               value={value}
               onChange={(e) => setFieldValue(field, e.target.value)}
-              className={cn(
-                'min-h-24 font-mono text-xs',
-                field.rowsClass,
-              )}
+              className={cn('min-h-24', field.rowsClass)}
               required={field.required}
             />
           )
@@ -394,7 +388,7 @@ export function CredentialDialog({
               value={value}
               onChange={(e) => setFieldValue(field, e.target.value)}
               placeholder={field.placeholder}
-              className={cn('pr-10', field.mono && 'font-mono text-sm')}
+              className="pr-10"
               required={field.required}
             />
             <Button
@@ -426,7 +420,6 @@ export function CredentialDialog({
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => setFieldValue(field, e.target.value)}
-            className={cn(field.mono && 'font-mono text-sm')}
             required={field.required}
           />
         )}

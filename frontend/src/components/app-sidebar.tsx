@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Bot,
-  Check,
   ChevronDown,
   ChevronRight,
   FileClock,
@@ -9,16 +8,15 @@ import {
   History,
   Layers,
   LogOut,
-  Moon,
   MoreHorizontal,
-  Palette,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Plus,
   Settings,
   Share2,
   ShieldCheck,
   Star,
-  Sun,
   Trash2,
   User,
   Users,
@@ -56,7 +54,6 @@ import {
 } from '@/components/ui/sidebar'
 import { getVaultDisplayIcon, VaultIcon } from '@/components/vault-icon'
 import type { Group, UserRole, Vault } from '@/lib/api'
-import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
 import { APP_VERSION } from '@/lib/version'
@@ -408,8 +405,12 @@ export function AppSidebar({
   onOpenSettings,
   onSignOut,
 }: AppSidebarProps) {
-  const { theme, setTheme } = useTheme()
-  const { setOpenMobile } = useSidebar()
+  const { isMobile, openMobile, state, setOpenMobile, toggleSidebar } =
+    useSidebar()
+
+  // Su desktop lo stato è "collapsed" quando la sidebar è chiusa;
+  // su mobile la sidebar è una sheet e conta openMobile.
+  const sidebarCollapsed = isMobile ? !openMobile : state === 'collapsed'
 
   // Gruppi collassati nella sidebar, persistiti in localStorage
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<
@@ -480,54 +481,21 @@ export function AppSidebar({
               </p>
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className="-mr-1.5 text-muted-foreground hover:text-foreground"
-                title="Cambia tema"
-                aria-label="Cambia tema"
-              >
-                {theme === 'light' ? (
-                  <Sun className="size-4" />
-                ) : theme === 'sync-security' ? (
-                  <Palette className="size-4 text-[#ff9c00]" />
-                ) : (
-                  <Moon className="size-4" />
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                Tema
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setTheme('light')}>
-                <Sun className="size-4" />
-                <span>Chiaro</span>
-                {theme === 'light' && <Check className="ml-auto size-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('dark')}>
-                <Moon className="size-4" />
-                <span>Scuro</span>
-                {theme === 'dark' && <Check className="ml-auto size-4" />}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('sync-security')}>
-                <span
-                  className="flex size-4 shrink-0 items-center justify-center rounded-full border border-[#ff9c00] bg-[#000c20]"
-                  aria-hidden="true"
-                >
-                  <span className="size-1.5 rounded-full bg-[#ff9c00]" />
-                </span>
-                <span>Sync Security</span>
-                {theme === 'sync-security' && (
-                  <Check className="ml-auto size-4" />
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="-mr-1.5 text-muted-foreground hover:text-foreground"
+            onClick={toggleSidebar}
+            title={sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'}
+            aria-label={sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="size-4" />
+            ) : (
+              <PanelLeftClose className="size-4" />
+            )}
+          </Button>
         </div>
 
         <Button
@@ -857,7 +825,7 @@ export function AppSidebar({
                             : 'text-muted-foreground',
                         )}
                       />
-                      <span>Lista utenti</span>
+                      <span>Utenti</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 

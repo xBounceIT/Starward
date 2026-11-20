@@ -18,7 +18,7 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
 3. **RBAC (Admin & User) e Pannello Admin**
    - Controllo degli accessi basato sui ruoli con ruoli globali **Admin** e **User** (il primo utente registrato diventa automaticamente **Admin**, con supporto opzionale per la variabile d'ambiente `ADMIN_EMAILS`).
    - **Pannello Admin** integrato nella sidebar (visibile esclusivamente agli utenti con ruolo **Admin**) con:
-     - **Lista utenti**: visualizzazione dettagli utenti, statistiche cartelle/credenziali, modifica del ruolo (`Admin` / `User`) ed eliminazione utenti.
+     - **Utenti**: visualizzazione dettagli utenti, statistiche cartelle/credenziali, modifica del ruolo (`Admin` / `User`) ed eliminazione utenti.
      - **Service Account**: creazione e gestione (riservata agli **Admin**) di utenti di sistema con chiavi API dedicate (`sw_sa_...`), permessi `read` o `read_write`, rotazione/revoca chiavi, sospensione temporanea e selezione granulare di **cartelle specifiche** e **credenziali specifiche**.
      - **Audit di sistema**: registro globale degli eventi di sicurezza e amministrazione (*chi ha fatto cosa e quando*) con filtri per attore/ruolo, categoria risorsa, codice azione e intervallo temporale.
 
