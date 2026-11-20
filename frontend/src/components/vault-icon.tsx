@@ -18,6 +18,17 @@ import type { Credential } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getVaultColor } from '@/lib/vault-utils'
 
+// Una cartella di un gruppo resta una cartella: se ha l'icona "Team" (users)
+// salvata nel DB, la mostriamo come cartella per non confonderla col gruppo.
+// Nessuna migrazione: la normalizzazione avviene solo in fase di render.
+export function getVaultDisplayIcon(vault: {
+  icon: string
+  owner_group_id?: string | null
+}): string {
+  if (vault.owner_group_id && vault.icon === 'users') return 'folder'
+  return vault.icon
+}
+
 export const VAULT_ICON_OPTIONS = [
   { value: 'folder', label: 'Cartella' },
   { value: 'lock', label: 'Privata' },

@@ -33,7 +33,7 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import { VaultIcon } from '@/components/vault-icon'
+import { getVaultDisplayIcon, VaultIcon } from '@/components/vault-icon'
 import {
   vaultApi,
   type ApiKeyPermission,
@@ -446,7 +446,7 @@ export function ServiceAccountDialog({
                                 {checked && <Check className="size-3" />}
                               </span>
                               <VaultIcon
-                                icon={vault.icon}
+                                icon={getVaultDisplayIcon(vault)}
                                 className={cn('size-4 shrink-0', palette.text)}
                               />
                               <div className="min-w-0">

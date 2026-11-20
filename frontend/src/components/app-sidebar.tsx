@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Bot,
   ChevronDown,
+  ChevronRight,
   FileClock,
   FolderPlus,
   History,
@@ -51,7 +52,7 @@ import {
   SidebarSeparator,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { VaultIcon } from '@/components/vault-icon'
+import { getVaultDisplayIcon, VaultIcon } from '@/components/vault-icon'
 import type { Group, UserRole, Vault } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
@@ -64,6 +65,9 @@ import { APP_VERSION } from '@/lib/version'
 const menuTrailingBadgeClass =
   'top-1/2! right-1 h-6 min-w-6 -translate-y-1/2 text-xs'
 const groupActionClass = 'top-3 right-3 h-6 w-6'
+
+// Stato di collasso dei gruppi nella sidebar, persistito in localStorage
+const COLLAPSED_GROUPS_STORAGE_KEY = 'starward-collapsed-groups'
 
 export type VaultSelection =
   | { type: 'all' }
@@ -98,6 +102,7 @@ interface VaultSidebarMenuItemProps {
   vault: Vault
   active: boolean
   indented?: boolean
+  showGroupBadge?: boolean
   onSelect: () => void
   onNewCredential: () => void
   onEditVault: () => void
@@ -110,6 +115,7 @@ function VaultSidebarMenuItem({
   vault,
   active,
   indented = false,
+  showGroupBadge = false,
   onSelect,
   onNewCredential,
   onEditVault,
@@ -139,7 +145,7 @@ function VaultSidebarMenuItem({
         onClick={onSelect}
       >
         <VaultIcon
-          icon={vault.icon}
+          icon={getVaultDisplayIcon(vault)}
           className={cn(
             'size-4 shrink-0',
             active
@@ -148,6 +154,14 @@ function VaultSidebarMenuItem({
           )}
         />
         <span className="truncate">{vault.name}</span>
+        {showGroupBadge && vault.owner_group_name && (
+          <span
+            className="ml-auto shrink-0 truncate text-[10px] text-muted-foreground"
+            title={`Cartella del gruppo ${vault.owner_group_name}`}
+          >
+            {vault.owner_group_name}
+          </span>
+        )}
         {!indented && vault.is_shared && (
           <Users
             className="ml-auto size-3 shrink-0 text-muted-foreground"
@@ -240,6 +254,8 @@ function VaultSidebarMenuItem({
 interface GroupSidebarMenuItemProps {
   group: Group
   active: boolean
+  collapsed: boolean
+  onToggleCollapsed: () => void
   onSelect: () => void
   onNewGroupVault: () => void
   onEditGroup: () => void
@@ -249,6 +265,8 @@ interface GroupSidebarMenuItemProps {
 function GroupSidebarMenuItem({
   group,
   active,
+  collapsed,
+  onToggleCollapsed,
   onSelect,
   onNewGroupVault,
   onEditGroup,
@@ -265,9 +283,35 @@ function GroupSidebarMenuItem({
         setMenuOpen(true)
       }}
     >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleCollapsed()
+        }}
+        aria-expanded={!collapsed}
+        aria-label={
+          collapsed
+            ? `Espandi le cartelle del gruppo ${group.name}`
+            : `Comprimi le cartelle del gruppo ${group.name}`
+        }
+        title={
+          collapsed
+            ? 'Espandi cartelle del gruppo'
+            : 'Comprimi cartelle del gruppo'
+        }
+        className="absolute left-1 top-1/2 z-10 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+      >
+        <ChevronRight
+          className={cn(
+            'size-3.5 transition-transform duration-200',
+            !collapsed && 'rotate-90',
+          )}
+        />
+      </button>
       <SidebarMenuButton
         isActive={active}
-        className="h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 sync-security:data-[active=true]:bg-[#ff9c00]/15"
+        className="h-9 rounded-lg pl-7 pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 sync-security:data-[active=true]:bg-[#ff9c00]/15"
         onClick={onSelect}
       >
         <Users
@@ -368,12 +412,51 @@ export function AppSidebar({
   // su mobile la sidebar è una sheet e conta openMobile.
   const sidebarCollapsed = isMobile ? !openMobile : state === 'collapsed'
 
-  const groupIds = new Set(groups.map((g) => g.id))
+  // Gruppi collassati nella sidebar, persistiti in localStorage
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set())
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY)
+      if (raw) {
+        const parsed: unknown = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          setCollapsedGroupIds(
+            new Set(parsed.filter((id) => typeof id === 'string')),
+          )
+        }
+      }
+    } catch {
+      // ignora errori di lettura dello storage
+    }
+  }, [])
+
+  const toggleGroupCollapsed = useCallback((groupId: string) => {
+    setCollapsedGroupIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(groupId)) {
+        next.delete(groupId)
+      } else {
+        next.add(groupId)
+      }
+      try {
+        localStorage.setItem(
+          COLLAPSED_GROUPS_STORAGE_KEY,
+          JSON.stringify([...next]),
+        )
+      } catch {
+        // ignora errori di scrittura dello storage
+      }
+      return next
+    })
+  }, [])
+
   const myVaults = vaults.filter((v) => !v.owner_group_id && !v.is_shared_with_me)
+  // "Condivise con me": cartelle condivise con l'utente + tutte le cartelle dei gruppi
   const sharedWithMe = vaults.filter(
-    (v) =>
-      (!v.owner_group_id && v.is_shared_with_me) ||
-      (v.owner_group_id !== null && !groupIds.has(v.owner_group_id)),
+    (v) => v.is_shared_with_me || v.owner_group_id !== null,
   )
 
   const handleSelect = (next: VaultSelection) => {
@@ -384,20 +467,7 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader className="gap-3.5 p-3.5 border-b sync-security:border-white/20">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center border border-border/80 bg-muted/50 text-foreground rounded-full sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
-              <ShieldCheck className="size-4.5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate font-semibold leading-none text-[13px] tracking-normal">
-                Starward Vault
-              </h1>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
-                Vault · v{APP_VERSION}
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center justify-end gap-2">
           <Button
             type="button"
             variant="ghost"
@@ -571,11 +641,19 @@ export function AppSidebar({
                   const groupVaults = vaults.filter(
                     (v) => v.owner_group_id === group.id,
                   )
+                  const childVaultActive =
+                    selection.type === 'vault' &&
+                    groupVaults.some((v) => v.id === selection.vaultId)
+                  // Se una cartella del gruppo è selezionata, il gruppo resta espanso
+                  const collapsed =
+                    collapsedGroupIds.has(group.id) && !childVaultActive
                   return (
                     <div key={group.id} className="space-y-0.5">
                       <GroupSidebarMenuItem
                         group={group}
                         active={groupActive}
+                        collapsed={collapsed}
+                        onToggleCollapsed={() => toggleGroupCollapsed(group.id)}
                         onSelect={() =>
                           handleSelect({ type: 'group', groupId: group.id })
                         }
@@ -592,45 +670,46 @@ export function AppSidebar({
                           onDeleteGroup(group)
                         }}
                       />
-                      {groupVaults.map((vault) => {
-                        const active =
-                          selection.type === 'vault' &&
-                          selection.vaultId === vault.id
-                        return (
-                          <VaultSidebarMenuItem
-                            key={vault.id}
-                            vault={vault}
-                            active={active}
-                            indented
-                            onSelect={() =>
-                              handleSelect({
-                                type: 'vault',
-                                vaultId: vault.id,
-                              })
-                            }
-                            onNewCredential={() => {
-                              setOpenMobile(false)
-                              onNewCredential(vault.id)
-                            }}
-                            onEditVault={() => {
-                              setOpenMobile(false)
-                              onEditVault(vault)
-                            }}
-                            onShareVault={() => {
-                              setOpenMobile(false)
-                              onShareVault(vault)
-                            }}
-                            onOpenAudit={() => {
-                              setOpenMobile(false)
-                              onOpenAudit(vault)
-                            }}
-                            onDeleteVault={() => {
-                              setOpenMobile(false)
-                              onDeleteVault(vault)
-                            }}
-                          />
-                        )
-                      })}
+                      {!collapsed &&
+                        groupVaults.map((vault) => {
+                          const active =
+                            selection.type === 'vault' &&
+                            selection.vaultId === vault.id
+                          return (
+                            <VaultSidebarMenuItem
+                              key={vault.id}
+                              vault={vault}
+                              active={active}
+                              indented
+                              onSelect={() =>
+                                handleSelect({
+                                  type: 'vault',
+                                  vaultId: vault.id,
+                                })
+                              }
+                              onNewCredential={() => {
+                                setOpenMobile(false)
+                                onNewCredential(vault.id)
+                              }}
+                              onEditVault={() => {
+                                setOpenMobile(false)
+                                onEditVault(vault)
+                              }}
+                              onShareVault={() => {
+                                setOpenMobile(false)
+                                onShareVault(vault)
+                              }}
+                              onOpenAudit={() => {
+                                setOpenMobile(false)
+                                onOpenAudit(vault)
+                              }}
+                              onDeleteVault={() => {
+                                setOpenMobile(false)
+                                onDeleteVault(vault)
+                              }}
+                            />
+                          )
+                        })}
                     </div>
                   )
                 })
@@ -673,6 +752,7 @@ export function AppSidebar({
                     vault={vault}
                     active={active}
                     indented
+                    showGroupBadge={vault.owner_group_id !== null}
                     onSelect={() =>
                       handleSelect({ type: 'vault', vaultId: vault.id })
                     }
@@ -814,6 +894,10 @@ export function AppSidebar({
           </>
         )}
       </SidebarContent>
+
+      <div className="shrink-0 px-3 py-2 text-center text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
+        Starward v{APP_VERSION}
+      </div>
 
       <SidebarFooter className="border-t border-sidebar-border p-2.5">
         <SidebarMenu>
