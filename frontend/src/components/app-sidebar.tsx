@@ -764,7 +764,7 @@ export function AppSidebar({
                             : 'text-muted-foreground',
                         )}
                       />
-                      <span>Lista utenti</span>
+                      <span>Utenti</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
