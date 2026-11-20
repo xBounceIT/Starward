@@ -23,7 +23,7 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
 
 ```text
 Starward/
-├── docker-compose.yml       # Istanza PostgreSQL 17 dedicata con volume persistente
+├── docker-compose.yml       # Istanza PostgreSQL 19 dedicata con volume persistente
 ├── backend/                 # Backend Rust (Axum + SQLx PostgreSQL + AES-256-GCM)
 │   ├── migrations/001_init.sql
 │   └── src/
@@ -73,7 +73,7 @@ Il workflow `.github/workflows/release.yml` esegue automaticamente:
 
 ## Deploy rapido con Docker Compose (build sul momento)
 
-Per compilare e avviare l'intero stack (**PostgreSQL 17 + Backend Rust + Frontend TanStack Start**) con un solo comando:
+Per compilare e avviare l'intero stack (**PostgreSQL 19 + Backend Rust + Frontend TanStack Start**) con un solo comando:
 
 ```bash
 # 1. Copia e personalizza le chiavi segrete (e opzionalmente SSO)
@@ -107,7 +107,7 @@ docker compose down
 ```bash
 docker compose up -d postgres
 ```
-Questo avvia un'istanza **PostgreSQL 17** dedicata su `127.0.0.1:5432` con database `starward` (utente `starward`, password `starward`).
+Questo avvia un'istanza **PostgreSQL 19** dedicata su `127.0.0.1:5432` con database `starward` (utente `starward`, password `starward`).
 In alternativa puoi puntare a qualsiasi istanza PostgreSQL esterna o gestita (Neon, Supabase, RDS, self-hosted) configurando `DATABASE_URL` (e opzionalmente `AUTH_DATABASE_URL` se vuoi separare auth e vault su due database distinti).
 
 ### 2. Configura le variabili d'ambiente

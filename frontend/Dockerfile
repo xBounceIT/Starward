@@ -3,7 +3,8 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10 --activate
+COPY --from=ghcr.io/pnpm/pnpm:12-alpine /opt/pnpm /opt/pnpm
+RUN for bin in pnpm pn pnpx pnx; do ln -s "/opt/pnpm/$bin" "/usr/local/bin/$bin"; done
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
