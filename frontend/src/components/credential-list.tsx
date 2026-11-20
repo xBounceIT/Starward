@@ -42,6 +42,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   CategoryIcon,
   CredentialBrandIcon,
+  getVaultDisplayIcon,
   VaultIcon,
 } from '@/components/vault-icon'
 import type { Credential, Vault } from '@/lib/api'
@@ -306,7 +307,7 @@ export function CredentialList({
                 <Star className="size-5 shrink-0 fill-amber-400 text-amber-400 sync-security:fill-[#ff9c00] sync-security:text-[#ff9c00]" />
               ) : activeVault ? (
                 <VaultIcon
-                  icon={activeVault.icon}
+                  icon={getVaultDisplayIcon(activeVault)}
                   className={cn(
                     'size-5 shrink-0',
                     getVaultColor(activeVault.color).text,

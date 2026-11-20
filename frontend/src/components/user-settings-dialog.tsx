@@ -55,7 +55,7 @@ import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { VaultIcon } from '@/components/vault-icon'
+import { getVaultDisplayIcon, VaultIcon } from '@/components/vault-icon'
 import {
   vaultApi,
   type ApiKeyItem,
@@ -1214,7 +1214,7 @@ export function UserSettingsDialog({
                               )}
                             >
                               <VaultIcon
-                                icon={v.icon}
+                                icon={getVaultDisplayIcon(v)}
                                 className={cn('size-3.5', palette.text)}
                               />
                               <span>{v.name}</span>

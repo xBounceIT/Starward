@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { SidebarTrigger } from '@/components/ui/sidebar'
-import { VaultIcon } from '@/components/vault-icon'
+import { getVaultDisplayIcon, VaultIcon } from '@/components/vault-icon'
 import {
   vaultApi,
   type Group,
@@ -428,7 +428,10 @@ export function GroupDetailPanel({
                             vp.text,
                           )}
                         >
-                          <VaultIcon icon={vault.icon} className="size-4" />
+                          <VaultIcon
+                            icon={getVaultDisplayIcon(vault)}
+                            className="size-4"
+                          />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -486,7 +489,10 @@ export function GroupDetailPanel({
                             vp.text,
                           )}
                         >
-                          <VaultIcon icon={vault.icon} className="size-4" />
+                          <VaultIcon
+                            icon={getVaultDisplayIcon(vault)}
+                            className="size-4"
+                          />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">

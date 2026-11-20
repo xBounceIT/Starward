@@ -21,7 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { VAULT_ICON_OPTIONS, VaultIcon } from '@/components/vault-icon'
+import {
+  getVaultDisplayIcon,
+  VAULT_ICON_OPTIONS,
+  VaultIcon,
+} from '@/components/vault-icon'
 import { vaultApi, type Group, type Vault } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getVaultColor, VAULT_COLORS } from '@/lib/vault-utils'
@@ -59,7 +63,7 @@ export function VaultDialog({
       setName(editingVault?.name ?? '')
       setDescription(editingVault?.description ?? '')
       if (editingVault) {
-        setIcon(editingVault.icon)
+        setIcon(getVaultDisplayIcon(editingVault))
         setColor(editingVault.color)
         setOwnerType(editingVault.owner_group_id ? 'group' : 'personal')
         setOwnerGroupId(editingVault.owner_group_id ?? '')
@@ -73,7 +77,9 @@ export function VaultDialog({
         )
         setOwnerType('group')
         setOwnerGroupId(defaultOwnerGroupId)
-        setIcon('users')
+        // La cartella del gruppo è una cartella: icona predefinita "folder",
+        // non l'icona "Team" del gruppo
+        setIcon('folder')
         setColor(targetGroup?.color ?? 'indigo')
         setGroupRole('editor')
       } else {

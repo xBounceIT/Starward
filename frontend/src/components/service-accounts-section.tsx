@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { VaultIcon } from '@/components/vault-icon'
+import { getVaultDisplayIcon, VaultIcon } from '@/components/vault-icon'
 import {
   vaultApi,
   type CreatedServiceAccountKey,
@@ -762,7 +762,7 @@ export function ServiceAccountsSection({
                                 className="gap-1.5 rounded-lg border border-border/70 bg-card px-2 py-0.5 text-[11px] font-medium"
                               >
                                 <VaultIcon
-                                  icon={v.icon}
+                                  icon={getVaultDisplayIcon(v)}
                                   className={cn('size-3', palette.text)}
                                 />
                                 <span>Cartella: {v.name}</span>
