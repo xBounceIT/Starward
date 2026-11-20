@@ -11,10 +11,11 @@ use crate::{
     auth::AuthenticatedUser,
     error::{AppError, AppResult},
     models::{
-        AuditLogDto, CreateVaultRequest, ShareVaultRequest, UpdateMemberRoleRequest,
-        UpdateVaultRequest, VaultDto, VaultMemberDto,
+        AuditLogDto, CreateVaultRequest, ShareVaultGroupRequest, ShareVaultRequest,
+        UpdateMemberRoleRequest, UpdateVaultGroupRoleRequest, UpdateVaultRequest, VaultDto,
+        VaultGroupShareDto, VaultMemberDto,
     },
-    routes::{record_audit, require_vault_role},
+    routes::{groups::get_user_group_role, record_audit, require_vault_role},
     AppState,
 };
 
@@ -28,6 +29,9 @@ struct VaultRow {
     owner_id: String,
     owner_name: String,
     owner_email: String,
+    owner_group_id: Option<String>,
+    owner_group_name: Option<String>,
+    owner_group_color: Option<String>,
     is_personal: bool,
     role: String,
     credential_count: i64,
@@ -43,6 +47,18 @@ struct MemberRow {
     member_email: String,
     user_name: Option<String>,
     user_image: Option<String>,
+    role: String,
+    created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, FromRow)]
+struct VaultGroupRow {
+    id: String,
+    vault_id: String,
+    group_id: String,
+    group_name: String,
+    group_color: String,
+    member_count: i64,
     role: String,
     created_at: DateTime<Utc>,
 }
@@ -87,15 +103,99 @@ async fn load_vault_members(db: &PgPool, vault_id: &str) -> AppResult<Vec<VaultM
         .collect())
 }
 
+async fn load_vault_groups(
+    db: &PgPool,
+    vault_id: &str,
+    owner_group_id: Option<&str>,
+) -> AppResult<Vec<VaultGroupShareDto>> {
+    let rows: Vec<VaultGroupRow> = sqlx::query_as(
+        r#"
+        SELECT
+            vg.id,
+            vg.vault_id,
+            vg.group_id,
+            g.name AS group_name,
+            g.color AS group_color,
+            (SELECT COUNT(*) FROM group_members gm WHERE gm.group_id = g.id) AS member_count,
+            vg.role,
+            vg.created_at
+        FROM vault_groups vg
+        INNER JOIN groups g ON g.id = vg.group_id
+        WHERE vg.vault_id = $1
+        ORDER BY
+            CASE WHEN vg.group_id = $2 THEN 0 ELSE 1 END,
+            LOWER(g.name) ASC
+        "#,
+    )
+    .bind(vault_id)
+    .bind(owner_group_id)
+    .fetch_all(db)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| VaultGroupShareDto {
+            is_owner_group: owner_group_id == Some(r.group_id.as_str()),
+            id: r.id,
+            vault_id: r.vault_id,
+            group_id: r.group_id,
+            group_name: r.group_name,
+            group_color: r.group_color,
+            member_count: r.member_count,
+            role: r.role,
+            created_at: r.created_at,
+        })
+        .collect())
+}
+
+async fn count_effective_vault_members(
+    db: &PgPool,
+    vault_id: &str,
+    owner_group_id: Option<&str>,
+) -> AppResult<i64> {
+    let (count,): (i64,) = sqlx::query_as(
+        r#"
+        SELECT COUNT(DISTINCT email_lower)
+        FROM (
+            SELECT LOWER(vm.member_email) AS email_lower
+            FROM vault_members vm
+            WHERE vm.vault_id = $1
+
+            UNION
+
+            SELECT LOWER(gm.member_email) AS email_lower
+            FROM vault_groups vg
+            INNER JOIN group_members gm ON gm.group_id = vg.group_id
+            WHERE vg.vault_id = $1
+
+            UNION
+
+            SELECT LOWER(gm.member_email) AS email_lower
+            FROM group_members gm
+            WHERE $2::TEXT IS NOT NULL AND gm.group_id = $2
+        ) AS all_people
+        "#,
+    )
+    .bind(vault_id)
+    .bind(owner_group_id)
+    .fetch_one(db)
+    .await?;
+
+    Ok(count)
+}
+
 async fn build_vault_dto(
     db: &PgPool,
     row: VaultRow,
     current_user_id: &str,
 ) -> AppResult<VaultDto> {
     let members = load_vault_members(db, &row.id).await?;
-    let member_count = members.len() as i64;
-    let is_shared = member_count > 1;
-    let is_shared_with_me = row.owner_id != current_user_id;
+    let shared_groups = load_vault_groups(db, &row.id, row.owner_group_id.as_deref()).await?;
+    let member_count =
+        count_effective_vault_members(db, &row.id, row.owner_group_id.as_deref()).await?;
+    let group_count = shared_groups.len() as i64;
+    let is_shared = member_count > 1 || group_count > 0 || row.owner_group_id.is_some();
+    let is_shared_with_me = row.owner_group_id.is_none() && row.owner_id != current_user_id;
 
     Ok(VaultDto {
         id: row.id,
@@ -106,13 +206,18 @@ async fn build_vault_dto(
         owner_id: row.owner_id,
         owner_name: row.owner_name,
         owner_email: row.owner_email,
+        owner_group_id: row.owner_group_id,
+        owner_group_name: row.owner_group_name,
+        owner_group_color: row.owner_group_color,
         is_personal: row.is_personal,
         role: row.role,
         is_shared,
         is_shared_with_me,
         member_count,
+        group_count,
         credential_count: row.credential_count,
         members,
+        shared_groups,
         created_at: row.created_at,
         updated_at: row.updated_at,
     })
@@ -125,6 +230,56 @@ async fn fetch_single_vault(
 ) -> AppResult<VaultDto> {
     let row: Option<VaultRow> = sqlx::query_as(
         r#"
+        WITH user_vault_roles AS (
+            SELECT
+                vault_id,
+                CASE MAX(role_rank)
+                    WHEN 3 THEN 'owner'
+                    WHEN 2 THEN 'editor'
+                    ELSE 'viewer'
+                END AS role
+            FROM (
+                SELECT
+                    vm.vault_id,
+                    CASE vm.role WHEN 'owner' THEN 3 WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_members vm
+                WHERE vm.vault_id = $1
+                  AND (vm.user_id = $2 OR LOWER(vm.member_email) = LOWER($3))
+
+                UNION ALL
+
+                SELECT
+                    vg.vault_id,
+                    CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_groups vg
+                INNER JOIN group_members gm ON gm.group_id = vg.group_id
+                WHERE vg.vault_id = $1
+                  AND (gm.user_id = $2 OR LOWER(gm.member_email) = LOWER($3))
+
+                UNION ALL
+
+                SELECT
+                    v.id AS vault_id,
+                    CASE
+                        WHEN gm.role = 'owner' OR v.owner_id = $2 THEN 3
+                        ELSE COALESCE(
+                            (
+                                SELECT CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END
+                                FROM vault_groups vg
+                                WHERE vg.vault_id = v.id AND vg.group_id = v.owner_group_id
+                                LIMIT 1
+                            ),
+                            2
+                        )
+                    END AS role_rank
+                FROM vaults v
+                INNER JOIN group_members gm ON gm.group_id = v.owner_group_id
+                WHERE v.id = $1
+                  AND v.owner_group_id IS NOT NULL
+                  AND (gm.user_id = $2 OR LOWER(gm.member_email) = LOWER($3))
+            ) AS raw_roles
+            GROUP BY vault_id
+        )
         SELECT
             v.id,
             v.name,
@@ -134,16 +289,19 @@ async fn fetch_single_vault(
             v.owner_id,
             owner.name AS owner_name,
             owner.email AS owner_email,
+            v.owner_group_id,
+            og.name AS owner_group_name,
+            og.color AS owner_group_color,
             v.is_personal,
-            vm.role,
+            uvr.role,
             (SELECT COUNT(*) FROM credentials c WHERE c.vault_id = v.id) AS credential_count,
             v.created_at,
             v.updated_at
         FROM vaults v
-        INNER JOIN vault_members vm ON vm.vault_id = v.id
+        INNER JOIN user_vault_roles uvr ON uvr.vault_id = v.id
         INNER JOIN users owner ON owner.id = v.owner_id
+        LEFT JOIN groups og ON og.id = v.owner_group_id
         WHERE v.id = $1
-          AND (vm.user_id = $2 OR LOWER(vm.member_email) = LOWER($3))
         LIMIT 1
         "#,
     )
@@ -163,6 +321,53 @@ pub async fn list_vaults(
 ) -> AppResult<Json<Vec<VaultDto>>> {
     let rows: Vec<VaultRow> = sqlx::query_as(
         r#"
+        WITH user_vault_roles AS (
+            SELECT
+                vault_id,
+                CASE MAX(role_rank)
+                    WHEN 3 THEN 'owner'
+                    WHEN 2 THEN 'editor'
+                    ELSE 'viewer'
+                END AS role
+            FROM (
+                SELECT
+                    vm.vault_id,
+                    CASE vm.role WHEN 'owner' THEN 3 WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_members vm
+                WHERE vm.user_id = $1 OR LOWER(vm.member_email) = LOWER($2)
+
+                UNION ALL
+
+                SELECT
+                    vg.vault_id,
+                    CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_groups vg
+                INNER JOIN group_members gm ON gm.group_id = vg.group_id
+                WHERE gm.user_id = $1 OR LOWER(gm.member_email) = LOWER($2)
+
+                UNION ALL
+
+                SELECT
+                    v.id AS vault_id,
+                    CASE
+                        WHEN gm.role = 'owner' OR v.owner_id = $1 THEN 3
+                        ELSE COALESCE(
+                            (
+                                SELECT CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END
+                                FROM vault_groups vg
+                                WHERE vg.vault_id = v.id AND vg.group_id = v.owner_group_id
+                                LIMIT 1
+                            ),
+                            2
+                        )
+                    END AS role_rank
+                FROM vaults v
+                INNER JOIN group_members gm ON gm.group_id = v.owner_group_id
+                WHERE v.owner_group_id IS NOT NULL
+                  AND (gm.user_id = $1 OR LOWER(gm.member_email) = LOWER($2))
+            ) AS raw_roles
+            GROUP BY vault_id
+        )
         SELECT
             v.id,
             v.name,
@@ -172,15 +377,18 @@ pub async fn list_vaults(
             v.owner_id,
             owner.name AS owner_name,
             owner.email AS owner_email,
+            v.owner_group_id,
+            og.name AS owner_group_name,
+            og.color AS owner_group_color,
             v.is_personal,
-            vm.role,
+            uvr.role,
             (SELECT COUNT(*) FROM credentials c WHERE c.vault_id = v.id) AS credential_count,
             v.created_at,
             v.updated_at
         FROM vaults v
-        INNER JOIN vault_members vm ON vm.vault_id = v.id
+        INNER JOIN user_vault_roles uvr ON uvr.vault_id = v.id
         INNER JOIN users owner ON owner.id = v.owner_id
-        WHERE vm.user_id = $1 OR LOWER(vm.member_email) = LOWER($2)
+        LEFT JOIN groups og ON og.id = v.owner_group_id
         ORDER BY v.is_personal DESC, LOWER(v.name) ASC
         "#,
     )
@@ -220,16 +428,58 @@ pub async fn create_vault(
         ));
     }
 
+    let owner_group_id = payload
+        .owner_group_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToOwned::to_owned);
+
+    let mut owner_group_name: Option<String> = None;
+    let group_role = match payload.group_role.as_deref().map(str::trim) {
+        Some(r) if !r.is_empty() => {
+            let normalized = r.to_lowercase();
+            if normalized != "editor" && normalized != "viewer" {
+                return Err(AppError::BadRequest(
+                    "Il ruolo del gruppo deve essere 'editor' o 'viewer'".to_string(),
+                ));
+            }
+            normalized
+        }
+        _ => "editor".to_string(),
+    };
+
+    if let Some(ref gid) = owner_group_id {
+        let group_row: Option<(String,)> =
+            sqlx::query_as("SELECT name FROM groups WHERE id = $1")
+                .bind(gid)
+                .fetch_optional(&state.db)
+                .await?;
+        let (gname,) =
+            group_row.ok_or_else(|| AppError::NotFound("Gruppo non trovato".to_string()))?;
+
+        let membership = get_user_group_role(&state.db, gid, &user).await?;
+        if membership.is_none() {
+            return Err(AppError::Forbidden(
+                "Devi essere membro del gruppo per creare una cartella a nome del gruppo"
+                    .to_string(),
+            ));
+        }
+
+        owner_group_name = Some(gname);
+    }
+
     let vault_id = Uuid::new_v4().to_string();
-    let member_id = Uuid::new_v4().to_string();
     let now = Utc::now();
 
     let mut tx = state.db.begin().await?;
 
     sqlx::query(
         r#"
-        INSERT INTO vaults (id, name, description, icon, color, owner_id, is_personal, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, $7)
+        INSERT INTO vaults (
+            id, name, description, icon, color, owner_id, owner_group_id, is_personal, created_at, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, FALSE, $8, $8)
         "#,
     )
     .bind(&vault_id)
@@ -238,25 +488,54 @@ pub async fn create_vault(
     .bind(payload.icon.trim())
     .bind(payload.color.trim())
     .bind(&user.id)
+    .bind(&owner_group_id)
     .bind(now)
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query(
-        r#"
-        INSERT INTO vault_members (id, vault_id, user_id, member_email, role, shared_by, created_at)
-        VALUES ($1, $2, $3, $4, 'owner', $3, $5)
-        "#,
-    )
-    .bind(&member_id)
-    .bind(&vault_id)
-    .bind(&user.id)
-    .bind(&user.email)
-    .bind(now)
-    .execute(&mut *tx)
-    .await?;
+    if let Some(ref gid) = owner_group_id {
+        let share_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            r#"
+            INSERT INTO vault_groups (id, vault_id, group_id, role, shared_by, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            "#,
+        )
+        .bind(&share_id)
+        .bind(&vault_id)
+        .bind(gid)
+        .bind(&group_role)
+        .bind(&user.id)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        let member_id = Uuid::new_v4().to_string();
+        sqlx::query(
+            r#"
+            INSERT INTO vault_members (id, vault_id, user_id, member_email, role, shared_by, created_at)
+            VALUES ($1, $2, $3, $4, 'owner', $3, $5)
+            "#,
+        )
+        .bind(&member_id)
+        .bind(&vault_id)
+        .bind(&user.id)
+        .bind(&user.email)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    }
 
     tx.commit().await?;
+
+    let audit_details = if let Some(ref gname) = owner_group_name {
+        format!(
+            "Cartella '{}' creata a nome del gruppo '{}' (permessi membri: {})",
+            name, gname, group_role
+        )
+    } else {
+        format!("Cartella '{}' creata", name)
+    };
 
     record_audit(
         &state.db,
@@ -264,7 +543,7 @@ pub async fn create_vault(
         None,
         &user,
         "vault.created",
-        &format!("Cartella '{}' creata", name),
+        &audit_details,
     )
     .await?;
 
@@ -563,6 +842,192 @@ pub async fn remove_member(
         &user,
         "vault.member_removed",
         &format!("Accesso revocato per {}", target_email),
+    )
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn share_vault_with_group(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(vault_id): Path<String>,
+    Json(payload): Json<ShareVaultGroupRequest>,
+) -> AppResult<(StatusCode, Json<VaultDto>)> {
+    require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
+
+    let group_id = payload.group_id.trim();
+    if group_id.is_empty() {
+        return Err(AppError::BadRequest("Seleziona un gruppo valido".to_string()));
+    }
+
+    let role = payload.role.trim().to_lowercase();
+    if role != "editor" && role != "viewer" {
+        return Err(AppError::BadRequest(
+            "Il ruolo deve essere 'editor' o 'viewer'".to_string(),
+        ));
+    }
+
+    let group: Option<(String,)> = sqlx::query_as("SELECT name FROM groups WHERE id = $1")
+        .bind(group_id)
+        .fetch_optional(&state.db)
+        .await?;
+    let (group_name,) =
+        group.ok_or_else(|| AppError::NotFound("Gruppo non trovato".to_string()))?;
+
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM vault_groups WHERE vault_id = $1 AND group_id = $2")
+            .bind(&vault_id)
+            .bind(group_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    if existing.is_some() {
+        return Err(AppError::Conflict(
+            "Questa cartella è già condivisa con questo gruppo".to_string(),
+        ));
+    }
+
+    let share_id = Uuid::new_v4().to_string();
+    let now = Utc::now();
+
+    sqlx::query(
+        r#"
+        INSERT INTO vault_groups (id, vault_id, group_id, role, shared_by, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        "#,
+    )
+    .bind(&share_id)
+    .bind(&vault_id)
+    .bind(group_id)
+    .bind(&role)
+    .bind(&user.id)
+    .bind(now)
+    .execute(&state.db)
+    .await?;
+
+    record_audit(
+        &state.db,
+        &vault_id,
+        None,
+        &user,
+        "vault.group_shared",
+        &format!(
+            "Cartella condivisa con il gruppo '{}' (ruolo: {})",
+            group_name, role
+        ),
+    )
+    .await?;
+
+    let dto = fetch_single_vault(&state.db, &vault_id, &user).await?;
+    Ok((StatusCode::CREATED, Json(dto)))
+}
+
+pub async fn update_vault_group_role(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path((vault_id, group_id)): Path<(String, String)>,
+    Json(payload): Json<UpdateVaultGroupRoleRequest>,
+) -> AppResult<Json<VaultDto>> {
+    require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
+
+    let new_role = payload.role.trim().to_lowercase();
+    if new_role != "editor" && new_role != "viewer" {
+        return Err(AppError::BadRequest(
+            "Il ruolo deve essere 'editor' o 'viewer'".to_string(),
+        ));
+    }
+
+    let existing: Option<(String,)> = sqlx::query_as(
+        r#"
+        SELECT g.name
+        FROM vault_groups vg
+        INNER JOIN groups g ON g.id = vg.group_id
+        WHERE vg.vault_id = $1 AND vg.group_id = $2
+        "#,
+    )
+    .bind(&vault_id)
+    .bind(&group_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let (group_name,) =
+        existing.ok_or_else(|| AppError::NotFound("Condivisione gruppo non trovata".to_string()))?;
+
+    sqlx::query("UPDATE vault_groups SET role = $1 WHERE vault_id = $2 AND group_id = $3")
+        .bind(&new_role)
+        .bind(&vault_id)
+        .bind(&group_id)
+        .execute(&state.db)
+        .await?;
+
+    record_audit(
+        &state.db,
+        &vault_id,
+        None,
+        &user,
+        "vault.group_updated",
+        &format!(
+            "Ruolo del gruppo '{}' aggiornato a {}",
+            group_name, new_role
+        ),
+    )
+    .await?;
+
+    let dto = fetch_single_vault(&state.db, &vault_id, &user).await?;
+    Ok(Json(dto))
+}
+
+pub async fn remove_vault_group(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path((vault_id, group_id)): Path<(String, String)>,
+) -> AppResult<StatusCode> {
+    require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
+
+    let vault_owner_group: Option<(Option<String>,)> =
+        sqlx::query_as("SELECT owner_group_id FROM vaults WHERE id = $1")
+            .bind(&vault_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    if let Some((Some(ref og_id),)) = vault_owner_group {
+        if og_id == &group_id {
+            return Err(AppError::BadRequest(
+                "Non è possibile rimuovere il gruppo proprietario della cartella".to_string(),
+            ));
+        }
+    }
+
+    let existing: Option<(String,)> = sqlx::query_as(
+        r#"
+        SELECT g.name
+        FROM vault_groups vg
+        INNER JOIN groups g ON g.id = vg.group_id
+        WHERE vg.vault_id = $1 AND vg.group_id = $2
+        "#,
+    )
+    .bind(&vault_id)
+    .bind(&group_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let (group_name,) =
+        existing.ok_or_else(|| AppError::NotFound("Condivisione gruppo non trovata".to_string()))?;
+
+    sqlx::query("DELETE FROM vault_groups WHERE vault_id = $1 AND group_id = $2")
+        .bind(&vault_id)
+        .bind(&group_id)
+        .execute(&state.db)
+        .await?;
+
+    record_audit(
+        &state.db,
+        &vault_id,
+        None,
+        &user,
+        "vault.group_removed",
+        &format!("Accesso revocato per il gruppo '{}'", group_name),
     )
     .await?;
 

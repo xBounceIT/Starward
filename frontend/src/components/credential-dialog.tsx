@@ -472,7 +472,11 @@ export function CredentialDialog({
                     {writableVaults.map((v) => (
                       <SelectItem key={v.id} value={v.id}>
                         {v.name}
-                        {v.is_shared_with_me ? ' (Condivisa)' : ''}
+                        {v.owner_group_name
+                          ? ` (${v.owner_group_name})`
+                          : v.is_shared_with_me
+                            ? ' (Condivisa)'
+                            : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>

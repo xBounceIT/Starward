@@ -11,6 +11,35 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
 
+CREATE TABLE IF NOT EXISTS groups (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    color TEXT NOT NULL DEFAULT 'indigo',
+    created_by TEXT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_name_lower ON groups (LOWER(name));
+CREATE INDEX IF NOT EXISTS idx_groups_created_by ON groups (created_by);
+
+CREATE TABLE IF NOT EXISTS group_members (
+    id TEXT PRIMARY KEY NOT NULL,
+    group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    member_email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'member')),
+    added_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_group_members_group_email_lower
+    ON group_members (group_id, LOWER(member_email));
+CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members (group_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON group_members (user_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_email_lower ON group_members (LOWER(member_email));
+
 CREATE TABLE IF NOT EXISTS vaults (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL,
@@ -18,12 +47,14 @@ CREATE TABLE IF NOT EXISTS vaults (
     icon TEXT NOT NULL DEFAULT 'folder',
     color TEXT NOT NULL DEFAULT 'indigo',
     owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    owner_group_id TEXT REFERENCES groups(id) ON DELETE SET NULL,
     is_personal BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_vaults_owner_id ON vaults (owner_id);
+CREATE INDEX IF NOT EXISTS idx_vaults_owner_group_id ON vaults (owner_group_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_vaults_owner_personal_unique
     ON vaults (owner_id)
     WHERE is_personal = TRUE;
@@ -43,6 +74,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_members_vault_email_lower
 CREATE INDEX IF NOT EXISTS idx_vault_members_user_id ON vault_members (user_id);
 CREATE INDEX IF NOT EXISTS idx_vault_members_email_lower ON vault_members (LOWER(member_email));
 CREATE INDEX IF NOT EXISTS idx_vault_members_vault_id ON vault_members (vault_id);
+
+CREATE TABLE IF NOT EXISTS vault_groups (
+    id TEXT PRIMARY KEY NOT NULL,
+    vault_id TEXT NOT NULL REFERENCES vaults(id) ON DELETE CASCADE,
+    group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('editor', 'viewer')),
+    shared_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_groups_vault_group
+    ON vault_groups (vault_id, group_id);
+CREATE INDEX IF NOT EXISTS idx_vault_groups_vault_id ON vault_groups (vault_id);
+CREATE INDEX IF NOT EXISTS idx_vault_groups_group_id ON vault_groups (group_id);
 
 CREATE TABLE IF NOT EXISTS credentials (
     id TEXT PRIMARY KEY NOT NULL,

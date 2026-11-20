@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod api_keys;
 pub mod credentials;
+pub mod groups;
 pub mod health;
 pub mod users;
 pub mod vaults;
@@ -21,11 +22,50 @@ pub async fn get_user_vault_role(
 ) -> AppResult<Option<String>> {
     let row: Option<(String,)> = sqlx::query_as(
         r#"
-        SELECT role
-        FROM vault_members
-        WHERE vault_id = $1
-          AND (user_id = $2 OR LOWER(member_email) = LOWER($3))
-        LIMIT 1
+        SELECT
+            CASE MAX(role_rank)
+                WHEN 3 THEN 'owner'
+                WHEN 2 THEN 'editor'
+                ELSE 'viewer'
+            END AS role
+        FROM (
+            SELECT
+                CASE vm.role WHEN 'owner' THEN 3 WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+            FROM vault_members vm
+            WHERE vm.vault_id = $1
+              AND (vm.user_id = $2 OR LOWER(vm.member_email) = LOWER($3))
+
+            UNION ALL
+
+            SELECT
+                CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+            FROM vault_groups vg
+            INNER JOIN group_members gm ON gm.group_id = vg.group_id
+            WHERE vg.vault_id = $1
+              AND (gm.user_id = $2 OR LOWER(gm.member_email) = LOWER($3))
+
+            UNION ALL
+
+            SELECT
+                CASE
+                    WHEN gm.role = 'owner' OR v.owner_id = $2 THEN 3
+                    ELSE COALESCE(
+                        (
+                            SELECT CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END
+                            FROM vault_groups vg
+                            WHERE vg.vault_id = v.id AND vg.group_id = v.owner_group_id
+                            LIMIT 1
+                        ),
+                        2
+                    )
+                END AS role_rank
+            FROM vaults v
+            INNER JOIN group_members gm ON gm.group_id = v.owner_group_id
+            WHERE v.id = $1
+              AND v.owner_group_id IS NOT NULL
+              AND (gm.user_id = $2 OR LOWER(gm.member_email) = LOWER($3))
+        ) AS effective_roles
+        HAVING MAX(role_rank) IS NOT NULL
         "#,
     )
     .bind(vault_id)

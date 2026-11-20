@@ -100,12 +100,59 @@ async fn fetch_credential_dto(
 ) -> AppResult<CredentialDto> {
     let row: Option<CredentialRow> = sqlx::query_as(
         r#"
+        WITH user_vault_roles AS (
+            SELECT
+                vault_id,
+                CASE MAX(role_rank)
+                    WHEN 3 THEN 'owner'
+                    WHEN 2 THEN 'editor'
+                    ELSE 'viewer'
+                END AS role
+            FROM (
+                SELECT
+                    vm.vault_id,
+                    CASE vm.role WHEN 'owner' THEN 3 WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_members vm
+                WHERE vm.user_id = $2 OR LOWER(vm.member_email) = LOWER($3)
+
+                UNION ALL
+
+                SELECT
+                    vg.vault_id,
+                    CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_groups vg
+                INNER JOIN group_members gm ON gm.group_id = vg.group_id
+                WHERE gm.user_id = $2 OR LOWER(gm.member_email) = LOWER($3)
+
+                UNION ALL
+
+                SELECT
+                    v.id AS vault_id,
+                    CASE
+                        WHEN gm.role = 'owner' OR v.owner_id = $2 THEN 3
+                        ELSE COALESCE(
+                            (
+                                SELECT CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END
+                                FROM vault_groups vg
+                                WHERE vg.vault_id = v.id AND vg.group_id = v.owner_group_id
+                                LIMIT 1
+                            ),
+                            2
+                        )
+                    END AS role_rank
+                FROM vaults v
+                INNER JOIN group_members gm ON gm.group_id = v.owner_group_id
+                WHERE v.owner_group_id IS NOT NULL
+                  AND (gm.user_id = $2 OR LOWER(gm.member_email) = LOWER($3))
+            ) AS raw_roles
+            GROUP BY vault_id
+        )
         SELECT
             c.id,
             c.vault_id,
             v.name AS vault_name,
             v.color AS vault_color,
-            vm.role AS vault_role,
+            uvr.role AS vault_role,
             c.title,
             c.username,
             c.url,
@@ -125,11 +172,10 @@ async fn fetch_credential_dto(
             c.updated_at
         FROM credentials c
         INNER JOIN vaults v ON v.id = c.vault_id
-        INNER JOIN vault_members vm ON vm.vault_id = v.id
+        INNER JOIN user_vault_roles uvr ON uvr.vault_id = v.id
         INNER JOIN users cb ON cb.id = c.created_by
         INNER JOIN users ub ON ub.id = c.updated_by
         WHERE c.id = $1
-          AND (vm.user_id = $2 OR LOWER(vm.member_email) = LOWER($3))
         LIMIT 1
         "#,
     )
@@ -160,12 +206,59 @@ pub async fn list_credentials(
 
     let rows: Vec<CredentialRow> = sqlx::query_as(
         r#"
+        WITH user_vault_roles AS (
+            SELECT
+                vault_id,
+                CASE MAX(role_rank)
+                    WHEN 3 THEN 'owner'
+                    WHEN 2 THEN 'editor'
+                    ELSE 'viewer'
+                END AS role
+            FROM (
+                SELECT
+                    vm.vault_id,
+                    CASE vm.role WHEN 'owner' THEN 3 WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_members vm
+                WHERE vm.user_id = $1 OR LOWER(vm.member_email) = LOWER($2)
+
+                UNION ALL
+
+                SELECT
+                    vg.vault_id,
+                    CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_groups vg
+                INNER JOIN group_members gm ON gm.group_id = vg.group_id
+                WHERE gm.user_id = $1 OR LOWER(gm.member_email) = LOWER($2)
+
+                UNION ALL
+
+                SELECT
+                    v.id AS vault_id,
+                    CASE
+                        WHEN gm.role = 'owner' OR v.owner_id = $1 THEN 3
+                        ELSE COALESCE(
+                            (
+                                SELECT CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END
+                                FROM vault_groups vg
+                                WHERE vg.vault_id = v.id AND vg.group_id = v.owner_group_id
+                                LIMIT 1
+                            ),
+                            2
+                        )
+                    END AS role_rank
+                FROM vaults v
+                INNER JOIN group_members gm ON gm.group_id = v.owner_group_id
+                WHERE v.owner_group_id IS NOT NULL
+                  AND (gm.user_id = $1 OR LOWER(gm.member_email) = LOWER($2))
+            ) AS raw_roles
+            GROUP BY vault_id
+        )
         SELECT
             c.id,
             c.vault_id,
             v.name AS vault_name,
             v.color AS vault_color,
-            vm.role AS vault_role,
+            uvr.role AS vault_role,
             c.title,
             c.username,
             c.url,
@@ -185,11 +278,10 @@ pub async fn list_credentials(
             c.updated_at
         FROM credentials c
         INNER JOIN vaults v ON v.id = c.vault_id
-        INNER JOIN vault_members vm ON vm.vault_id = v.id
+        INNER JOIN user_vault_roles uvr ON uvr.vault_id = v.id
         INNER JOIN users cb ON cb.id = c.created_by
         INNER JOIN users ub ON ub.id = c.updated_by
-        WHERE (vm.user_id = $1 OR LOWER(vm.member_email) = LOWER($2))
-          AND ($3::TEXT IS NULL OR c.vault_id = $3)
+        WHERE ($3::TEXT IS NULL OR c.vault_id = $3)
           AND (NOT $4 OR c.favorite = TRUE)
           AND ($5 = '' OR LOWER(c.category) = $5)
           AND (

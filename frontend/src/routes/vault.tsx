@@ -12,6 +12,8 @@ import {
   type CredentialListStats,
   type CredentialSortOption,
 } from '@/components/credential-list'
+import { GroupDetailPanel } from '@/components/group-detail-panel'
+import { GroupDialog } from '@/components/group-dialog'
 import { ShareVaultDialog } from '@/components/share-vault-dialog'
 import {
   AlertDialog,
@@ -38,6 +40,7 @@ import { VaultDialog } from '@/components/vault-dialog'
 import {
   vaultApi,
   type Credential,
+  type Group,
   type UserSettings,
   type UserSummary,
   type Vault,
@@ -78,6 +81,7 @@ function VaultWorkspace() {
   }))
   const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
   const [vaults, setVaults] = useState<Vault[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [allCredentials, setAllCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -102,6 +106,11 @@ function VaultWorkspace() {
     useState<Credential | null>(null)
   const [vaultDialogOpen, setVaultDialogOpen] = useState(false)
   const [editingVault, setEditingVault] = useState<Vault | null>(null)
+  const [vaultDefaultOwnerGroupId, setVaultDefaultOwnerGroupId] = useState<
+    string | null
+  >(null)
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null)
   const [shareVaultTarget, setShareVaultTarget] = useState<Vault | null>(null)
   const [auditVaultTarget, setAuditVaultTarget] = useState<Vault | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -109,6 +118,9 @@ function VaultWorkspace() {
   const [pendingDeleteCred, setPendingDeleteCred] =
     useState<Credential | null>(null)
   const [pendingDeleteVault, setPendingDeleteVault] = useState<Vault | null>(
+    null,
+  )
+  const [pendingDeleteGroup, setPendingDeleteGroup] = useState<Group | null>(
     null,
   )
 
@@ -143,14 +155,17 @@ function VaultWorkspace() {
 
   const refreshData = useCallback(async () => {
     try {
-      const [meProfile, vaultList, credList, settingsData] = await Promise.all([
-        vaultApi.me(),
-        vaultApi.listVaults(),
-        vaultApi.listCredentials(),
-        vaultApi.getSettings().catch(() => null),
-      ])
+      const [meProfile, vaultList, groupList, credList, settingsData] =
+        await Promise.all([
+          vaultApi.me(),
+          vaultApi.listVaults(),
+          vaultApi.listGroups(),
+          vaultApi.listCredentials(),
+          vaultApi.getSettings().catch(() => null),
+        ])
       setCurrentUser(meProfile)
       setVaults(vaultList)
+      setGroups(groupList)
       setAllCredentials(credList)
       if (settingsData) {
         setUserSettings(settingsData)
@@ -201,6 +216,17 @@ function VaultWorkspace() {
     if (selection.type !== 'vault') return null
     return vaults.find((v) => v.id === selection.vaultId) ?? null
   }, [vaults, selection])
+
+  const activeGroup = useMemo(() => {
+    if (selection.type !== 'group') return null
+    return groups.find((g) => g.id === selection.groupId) ?? null
+  }, [groups, selection])
+
+  useEffect(() => {
+    if (!loading && selection.type === 'group' && !activeGroup) {
+      setSelection({ type: 'all' })
+    }
+  }, [loading, selection.type, activeGroup])
 
   const scopedCredentials = useMemo(() => {
     if (selection.type === 'vault') {
@@ -353,6 +379,24 @@ function VaultWorkspace() {
     }
   }
 
+  const confirmDeleteGroup = async () => {
+    if (!pendingDeleteGroup) return
+    const group = pendingDeleteGroup
+    setPendingDeleteGroup(null)
+    try {
+      await vaultApi.deleteGroup(group.id)
+      toast.success(`Gruppo "${group.name}" eliminato`)
+      if (selection.type === 'group' && selection.groupId === group.id) {
+        setSelection({ type: 'all' })
+      }
+      await refreshData()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Errore eliminazione gruppo',
+      )
+    }
+  }
+
   const handleVaultUpdated = (updated: Vault) => {
     setVaults((prev) => prev.map((v) => (v.id === updated.id ? updated : v)))
     if (shareVaultTarget?.id === updated.id) {
@@ -360,11 +404,16 @@ function VaultWorkspace() {
     }
   }
 
+  const handleGroupUpdated = (updated: Group) => {
+    setGroups((prev) => prev.map((g) => (g.id === updated.id ? updated : g)))
+  }
+
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar
         user={currentUser}
         vaults={vaults}
+        groups={groups}
         totalCredentialsCount={allCredentials.length}
         favoritesCount={favoritesCount}
         selection={selection}
@@ -376,15 +425,31 @@ function VaultWorkspace() {
         }}
         onNewVault={() => {
           setEditingVault(null)
+          setVaultDefaultOwnerGroupId(null)
           setVaultDialogOpen(true)
         }}
         onEditVault={(vault) => {
           setEditingVault(vault)
+          setVaultDefaultOwnerGroupId(null)
           setVaultDialogOpen(true)
         }}
         onShareVault={(vault) => setShareVaultTarget(vault)}
         onOpenAudit={(vault) => setAuditVaultTarget(vault)}
         onDeleteVault={(vault) => setPendingDeleteVault(vault)}
+        onNewGroup={() => {
+          setEditingGroup(null)
+          setGroupDialogOpen(true)
+        }}
+        onEditGroup={(group) => {
+          setEditingGroup(group)
+          setGroupDialogOpen(true)
+        }}
+        onDeleteGroup={(group) => setPendingDeleteGroup(group)}
+        onNewGroupVault={(group) => {
+          setEditingVault(null)
+          setVaultDefaultOwnerGroupId(group.id)
+          setVaultDialogOpen(true)
+        }}
         onOpenSettings={(tab = 'profile') => {
           setSettingsTab(tab)
           setSettingsOpen(true)
@@ -396,7 +461,9 @@ function VaultWorkspace() {
         {/* Mobile & Tablet Header */}
         <header className="flex h-12 shrink-0 items-center justify-between border-b px-3 lg:hidden">
           <div className="flex items-center gap-2">
-            {selection.type !== 'admin' && mobileDetailOpen ? (
+            {selection.type !== 'admin' &&
+            selection.type !== 'group' &&
+            mobileDetailOpen ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -417,10 +484,12 @@ function VaultWorkspace() {
             <span className="text-sm font-semibold">
               {selection.type === 'admin'
                 ? 'Pannello Admin'
-                : 'Starward Vault'}
+                : selection.type === 'group' && activeGroup
+                  ? `Gruppo · ${activeGroup.name}`
+                  : 'Starward Vault'}
             </span>
           </div>
-          {selection.type !== 'admin' && (
+          {selection.type !== 'admin' && selection.type !== 'group' && (
             <Button
               size="sm"
               onClick={() => {
@@ -440,6 +509,33 @@ function VaultWorkspace() {
               activeTab={selection.tab}
               onTabChange={(tab) => setSelection({ type: 'admin', tab })}
               onUsersChanged={refreshData}
+            />
+          </div>
+        ) : selection.type === 'group' && activeGroup ? (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <GroupDetailPanel
+              group={activeGroup}
+              vaults={vaults}
+              currentUserId={currentUser.id}
+              onGroupUpdated={handleGroupUpdated}
+              onLeftGroup={async () => {
+                setSelection({ type: 'all' })
+                await refreshData()
+              }}
+              onEditGroup={(group) => {
+                setEditingGroup(group)
+                setGroupDialogOpen(true)
+              }}
+              onDeleteGroup={(group) => setPendingDeleteGroup(group)}
+              onNewGroupVault={(group) => {
+                setEditingVault(null)
+                setVaultDefaultOwnerGroupId(group.id)
+                setVaultDialogOpen(true)
+              }}
+              onSelectVault={(vaultId) =>
+                handleSelectNavigation({ type: 'vault', vaultId })
+              }
+              onDataChanged={refreshData}
             />
           </div>
         ) : (
@@ -575,11 +671,26 @@ function VaultWorkspace() {
 
       <VaultDialog
         open={vaultDialogOpen}
-        onOpenChange={setVaultDialogOpen}
+        onOpenChange={(open) => {
+          setVaultDialogOpen(open)
+          if (!open) setVaultDefaultOwnerGroupId(null)
+        }}
         editingVault={editingVault}
+        groups={groups}
+        defaultOwnerGroupId={vaultDefaultOwnerGroupId}
         onSaved={async (saved) => {
           await refreshData()
           setSelection({ type: 'vault', vaultId: saved.id })
+        }}
+      />
+
+      <GroupDialog
+        open={groupDialogOpen}
+        onOpenChange={setGroupDialogOpen}
+        editingGroup={editingGroup}
+        onSaved={async (saved) => {
+          await refreshData()
+          setSelection({ type: 'group', groupId: saved.id })
         }}
       />
 
@@ -667,6 +778,38 @@ function VaultWorkspace() {
               onClick={confirmDeleteVault}
             >
               Elimina cartella
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      {/* Delete Group Confirmation */}
+      <AlertDialog
+        open={Boolean(pendingDeleteGroup)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteGroup(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminare questo gruppo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Il gruppo{' '}
+              <strong className="text-foreground">
+                "{pendingDeleteGroup?.name}"
+              </strong>{' '}
+              verrà eliminato. Le condivisioni delle cartelle verso questo
+              gruppo saranno revocate, mentre eventuali cartelle create a nome
+              del gruppo torneranno di proprietà del loro creatore senza
+              perdita di credenziali.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmDeleteGroup}
+            >
+              Elimina gruppo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

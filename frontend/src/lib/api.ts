@@ -36,6 +36,58 @@ export interface SystemAuditEvent {
   created_at: string
 }
 
+export type GroupRole = 'owner' | 'member'
+
+export interface GroupMember {
+  id: string
+  group_id: string
+  user_id: string | null
+  email: string
+  name: string | null
+  image: string | null
+  role: GroupRole
+  is_pending: boolean
+  created_at: string
+}
+
+export interface GroupSummary {
+  id: string
+  name: string
+  description: string
+  color: string
+  member_count: number
+  vault_count: number
+  my_role: GroupRole | null
+}
+
+export interface Group {
+  id: string
+  name: string
+  description: string
+  color: string
+  created_by: string
+  created_by_name: string
+  my_role: GroupRole | null
+  can_manage: boolean
+  member_count: number
+  vault_count: number
+  members: GroupMember[]
+  created_at: string
+  updated_at: string
+}
+
+export interface VaultGroupShare {
+  id: string
+  vault_id: string
+  group_id: string
+  group_name: string
+  group_color: string
+  member_count: number
+  role: 'editor' | 'viewer'
+  is_owner_group: boolean
+  created_at: string
+}
+
 export interface VaultMember {
   id: string
   vault_id: string
@@ -57,13 +109,18 @@ export interface Vault {
   owner_id: string
   owner_name: string
   owner_email: string
+  owner_group_id: string | null
+  owner_group_name: string | null
+  owner_group_color: string | null
   is_personal: boolean
   role: 'owner' | 'editor' | 'viewer'
   is_shared: boolean
   is_shared_with_me: boolean
   member_count: number
+  group_count: number
   credential_count: number
   members: VaultMember[]
+  shared_groups: VaultGroupShare[]
   created_at: string
   updated_at: string
 }
@@ -241,6 +298,71 @@ export const vaultApi = {
 
   listSystemAudit: () => request<SystemAuditEvent[]>('/admin/audit'),
 
+  listAdminGroups: (q?: string) => {
+    const qs = q ? `?q=${encodeURIComponent(q)}` : ''
+    return request<Group[]>(`/admin/groups${qs}`)
+  },
+
+  listGroups: () => request<Group[]>('/groups'),
+
+  searchGroups: (q = '') =>
+    request<GroupSummary[]>(`/groups/directory?q=${encodeURIComponent(q)}`),
+
+  getGroup: (groupId: string) => request<Group>(`/groups/${groupId}`),
+
+  createGroup: (payload: {
+    name: string
+    description?: string
+    color?: string
+    member_emails?: string[]
+  }) =>
+    request<Group>('/groups', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateGroup: (
+    groupId: string,
+    payload: {
+      name?: string
+      description?: string
+      color?: string
+    },
+  ) =>
+    request<Group>(`/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteGroup: (groupId: string) =>
+    request<void>(`/groups/${groupId}`, {
+      method: 'DELETE',
+    }),
+
+  addGroupMember: (
+    groupId: string,
+    payload: { email: string; role?: GroupRole },
+  ) =>
+    request<Group>(`/groups/${groupId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateGroupMemberRole: (
+    groupId: string,
+    memberId: string,
+    role: GroupRole,
+  ) =>
+    request<Group>(`/groups/${groupId}/members/${memberId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeGroupMember: (groupId: string, memberId: string) =>
+    request<void>(`/groups/${groupId}/members/${memberId}`, {
+      method: 'DELETE',
+    }),
+
   listVaults: () => request<Vault[]>('/vaults'),
 
   createVault: (payload: {
@@ -248,6 +370,8 @@ export const vaultApi = {
     description?: string
     icon?: string
     color?: string
+    owner_group_id?: string | null
+    group_role?: 'editor' | 'viewer'
   }) =>
     request<Vault>('/vaults', {
       method: 'POST',
@@ -294,6 +418,30 @@ export const vaultApi = {
 
   removeMember: (vaultId: string, memberId: string) =>
     request<void>(`/vaults/${vaultId}/members/${memberId}`, {
+      method: 'DELETE',
+    }),
+
+  shareVaultWithGroup: (
+    vaultId: string,
+    payload: { group_id: string; role: 'editor' | 'viewer' },
+  ) =>
+    request<Vault>(`/vaults/${vaultId}/groups`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateVaultGroupRole: (
+    vaultId: string,
+    groupId: string,
+    role: 'editor' | 'viewer',
+  ) =>
+    request<Vault>(`/vaults/${vaultId}/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeVaultGroup: (vaultId: string, groupId: string) =>
+    request<void>(`/vaults/${vaultId}/groups/${groupId}`, {
       method: 'DELETE',
     }),
 

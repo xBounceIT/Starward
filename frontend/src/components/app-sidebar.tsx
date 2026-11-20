@@ -55,7 +55,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { VaultIcon } from '@/components/vault-icon'
-import type { UserRole, Vault } from '@/lib/api'
+import type { Group, UserRole, Vault } from '@/lib/api'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
@@ -65,11 +65,13 @@ export type VaultSelection =
   | { type: 'all' }
   | { type: 'favorites' }
   | { type: 'vault'; vaultId: string }
+  | { type: 'group'; groupId: string }
   | { type: 'admin'; tab: AdminPanelTab }
 
 interface AppSidebarProps {
   user: { id: string; name: string; email: string; role?: UserRole }
   vaults: Vault[]
+  groups: Group[]
   totalCredentialsCount: number
   favoritesCount: number
   selection: VaultSelection
@@ -80,6 +82,10 @@ interface AppSidebarProps {
   onShareVault: (vault: Vault) => void
   onOpenAudit: (vault: Vault) => void
   onDeleteVault: (vault: Vault) => void
+  onNewGroup: () => void
+  onEditGroup: (group: Group) => void
+  onDeleteGroup: (group: Group) => void
+  onNewGroupVault: (group: Group) => void
   onOpenSettings: (tab?: SettingsTab) => void
   onSignOut: () => void
 }
@@ -227,9 +233,113 @@ function VaultSidebarMenuItem({
   )
 }
 
+interface GroupSidebarMenuItemProps {
+  group: Group
+  active: boolean
+  onSelect: () => void
+  onNewGroupVault: () => void
+  onEditGroup: () => void
+  onDeleteGroup: () => void
+}
+
+function GroupSidebarMenuItem({
+  group,
+  active,
+  onSelect,
+  onNewGroupVault,
+  onEditGroup,
+  onDeleteGroup,
+}: GroupSidebarMenuItemProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const palette = getVaultColor(group.color)
+
+  return (
+    <SidebarMenuItem
+      onContextMenu={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setMenuOpen(true)
+      }}
+    >
+      <SidebarMenuButton
+        isActive={active}
+        className="h-9 rounded-lg pr-14 group-has-data-[sidebar=menu-action]/menu-item:pr-14 data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+        onClick={onSelect}
+      >
+        <Users
+          className={cn(
+            'size-4 shrink-0',
+            active
+              ? 'text-violet-400 sync-security:text-[#ff9c00]'
+              : palette.text,
+          )}
+        />
+        <span className="truncate font-medium">{group.name}</span>
+      </SidebarMenuButton>
+
+      <SidebarMenuBadge
+        className={cn(
+          'top-1/2! right-7 -translate-y-1/2 text-xs',
+          active ? 'text-foreground' : 'text-muted-foreground',
+        )}
+        title={`${group.member_count} ${group.member_count === 1 ? 'membro' : 'membri'}`}
+      >
+        {group.member_count}
+      </SidebarMenuBadge>
+
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <SidebarMenuAction
+            className="top-1/2! right-1 size-6 -translate-y-1/2 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-foreground"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Opzioni per il gruppo ${group.name}`}
+            title="Opzioni gruppo"
+          >
+            <MoreHorizontal className="size-4" />
+          </SidebarMenuAction>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side="right"
+          sideOffset={6}
+          className="w-52"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DropdownMenuLabel className="truncate text-xs text-muted-foreground">
+            Gruppo · {group.name}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onNewGroupVault}>
+            <FolderPlus className="size-4" />
+            Nuova cartella del gruppo
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onSelect}>
+            <Users className="size-4" />
+            Membri e cartelle ({group.member_count})
+          </DropdownMenuItem>
+          {group.can_manage && (
+            <>
+              <DropdownMenuItem onClick={onEditGroup}>
+                <Pencil className="size-4" />
+                Modifica gruppo
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem variant="destructive" onClick={onDeleteGroup}>
+                <Trash2 className="size-4" />
+                Elimina gruppo
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  )
+}
+
 export function AppSidebar({
   user,
   vaults,
+  groups,
   totalCredentialsCount,
   favoritesCount,
   selection,
@@ -240,14 +350,23 @@ export function AppSidebar({
   onShareVault,
   onOpenAudit,
   onDeleteVault,
+  onNewGroup,
+  onEditGroup,
+  onDeleteGroup,
+  onNewGroupVault,
   onOpenSettings,
   onSignOut,
 }: AppSidebarProps) {
   const { theme, setTheme } = useTheme()
   const { setOpenMobile } = useSidebar()
 
-  const myVaults = vaults.filter((v) => !v.is_shared_with_me)
-  const sharedWithMe = vaults.filter((v) => v.is_shared_with_me)
+  const groupIds = new Set(groups.map((g) => g.id))
+  const myVaults = vaults.filter((v) => !v.owner_group_id && !v.is_shared_with_me)
+  const sharedWithMe = vaults.filter(
+    (v) =>
+      (!v.owner_group_id && v.is_shared_with_me) ||
+      (v.owner_group_id !== null && !groupIds.has(v.owner_group_id)),
+  )
 
   const handleSelect = (next: VaultSelection) => {
     onSelect(next)
@@ -435,12 +554,119 @@ export function AppSidebar({
         <SidebarSeparator className="my-1" />
 
         <SidebarGroup className="py-1">
+          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
+            Gruppi
+          </SidebarGroupLabel>
+          <SidebarGroupAction
+            title="Nuovo gruppo"
+            onClick={() => {
+              setOpenMobile(false)
+              onNewGroup()
+            }}
+          >
+            <Plus className="size-4 text-muted-foreground" />
+            <span className="sr-only">Nuovo gruppo</span>
+          </SidebarGroupAction>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-1">
+              {groups.length === 0 ? (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className="h-8 rounded-lg text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      setOpenMobile(false)
+                      onNewGroup()
+                    }}
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Crea un gruppo</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : (
+                groups.map((group) => {
+                  const groupActive =
+                    selection.type === 'group' &&
+                    selection.groupId === group.id
+                  const groupVaults = vaults.filter(
+                    (v) => v.owner_group_id === group.id,
+                  )
+                  return (
+                    <div key={group.id} className="space-y-0.5">
+                      <GroupSidebarMenuItem
+                        group={group}
+                        active={groupActive}
+                        onSelect={() =>
+                          handleSelect({ type: 'group', groupId: group.id })
+                        }
+                        onNewGroupVault={() => {
+                          setOpenMobile(false)
+                          onNewGroupVault(group)
+                        }}
+                        onEditGroup={() => {
+                          setOpenMobile(false)
+                          onEditGroup(group)
+                        }}
+                        onDeleteGroup={() => {
+                          setOpenMobile(false)
+                          onDeleteGroup(group)
+                        }}
+                      />
+                      {groupVaults.map((vault) => {
+                        const active =
+                          selection.type === 'vault' &&
+                          selection.vaultId === vault.id
+                        return (
+                          <VaultSidebarMenuItem
+                            key={vault.id}
+                            vault={vault}
+                            active={active}
+                            indented
+                            onSelect={() =>
+                              handleSelect({
+                                type: 'vault',
+                                vaultId: vault.id,
+                              })
+                            }
+                            onNewCredential={() => {
+                              setOpenMobile(false)
+                              onNewCredential(vault.id)
+                            }}
+                            onEditVault={() => {
+                              setOpenMobile(false)
+                              onEditVault(vault)
+                            }}
+                            onShareVault={() => {
+                              setOpenMobile(false)
+                              onShareVault(vault)
+                            }}
+                            onOpenAudit={() => {
+                              setOpenMobile(false)
+                              onOpenAudit(vault)
+                            }}
+                            onDeleteVault={() => {
+                              setOpenMobile(false)
+                              onDeleteVault(vault)
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  )
+                })
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator className="my-1" />
+
+        <SidebarGroup className="py-1">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               <SidebarMenuItem>
                 <div className="flex h-9 items-center justify-between px-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <Users className="size-4 shrink-0" />
+                    <Share2 className="size-4 shrink-0" />
                     <span className="text-xs font-medium">
                       Condivise con me
                     </span>
@@ -516,7 +742,7 @@ export function AppSidebar({
                       }
                       className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
                     >
-                      <Users
+                      <User
                         className={cn(
                           'size-4',
                           selection.type === 'admin' &&
@@ -526,6 +752,29 @@ export function AppSidebar({
                         )}
                       />
                       <span>Lista utenti</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={
+                        selection.type === 'admin' && selection.tab === 'groups'
+                      }
+                      onClick={() =>
+                        handleSelect({ type: 'admin', tab: 'groups' })
+                      }
+                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                    >
+                      <Users
+                        className={cn(
+                          'size-4',
+                          selection.type === 'admin' &&
+                            selection.tab === 'groups'
+                            ? 'text-violet-400 sync-security:text-[#ff9c00]'
+                            : 'text-muted-foreground',
+                        )}
+                      />
+                      <span>Gruppi</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 

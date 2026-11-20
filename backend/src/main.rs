@@ -126,7 +126,31 @@ pub fn build_app(state: AppState) -> Router {
             "/api/admin/users/{user_id}",
             patch(routes::admin::update_user_role).delete(routes::admin::delete_user),
         )
+        .route("/api/admin/groups", get(routes::groups::list_admin_groups))
         .route("/api/admin/audit", get(routes::admin::list_system_audit))
+        .route(
+            "/api/groups",
+            get(routes::groups::list_groups).post(routes::groups::create_group),
+        )
+        .route(
+            "/api/groups/directory",
+            get(routes::groups::search_groups_directory),
+        )
+        .route(
+            "/api/groups/{group_id}",
+            get(routes::groups::get_group)
+                .patch(routes::groups::update_group)
+                .delete(routes::groups::delete_group),
+        )
+        .route(
+            "/api/groups/{group_id}/members",
+            post(routes::groups::add_group_member),
+        )
+        .route(
+            "/api/groups/{group_id}/members/{member_id}",
+            patch(routes::groups::update_group_member_role)
+                .delete(routes::groups::remove_group_member),
+        )
         .route(
             "/api/vaults",
             get(routes::vaults::list_vaults).post(routes::vaults::create_vault),
@@ -142,6 +166,15 @@ pub fn build_app(state: AppState) -> Router {
         .route(
             "/api/vaults/{vault_id}/members/{member_id}",
             patch(routes::vaults::update_member_role).delete(routes::vaults::remove_member),
+        )
+        .route(
+            "/api/vaults/{vault_id}/groups",
+            post(routes::vaults::share_vault_with_group),
+        )
+        .route(
+            "/api/vaults/{vault_id}/groups/{group_id}",
+            patch(routes::vaults::update_vault_group_role)
+                .delete(routes::vaults::remove_vault_group),
         )
         .route(
             "/api/vaults/{vault_id}/audit",
@@ -938,11 +971,222 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
+        // 13. Groups: create group, share existing vault with group, create vault on behalf of group, dynamic membership
+        let dave_id = format!("test-dave-{suffix}");
+        let dave_email = format!("dave-{suffix}@starward.io");
+        let dave_token = make_token(&config.auth_secret, &dave_id, &dave_email, "Dave");
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/groups")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": format!("DevOps-{suffix}"),
+                            "description": "Team infrastruttura",
+                            "color": "emerald",
+                            "member_emails": [bob_email]
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let group = read_json(res).await;
+        let group_id = group["id"].as_str().unwrap().to_string();
+        assert_eq!(group["member_count"], 2);
+        assert_eq!(group["my_role"], "owner");
+
+        // Share existing "Produzione" vault with group as editor (upgrades Bob from viewer to editor!)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{prod_id}/groups"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "group_id": group_id, "role": "editor" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let shared_prod = read_json(res).await;
+        assert_eq!(shared_prod["group_count"], 1);
+
+        // Bob now has effective role 'editor' on Produzione via group (higher than direct 'viewer')
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let bob_vaults_after = read_json(res).await;
+        let bob_prod = bob_vaults_after
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|v| v["id"] == prod_id)
+            .collect::<Vec<_>>();
+        assert_eq!(bob_prod.len(), 1);
+        assert_eq!(bob_prod[0]["role"], "editor");
+
+        // Create a folder ON BEHALF OF the group -> automatically shared with all members
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "Infrastruttura DevOps",
+                            "description": "Cartella di proprietà del gruppo",
+                            "icon": "server",
+                            "color": "emerald",
+                            "owner_group_id": group_id,
+                            "group_role": "editor"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let group_vault = read_json(res).await;
+        let group_vault_id = group_vault["id"].as_str().unwrap().to_string();
+        assert_eq!(group_vault["owner_group_id"], group_id);
+        assert_eq!(group_vault["member_count"], 2);
+        assert_eq!(group_vault["shared_groups"][0]["is_owner_group"], true);
+
+        // Bob (group member) immediately sees the group-owned vault as editor and can create a credential in it
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": group_vault_id,
+                            "title": "K8s Cluster Admin",
+                            "username": "kubeadmin",
+                            "password": "ClusterSecret!2026"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        // Add Dave (pending, before first login) to the group -> Dave automatically gains access upon login!
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/groups/{group_id}/members"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "email": dave_email, "role": "member" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {dave_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let dave_vaults = read_json(res).await;
+        assert!(dave_vaults
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["id"] == group_vault_id && v["role"] == "editor"));
+        assert!(dave_vaults
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["id"] == prod_id && v["role"] == "editor"));
+
+        // Deleting the group preserves the group-owned vault by returning ownership to creator
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/groups/{group_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        // Alice still owns the preserved vault; Dave lost group access
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {dave_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let dave_vaults_after = read_json(res).await;
+        assert!(!dave_vaults_after
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v["id"] == group_vault_id));
+
         // Clean up test users (cascades vaults, members, credentials, audit logs)
-        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3)")
+        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3, $4)")
             .bind(&alice_id)
             .bind(&bob_id)
             .bind(&charlie_id)
+            .bind(&dave_id)
             .execute(&db)
             .await;
     }

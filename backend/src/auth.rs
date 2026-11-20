@@ -285,6 +285,19 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         .execute(&state.db)
         .await?;
 
+        // Automatically attach any pending group memberships invited by email before first login
+        sqlx::query(
+            r#"
+            UPDATE group_members
+            SET user_id = $1
+            WHERE LOWER(member_email) = LOWER($2) AND user_id IS NULL
+            "#,
+        )
+        .bind(&claims.sub)
+        .bind(&email_normalized)
+        .execute(&state.db)
+        .await?;
+
         // Ensure the user has a default Personal vault on first login
         let personal_exists: Option<(String,)> = sqlx::query_as(
             "SELECT id FROM vaults WHERE owner_id = $1 AND is_personal = TRUE LIMIT 1",

@@ -116,6 +116,102 @@ pub struct CreateApiKeyRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupMemberDto {
+    pub id: String,
+    pub group_id: String,
+    pub user_id: Option<String>,
+    pub email: String,
+    pub name: Option<String>,
+    pub image: Option<String>,
+    pub role: String,
+    pub is_pending: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupSummaryDto {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub color: String,
+    pub member_count: i64,
+    pub vault_count: i64,
+    pub my_role: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupDto {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub color: String,
+    pub created_by: String,
+    pub created_by_name: String,
+    pub my_role: Option<String>,
+    pub can_manage: bool,
+    pub member_count: i64,
+    pub vault_count: i64,
+    pub members: Vec<GroupMemberDto>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateGroupRequest {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default = "default_color")]
+    pub color: String,
+    #[serde(default)]
+    pub member_emails: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateGroupRequest {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AddGroupMemberRequest {
+    pub email: String,
+    #[serde(default = "default_group_member_role")]
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateGroupMemberRoleRequest {
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultGroupShareDto {
+    pub id: String,
+    pub vault_id: String,
+    pub group_id: String,
+    pub group_name: String,
+    pub group_color: String,
+    pub member_count: i64,
+    pub role: String,
+    pub is_owner_group: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShareVaultGroupRequest {
+    pub group_id: String,
+    #[serde(default = "default_share_role")]
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateVaultGroupRoleRequest {
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultMemberDto {
     pub id: String,
     pub vault_id: String,
@@ -138,13 +234,18 @@ pub struct VaultDto {
     pub owner_id: String,
     pub owner_name: String,
     pub owner_email: String,
+    pub owner_group_id: Option<String>,
+    pub owner_group_name: Option<String>,
+    pub owner_group_color: Option<String>,
     pub is_personal: bool,
     pub role: String,
     pub is_shared: bool,
     pub is_shared_with_me: bool,
     pub member_count: i64,
+    pub group_count: i64,
     pub credential_count: i64,
     pub members: Vec<VaultMemberDto>,
+    pub shared_groups: Vec<VaultGroupShareDto>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -158,6 +259,8 @@ pub struct CreateVaultRequest {
     pub icon: String,
     #[serde(default = "default_color")]
     pub color: String,
+    pub owner_group_id: Option<String>,
+    pub group_role: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -267,4 +370,8 @@ fn default_category() -> String {
 
 fn default_api_key_permission() -> String {
     "read".to_string()
+}
+
+fn default_group_member_role() -> String {
+    "member".to_string()
 }

@@ -181,6 +181,112 @@ pub async fn delete_user(
 
     let mut tx = state.db.begin().await?;
 
+    // Preserve group-owned vaults created by this user by reassigning owner_id to another group member or the deleting admin
+    sqlx::query(
+        r#"
+        UPDATE vaults v
+        SET owner_id = COALESCE(
+            (
+                SELECT gm.user_id
+                FROM group_members gm
+                WHERE gm.group_id = v.owner_group_id
+                  AND gm.user_id IS NOT NULL
+                  AND gm.user_id != $1
+                ORDER BY
+                    CASE gm.role WHEN 'owner' THEN 0 ELSE 1 END,
+                    gm.created_at ASC
+                LIMIT 1
+            ),
+            $2
+        )
+        WHERE v.owner_id = $1
+          AND v.owner_group_id IS NOT NULL
+        "#,
+    )
+    .bind(&target_user_id)
+    .bind(&user.id)
+    .execute(&mut *tx)
+    .await?;
+
+    // Reassign groups created by this user so ON DELETE RESTRICT does not block user deletion
+    sqlx::query(
+        r#"
+        UPDATE groups g
+        SET created_by = COALESCE(
+            (
+                SELECT gm.user_id
+                FROM group_members gm
+                WHERE gm.group_id = g.id
+                  AND gm.user_id IS NOT NULL
+                  AND gm.user_id != $1
+                ORDER BY
+                    CASE gm.role WHEN 'owner' THEN 0 ELSE 1 END,
+                    gm.created_at ASC
+                LIMIT 1
+            ),
+            $2
+        )
+        WHERE g.created_by = $1
+        "#,
+    )
+    .bind(&target_user_id)
+    .bind(&user.id)
+    .execute(&mut *tx)
+    .await?;
+
+    // Ensure groups where this user was the sole owner still have an owner among remaining members
+    sqlx::query(
+        r#"
+        UPDATE group_members
+        SET role = 'owner'
+        WHERE id IN (
+            SELECT DISTINCT ON (gm.group_id) gm.id
+            FROM group_members gm
+            WHERE (gm.user_id IS NULL OR gm.user_id != $1)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM group_members gm2
+                  WHERE gm2.group_id = gm.group_id
+                    AND gm2.role = 'owner'
+                    AND (gm2.user_id IS NULL OR gm2.user_id != $1)
+              )
+            ORDER BY gm.group_id, gm.created_at ASC
+        )
+        "#,
+    )
+    .bind(&target_user_id)
+    .execute(&mut *tx)
+    .await?;
+
+    // Preserve group_members.added_by and vault_groups.shared_by references
+    sqlx::query(
+        r#"
+        UPDATE group_members gm
+        SET added_by = g.created_by
+        FROM groups g
+        WHERE gm.group_id = g.id
+          AND gm.added_by = $1
+          AND g.created_by != $1
+        "#,
+    )
+    .bind(&target_user_id)
+    .execute(&mut *tx)
+    .await?;
+
+    sqlx::query(
+        r#"
+        UPDATE vault_groups vg
+        SET shared_by = v.owner_id
+        FROM vaults v
+        WHERE vg.vault_id = v.id
+          AND vg.shared_by = $1
+          AND v.owner_id != $1
+        "#,
+    )
+    .bind(&target_user_id)
+    .execute(&mut *tx)
+    .await?;
+
     // Preserve credentials created or edited by this user inside shared vaults owned by others
     sqlx::query(
         r#"

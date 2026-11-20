@@ -186,9 +186,11 @@ export function CredentialList({
       : selection.type === 'favorites'
         ? 'Accesso rapido alle credenziali principali contrassegnate come preferite.'
         : activeVault?.description ||
-          (activeVault?.is_shared_with_me
-            ? `Cartella condivisa da ${activeVault.owner_name}`
-            : 'Tutte le tue credenziali archiviate in questa cartella.')
+          (activeVault?.owner_group_name
+            ? `Cartella del gruppo ${activeVault.owner_group_name} · condivisa automaticamente con tutti i membri.`
+            : activeVault?.is_shared_with_me
+              ? `Cartella condivisa da ${activeVault.owner_name}`
+              : 'Tutte le tue credenziali archiviate in questa cartella.')
 
   const canCreateInCurrent =
     !activeVault ||
@@ -314,7 +316,23 @@ export function CredentialList({
               <h2 className="truncate text-xl font-bold tracking-tight">
                 {headerTitle}
               </h2>
-              {activeVault?.is_shared_with_me && (
+              {activeVault?.owner_group_name && (
+                <Badge
+                  variant="secondary"
+                  className={cn(
+                    'gap-1 text-[10px]',
+                    getVaultColor(activeVault.owner_group_color ?? 'indigo').bg,
+                    getVaultColor(activeVault.owner_group_color ?? 'indigo')
+                      .text,
+                  )}
+                >
+                  <Users className="size-3" />
+                  {activeVault.owner_group_name}
+                </Badge>
+              )}
+              {(activeVault?.is_shared_with_me ||
+                (activeVault?.owner_group_id &&
+                  activeVault.role !== 'owner')) && (
                 <Badge variant="secondary" className="text-[10px]">
                   {activeVault.role === 'editor' ? 'Editor' : 'Sola lettura'}
                 </Badge>

@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Crown, MailPlus, Trash2, UserCheck, Users } from 'lucide-react'
+import {
+  Crown,
+  MailPlus,
+  Share2,
+  Trash2,
+  User,
+  UserCheck,
+  Users,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -21,8 +29,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { vaultApi, type UserSummary, type Vault } from '@/lib/api'
-import { getInitials } from '@/lib/vault-utils'
+import {
+  vaultApi,
+  type GroupSummary,
+  type UserSummary,
+  type Vault,
+} from '@/lib/api'
+import { cn } from '@/lib/utils'
+import { getInitials, getVaultColor } from '@/lib/vault-utils'
 
 interface ShareVaultDialogProps {
   open: boolean
@@ -41,11 +55,15 @@ export function ShareVaultDialog({
   onVaultUpdated,
   onLeftVault,
 }: ShareVaultDialogProps) {
+  const [shareMode, setShareMode] = useState<'user' | 'group'>('user')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'editor' | 'viewer'>('editor')
+  const [selectedGroupId, setSelectedGroupId] = useState('')
+  const [groupRole, setGroupRole] = useState<'editor' | 'viewer'>('editor')
   const [suggestions, setSuggestions] = useState<UserSummary[]>([])
+  const [availableGroups, setAvailableGroups] = useState<GroupSummary[]>([])
   const [submitting, setSubmitting] = useState(false)
-  const [busyMemberId, setBusyMemberId] = useState<string | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
 
   const isOwner = vault?.role === 'owner'
 
@@ -73,9 +91,34 @@ export function ShareVaultDialog({
     }
   }, [email, open, isOwner, vault?.members])
 
+  useEffect(() => {
+    if (!open || !isOwner) return
+    let active = true
+    vaultApi
+      .searchGroups('')
+      .then((list) => {
+        if (!active) return
+        const alreadyShared = new Set(
+          (vault?.shared_groups ?? []).map((sg) => sg.group_id),
+        )
+        const filtered = list.filter((g) => !alreadyShared.has(g.id))
+        setAvailableGroups(filtered)
+        setSelectedGroupId((prev) =>
+          filtered.some((g) => g.id === prev) ? prev : (filtered[0]?.id ?? ''),
+        )
+      })
+      .catch(() => {
+        // ignore group directory errors
+      })
+
+    return () => {
+      active = false
+    }
+  }, [open, isOwner, vault?.shared_groups])
+
   if (!vault) return null
 
-  const handleShare = async (e: React.FormEvent) => {
+  const handleShareUser = async (e: React.FormEvent) => {
     e.preventDefault()
     const cleanEmail = email.trim().toLowerCase()
     if (!cleanEmail || !cleanEmail.includes('@')) {
@@ -101,11 +144,42 @@ export function ShareVaultDialog({
     }
   }
 
+  const handleShareGroup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedGroupId) {
+      toast.error('Seleziona un gruppo con cui condividere la cartella')
+      return
+    }
+
+    const targetGroup = availableGroups.find((g) => g.id === selectedGroupId)
+    setSubmitting(true)
+    try {
+      const updated = await vaultApi.shareVaultWithGroup(vault.id, {
+        group_id: selectedGroupId,
+        role: groupRole,
+      })
+      onVaultUpdated(updated)
+      toast.success(
+        targetGroup
+          ? `Cartella condivisa con il gruppo "${targetGroup.name}"`
+          : 'Cartella condivisa con il gruppo',
+      )
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Errore durante la condivisione con il gruppo',
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleRoleChange = async (
     memberId: string,
     newRole: 'editor' | 'viewer',
   ) => {
-    setBusyMemberId(memberId)
+    setBusyId(memberId)
     try {
       const updated = await vaultApi.updateMemberRole(
         vault.id,
@@ -119,12 +193,16 @@ export function ShareVaultDialog({
         err instanceof Error ? err.message : 'Errore aggiornamento ruolo',
       )
     } finally {
-      setBusyMemberId(null)
+      setBusyId(null)
     }
   }
 
-  const handleRemove = async (memberId: string, memberEmail: string, isSelf: boolean) => {
-    setBusyMemberId(memberId)
+  const handleRemoveMember = async (
+    memberId: string,
+    memberEmail: string,
+    isSelf: boolean,
+  ) => {
+    setBusyId(memberId)
     try {
       await vaultApi.removeMember(vault.id, memberId)
       if (isSelf) {
@@ -136,8 +214,8 @@ export function ShareVaultDialog({
         onVaultUpdated({
           ...vault,
           members: nextMembers,
-          member_count: nextMembers.length,
-          is_shared: nextMembers.length > 1,
+          member_count: Math.max(1, vault.member_count - 1),
+          is_shared: nextMembers.length > 1 || vault.shared_groups.length > 0,
         })
         toast.success(`Accesso rimosso per ${memberEmail}`)
       }
@@ -146,199 +224,487 @@ export function ShareVaultDialog({
         err instanceof Error ? err.message : 'Errore rimozione membro',
       )
     } finally {
-      setBusyMemberId(null)
+      setBusyId(null)
+    }
+  }
+
+  const handleGroupRoleChange = async (
+    groupId: string,
+    newRole: 'editor' | 'viewer',
+  ) => {
+    setBusyId(`group:${groupId}`)
+    try {
+      const updated = await vaultApi.updateVaultGroupRole(
+        vault.id,
+        groupId,
+        newRole,
+      )
+      onVaultUpdated(updated)
+      toast.success('Permessi del gruppo aggiornati')
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Errore aggiornamento permessi gruppo',
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const handleRemoveGroup = async (groupId: string, groupName: string) => {
+    setBusyId(`group:${groupId}`)
+    try {
+      await vaultApi.removeVaultGroup(vault.id, groupId)
+      const nextGroups = vault.shared_groups.filter(
+        (sg) => sg.group_id !== groupId,
+      )
+      onVaultUpdated({
+        ...vault,
+        shared_groups: nextGroups,
+        group_count: nextGroups.length,
+        is_shared: vault.members.length > 1 || nextGroups.length > 0,
+      })
+      toast.success(`Accesso rimosso per il gruppo "${groupName}"`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Errore rimozione gruppo',
+      )
+    } finally {
+      setBusyId(null)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="size-5 text-primary" />
             Condivisione cartella "{vault.name}"
           </DialogTitle>
           <DialogDescription>
-            Tutti gli utenti aggiunti vedranno questa cartella condivisa nella
-            propria sidebar con accesso live alle credenziali contenute.
+            Condividi questa cartella con singoli utenti oppure con interi gruppi
+            di lavoro.
           </DialogDescription>
         </DialogHeader>
 
-        {isOwner && (
-          <form onSubmit={handleShare} className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="share-email">Aggiungi utente tramite email</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="share-email"
-                  type="email"
-                  placeholder="collega@azienda.it"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="flex-1"
-                />
-                <Select
-                  value={role}
-                  onValueChange={(v) => setRole(v as 'editor' | 'viewer')}
+        <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+          {isOwner && (
+            <div className="space-y-3">
+              {/* Mode switcher: User vs Group */}
+              <div className="grid grid-cols-2 gap-1 rounded-xl border border-border/70 bg-muted/40 p-1">
+                <button
+                  type="button"
+                  onClick={() => setShareMode('user')}
+                  className={cn(
+                    'flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                    shareMode === 'user'
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
                 >
-                  <SelectTrigger className="w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="editor">Editor</SelectItem>
-                    <SelectItem value="viewer">Sola lettura</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button type="submit" disabled={submitting}>
-                  <MailPlus className="size-4" />
-                  Condividi
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {role === 'editor'
-                  ? 'Editor: può visualizzare, copiare, aggiungere e modificare le credenziali nella cartella.'
-                  : 'Sola lettura: può visualizzare e copiare le credenziali senza modificarle.'}
-              </p>
-            </div>
-
-            {suggestions.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 p-2">
-                <p className="mb-1.5 px-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Utenti registrati in Starward
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {suggestions.slice(0, 6).map((user) => (
-                    <Button
-                      key={user.id}
-                      type="button"
-                      variant="outline"
-                      size="xs"
-                      className="rounded-full"
-                      onClick={() => setEmail(user.email)}
-                    >
-                      <UserCheck className="size-3" />
-                      <span className="font-medium">{user.name}</span>
-                      <span className="text-muted-foreground">
-                        ({user.email})
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </form>
-        )}
-
-        <Separator />
-
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Persone con accesso ({vault.members.length})
-            </span>
-          </div>
-
-          <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
-            {vault.members.map((member) => {
-              const isSelf = member.user_id === currentUserId
-              return (
-                <div
-                  key={member.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2"
+                  <User className="size-3.5" />
+                  Condividi con utente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShareMode('group')}
+                  className={cn(
+                    'flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                    shareMode === 'group'
+                      ? 'bg-background text-foreground shadow-xs'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar className="size-8">
-                      <AvatarFallback>
-                        {getInitials(member.name || member.email)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="truncate text-sm font-medium">
-                          {member.name || member.email}
-                          {isSelf && (
-                            <span className="ml-1 text-xs text-muted-foreground">
-                              (tu)
+                  <Users className="size-3.5" />
+                  Condividi con gruppo
+                </button>
+              </div>
+
+              {shareMode === 'user' ? (
+                <form onSubmit={handleShareUser} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="share-email">
+                      Aggiungi utente tramite email
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="share-email"
+                        type="email"
+                        placeholder="collega@azienda.it"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Select
+                        value={role}
+                        onValueChange={(v) => setRole(v as 'editor' | 'viewer')}
+                      >
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="editor">Editor</SelectItem>
+                          <SelectItem value="viewer">Sola lettura</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button type="submit" disabled={submitting}>
+                        <MailPlus className="size-4" />
+                        Condividi
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {role === 'editor'
+                        ? 'Editor: può visualizzare, copiare, aggiungere e modificare le credenziali nella cartella.'
+                        : 'Sola lettura: può visualizzare e copiare le credenziali senza modificarle.'}
+                    </p>
+                  </div>
+
+                  {suggestions.length > 0 && (
+                    <div className="rounded-lg border bg-muted/30 p-2">
+                      <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                        Utenti registrati in Starward
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {suggestions.slice(0, 6).map((user) => (
+                          <Button
+                            key={user.id}
+                            type="button"
+                            variant="outline"
+                            size="xs"
+                            className="rounded-full"
+                            onClick={() => setEmail(user.email)}
+                          >
+                            <UserCheck className="size-3" />
+                            <span className="font-medium">{user.name}</span>
+                            <span className="text-muted-foreground">
+                              ({user.email})
                             </span>
-                          )}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              ) : (
+                <form onSubmit={handleShareGroup} className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Seleziona gruppo</Label>
+                    {availableGroups.length === 0 ? (
+                      <div className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-center text-xs text-muted-foreground">
+                        Nessun altro gruppo disponibile da aggiungere. Puoi
+                        creare un nuovo gruppo dalla sezione Gruppi nella
+                        sidebar.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex gap-2">
+                          <Select
+                            value={selectedGroupId}
+                            onValueChange={setSelectedGroupId}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Scegli un gruppo..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableGroups.map((g) => (
+                                <SelectItem key={g.id} value={g.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span
+                                      className={cn(
+                                        'size-2 rounded-full',
+                                        getVaultColor(g.color).dot,
+                                      )}
+                                    />
+                                    <span>{g.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({g.member_count}{' '}
+                                      {g.member_count === 1
+                                        ? 'membro'
+                                        : 'membri'}
+                                      )
+                                    </span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <Select
+                            value={groupRole}
+                            onValueChange={(v) =>
+                              setGroupRole(v as 'editor' | 'viewer')
+                            }
+                          >
+                            <SelectTrigger className="w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="editor">Editor</SelectItem>
+                              <SelectItem value="viewer">
+                                Sola lettura
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <Button type="submit" disabled={submitting}>
+                            <Share2 className="size-4" />
+                            Condividi
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Tutti i membri attuali e futuri del gruppo avranno
+                          automaticamente accesso a questa cartella.
                         </p>
-                        {member.is_pending && (
-                          <Badge variant="outline" className="py-0 text-[10px]">
-                            In attesa di accesso
+                      </>
+                    )}
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Shared Groups List */}
+          {vault.shared_groups.length > 0 && (
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                  Gruppi con accesso ({vault.shared_groups.length})
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {vault.shared_groups.map((sg) => {
+                  const palette = getVaultColor(sg.group_color)
+                  const isBusy = busyId === `group:${sg.group_id}`
+                  return (
+                    <div
+                      key={sg.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <div
+                          className={cn(
+                            'flex size-8 shrink-0 items-center justify-center rounded-lg',
+                            palette.bg,
+                            palette.text,
+                          )}
+                        >
+                          <Users className="size-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-sm font-medium">
+                              {sg.group_name}
+                            </p>
+                            {sg.is_owner_group && (
+                              <Badge
+                                variant="secondary"
+                                className="gap-1 py-0 text-[10px]"
+                              >
+                                <Crown className="size-2.5 text-amber-500" />
+                                Gruppo proprietario
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {sg.member_count}{' '}
+                            {sg.member_count === 1 ? 'membro' : 'membri'}
+                            {sg.is_owner_group
+                              ? ' · Gestori del gruppo hanno accesso completo'
+                              : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {isOwner ? (
+                          <>
+                            <Select
+                              value={sg.role}
+                              disabled={isBusy}
+                              onValueChange={(v) =>
+                                handleGroupRoleChange(
+                                  sg.group_id,
+                                  v as 'editor' | 'viewer',
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-32 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="editor">Editor</SelectItem>
+                                <SelectItem value="viewer">
+                                  Sola lettura
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {!sg.is_owner_group && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                disabled={isBusy}
+                                className="text-muted-foreground hover:text-destructive"
+                                onClick={() =>
+                                  handleRemoveGroup(sg.group_id, sg.group_name)
+                                }
+                                title="Revoca accesso al gruppo"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            )}
+                          </>
+                        ) : (
+                          <Badge variant="outline">
+                            {sg.role === 'editor' ? 'Editor' : 'Sola lettura'}
                           </Badge>
                         )}
                       </div>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {member.email}
-                      </p>
                     </div>
-                  </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {member.role === 'owner' ? (
-                      <Badge variant="secondary" className="gap-1">
-                        <Crown className="size-3 text-amber-500" />
-                        Proprietario
-                      </Badge>
-                    ) : isOwner ? (
-                      <>
-                        <Select
-                          value={member.role}
-                          disabled={busyMemberId === member.id}
-                          onValueChange={(v) =>
-                            handleRoleChange(
-                              member.id,
-                              v as 'editor' | 'viewer',
-                            )
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-32 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="editor">Editor</SelectItem>
-                            <SelectItem value="viewer">Sola lettura</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={busyMemberId === member.id}
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() =>
-                            handleRemove(member.id, member.email, false)
-                          }
-                          title="Revoca accesso"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      </>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          {member.role === 'editor' ? 'Editor' : 'Sola lettura'}
-                        </Badge>
-                        {isSelf && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={busyMemberId === member.id}
-                            className="h-7 text-xs text-destructive hover:text-destructive"
-                            onClick={() =>
-                              handleRemove(member.id, member.email, true)
-                            }
-                          >
-                            Lascia
-                          </Button>
+          {/* Direct User Members List */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                Persone con accesso diretto ({vault.members.length})
+              </span>
+            </div>
+
+            {vault.members.length === 0 ? (
+              <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-3 text-center text-xs text-muted-foreground">
+                {vault.owner_group_name
+                  ? `Nessun utente individuale extra: tutti i membri del gruppo "${vault.owner_group_name}" hanno già accesso automatico.`
+                  : 'Nessun membro diretto configurato.'}
+              </p>
+            ) : (
+              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                {vault.members.map((member) => {
+                  const isSelf = member.user_id === currentUserId
+                  return (
+                    <div
+                      key={member.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border bg-card px-3 py-2"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <Avatar className="size-8">
+                          <AvatarFallback>
+                            {getInitials(member.name || member.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <p className="truncate text-sm font-medium">
+                              {member.name || member.email}
+                              {isSelf && (
+                                <span className="ml-1 text-xs text-muted-foreground">
+                                  (tu)
+                                </span>
+                              )}
+                            </p>
+                            {member.is_pending && (
+                              <Badge
+                                variant="outline"
+                                className="py-0 text-[10px]"
+                              >
+                                In attesa di accesso
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {member.email}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {member.role === 'owner' ? (
+                          <Badge variant="secondary" className="gap-1">
+                            <Crown className="size-3 text-amber-500" />
+                            Proprietario
+                          </Badge>
+                        ) : isOwner ? (
+                          <>
+                            <Select
+                              value={member.role}
+                              disabled={busyId === member.id}
+                              onValueChange={(v) =>
+                                handleRoleChange(
+                                  member.id,
+                                  v as 'editor' | 'viewer',
+                                )
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-32 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="editor">Editor</SelectItem>
+                                <SelectItem value="viewer">
+                                  Sola lettura
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              disabled={busyId === member.id}
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() =>
+                                handleRemoveMember(
+                                  member.id,
+                                  member.email,
+                                  false,
+                                )
+                              }
+                              title="Revoca accesso"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                              {member.role === 'editor'
+                                ? 'Editor'
+                                : 'Sola lettura'}
+                            </Badge>
+                            {isSelf && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                disabled={busyId === member.id}
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                                onClick={() =>
+                                  handleRemoveMember(
+                                    member.id,
+                                    member.email,
+                                    true,
+                                  )
+                                }
+                              >
+                                Lascia
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
