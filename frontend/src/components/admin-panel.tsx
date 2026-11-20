@@ -1,8 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type Column,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type FilterFn,
+  type SortingState,
+} from '@tanstack/react-table'
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Bot,
   Calendar,
+  Check,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -11,6 +28,7 @@ import {
   FilterX,
   Folder,
   KeyRound,
+  ListFilter,
   Lock,
   Pencil,
   Plus,
@@ -42,6 +60,12 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
@@ -52,6 +76,15 @@ import {
 } from '@/components/ui/select'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { Skeleton } from '@/components/ui/skeleton'
+
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import {
   vaultApi,
   type AdminUser,
@@ -304,6 +337,382 @@ function formatExactAuditDateTime(iso: string): string {
   }
 }
 
+interface AuditActorFilterValue {
+  actorId: string
+  role: '' | UserRole
+}
+interface AuditActionFilterValue {
+  targetType: string
+  action: string
+}
+const AUDIT_ROLE_OPTIONS: { value: '' | UserRole; label: string }[] = [
+  { value: '', label: 'Tutti' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'user', label: 'User' },
+]
+const AUDIT_TARGET_OPTIONS: { value: string; label: string }[] = [
+  { value: 'auth', label: 'Autenticazione' },
+  { value: 'user', label: 'Utenti & RBAC' },
+  { value: 'vault', label: 'Cartelle' },
+  { value: 'credential', label: 'Credenziali' },
+  { value: 'api_key', label: 'API Key' },
+  { value: 'service_account', label: 'Service Account' },
+]
+const AUDIT_PERIOD_OPTIONS: { value: AuditPeriodFilter; label: string }[] = [
+  { value: 'all', label: 'Tutto' },
+  { value: '24h', label: '24 ore' },
+  { value: '7d', label: '7 giorni' },
+  { value: '30d', label: '30 giorni' },
+]
+const auditGlobalFilter: FilterFn<SystemAuditEvent> = (
+  row,
+  _columnId,
+  value,
+) => {
+  const q = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (!q) return true
+  const ev = row.original
+  const meta = getAuditActionMeta(ev.action)
+  const targetLabel = TARGET_TYPE_LABELS[ev.target_type] ?? ev.target_type
+  const hay =
+    `${ev.actor_name} ${ev.actor_email} ${ev.actor_role} ${ev.action} ${meta.label} ${targetLabel} ${ev.details}`.toLowerCase()
+  return hay.includes(q)
+}
+const auditActorFilter: FilterFn<SystemAuditEvent> = (
+  row,
+  _columnId,
+  value,
+) => {
+  const filter = (value as AuditActorFilterValue | undefined) ?? {
+    actorId: 'all',
+    role: '',
+  }
+  if (filter.actorId !== 'all' && row.original.actor_id !== filter.actorId)
+    return false
+  if (filter.role && row.original.actor_role !== filter.role) return false
+  return true
+}
+const auditActionFilter: FilterFn<SystemAuditEvent> = (
+  row,
+  _columnId,
+  value,
+) => {
+  const filter = (value as AuditActionFilterValue | undefined) ?? {
+    targetType: 'all',
+    action: 'all',
+  }
+  if (
+    filter.targetType !== 'all' &&
+    row.original.target_type !== filter.targetType
+  )
+    return false
+  if (filter.action !== 'all' && row.original.action !== filter.action)
+    return false
+  return true
+}
+const auditWhenFilter: FilterFn<SystemAuditEvent> = (
+  row,
+  _columnId,
+  value,
+) => {
+  const period = (value as AuditPeriodFilter | undefined) ?? 'all'
+  if (period === 'all') return true
+  const nowMs = Date.now()
+  const cutoffMs =
+    period === '24h'
+      ? nowMs - 24 * 3600 * 1000
+      : period === '7d'
+        ? nowMs - 7 * 24 * 3600 * 1000
+        : nowMs - 30 * 24 * 3600 * 1000
+  const ts = new Date(row.original.created_at).getTime()
+  if (!Number.isNaN(ts) && ts < cutoffMs) return false
+  return true
+}
+function AuditSortButton({
+  column,
+  label,
+}: {
+  column: Column<SystemAuditEvent, unknown>
+  label: string
+}) {
+  const sorted = column.getIsSorted()
+  return (
+    <button
+      type="button"
+      onClick={column.getToggleSortingHandler()}
+      title="Ordina colonna"
+      className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
+    >
+      <span>{label}</span>
+      {sorted === 'asc' ? (
+        <ArrowUp className="size-3" />
+      ) : sorted === 'desc' ? (
+        <ArrowDown className="size-3" />
+      ) : (
+        <ArrowUpDown className="size-3 opacity-40" />
+      )}
+    </button>
+  )
+}
+function HeaderFilterTrigger({
+  active,
+  title,
+  children,
+}: {
+  active: boolean
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <PopoverTrigger asChild>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        title={title}
+        aria-label={title}
+        className={cn(
+          'relative size-6 text-muted-foreground hover:text-foreground',
+          active && 'text-foreground',
+        )}
+      >
+        {children}
+        {active && (
+          <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary sync-security:bg-[#ff9c00]" />
+        )}
+      </Button>
+    </PopoverTrigger>
+  )
+}
+function ActorColumnFilter({
+  column,
+  actors,
+}: {
+  column: Column<SystemAuditEvent, unknown>
+  actors: { id: string; name: string; email: string; role: UserRole }[]
+}) {
+  const value = (column.getFilterValue() as AuditActorFilterValue | undefined) ?? {
+    actorId: 'all',
+    role: '',
+  }
+  const setValue = (next: AuditActorFilterValue) => {
+    column.setFilterValue(
+      next.actorId === 'all' && !next.role ? undefined : next,
+    )
+  }
+  const active = value.actorId !== 'all' || value.role !== ''
+  return (
+    <Popover>
+      <HeaderFilterTrigger active={active} title="Filtra per attore o ruolo">
+        <ListFilter className="size-3.5" />
+      </HeaderFilterTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Ruolo
+        </p>
+        <div className="mb-2.5 flex gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5 sync-security:border-white/15 sync-security:bg-[#000c20]">
+          {AUDIT_ROLE_OPTIONS.map((pill) => (
+            <button
+              key={pill.label}
+              type="button"
+              onClick={() => setValue({ ...value, role: pill.value })}
+              className={cn(
+                'flex-1 rounded-md px-2 py-1 text-[11px] font-medium transition-colors',
+                value.role === pill.value
+                  ? 'bg-foreground text-background sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                  : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
+              )}
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
+        <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Attore
+        </p>
+        <div className="max-h-56 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => setValue({ ...value, actorId: 'all' })}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+          >
+            <Check
+              className={cn(
+                'size-3.5 shrink-0',
+                value.actorId === 'all' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            Tutti gli utenti
+          </button>
+          {actors.map((actor) => (
+            <button
+              key={actor.id}
+              type="button"
+              onClick={() => setValue({ ...value, actorId: actor.id })}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+            >
+              <Check
+                className={cn(
+                  'size-3.5 shrink-0',
+                  value.actorId === actor.id ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              <span className="min-w-0 truncate">
+                {actor.name}{' '}
+                <span className="text-muted-foreground">({actor.email})</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+function ActionColumnFilter({
+  column,
+  actions,
+}: {
+  column: Column<SystemAuditEvent, unknown>
+  actions: string[]
+}) {
+  const value = (column.getFilterValue() as AuditActionFilterValue | undefined) ?? {
+    targetType: 'all',
+    action: 'all',
+  }
+  const setValue = (next: AuditActionFilterValue) => {
+    column.setFilterValue(
+      next.targetType === 'all' && next.action === 'all' ? undefined : next,
+    )
+  }
+  const active = value.targetType !== 'all' || value.action !== 'all'
+  return (
+    <Popover>
+      <HeaderFilterTrigger active={active} title="Filtra per azione o risorsa">
+        <ListFilter className="size-3.5" />
+      </HeaderFilterTrigger>
+      <PopoverContent align="start" className="w-64 p-2">
+        <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Risorsa
+        </p>
+        <div className="mb-2.5 max-h-40 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => setValue({ targetType: 'all', action: 'all' })}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+          >
+            <Check
+              className={cn(
+                'size-3.5 shrink-0',
+                value.targetType === 'all' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            Tutte le risorse
+          </button>
+          {AUDIT_TARGET_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setValue({ targetType: opt.value, action: 'all' })}
+              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+            >
+              <Check
+                className={cn(
+                  'size-3.5 shrink-0',
+                  value.targetType === opt.value ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Azione
+        </p>
+        <div className="max-h-56 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => setValue({ ...value, action: 'all' })}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+          >
+            <Check
+              className={cn(
+                'size-3.5 shrink-0',
+                value.action === 'all' ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            Tutte le azioni
+          </button>
+          {actions.map((act) => {
+            const meta = getAuditActionMeta(act)
+            return (
+              <button
+                key={act}
+                type="button"
+                onClick={() => setValue({ ...value, action: act })}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+              >
+                <Check
+                  className={cn(
+                    'size-3.5 shrink-0',
+                    value.action === act ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+                <span className="min-w-0 truncate">
+                  {meta.label}{' '}
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    ({act})
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+function PeriodColumnFilter({
+  column,
+}: {
+  column: Column<SystemAuditEvent, unknown>
+}) {
+  const value =
+    (column.getFilterValue() as AuditPeriodFilter | undefined) ?? 'all'
+  return (
+    <Popover>
+      <HeaderFilterTrigger
+        active={value !== 'all'}
+        title="Filtra per intervallo temporale"
+      >
+        <ListFilter className="size-3.5" />
+      </HeaderFilterTrigger>
+      <PopoverContent align="end" className="w-44 p-1.5">
+        {AUDIT_PERIOD_OPTIONS.map((period) => (
+          <button
+            key={period.value}
+            type="button"
+            onClick={() =>
+              column.setFilterValue(
+                period.value === 'all' ? undefined : period.value,
+              )
+            }
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted"
+          >
+            <Check
+              className={cn(
+                'size-3.5 shrink-0',
+                value === period.value ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            {period.label}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
 interface AdminPanelProps {
   currentUser: UserSummary
   activeTab: AdminPanelTab
@@ -344,11 +753,11 @@ export function AdminPanel({
   const [auditLoading, setAuditLoading] = useState(true)
   const [auditRefreshing, setAuditRefreshing] = useState(false)
   const [auditSearchQuery, setAuditSearchQuery] = useState('')
-  const [auditActorId, setAuditActorId] = useState<string>('all')
-  const [auditActorRole, setAuditActorRole] = useState<'' | UserRole>('')
-  const [auditTargetType, setAuditTargetType] = useState<string>('all')
-  const [auditAction, setAuditAction] = useState<string>('all')
-  const [auditPeriod, setAuditPeriod] = useState<AuditPeriodFilter>('all')
+  const [auditSorting, setAuditSorting] = useState<SortingState>([
+    { id: 'when', desc: true },
+  ])
+  const [auditColumnFilters, setAuditColumnFilters] =
+    useState<ColumnFiltersState>([])
 
   const loadData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) {
@@ -650,6 +1059,13 @@ export function AdminPanel({
     )
   }, [users, auditEvents])
 
+  const auditTargetTypeFilter = useMemo(() => {
+    const filter = auditColumnFilters.find((f) => f.id === 'action')
+    const value = filter?.value as AuditActionFilterValue | undefined
+    return value?.targetType && value.targetType !== 'all'
+      ? value.targetType
+      : 'all'
+  }, [auditColumnFilters])
   const availableActions = useMemo(() => {
     const set = new Set<string>(Object.keys(AUDIT_ACTION_META))
     for (const ev of auditEvents) {
@@ -657,16 +1073,16 @@ export function AdminPanel({
     }
     return Array.from(set)
       .filter((act) => {
-        if (auditTargetType === 'all') return true
-        if (auditTargetType === 'auth') return act.startsWith('auth.')
-        if (auditTargetType === 'user')
+        if (auditTargetTypeFilter === 'all') return true
+        if (auditTargetTypeFilter === 'auth') return act.startsWith('auth.')
+        if (auditTargetTypeFilter === 'user')
           return act.startsWith('user.') || act.startsWith('rbac.')
-        if (auditTargetType === 'vault') return act.startsWith('vault.')
-        if (auditTargetType === 'credential')
+        if (auditTargetTypeFilter === 'vault') return act.startsWith('vault.')
+        if (auditTargetTypeFilter === 'credential')
           return act.startsWith('credential.')
-        if (auditTargetType === 'api_key')
+        if (auditTargetTypeFilter === 'api_key')
           return act.startsWith('api_key.') || act === 'auth.api_key_used'
-        if (auditTargetType === 'service_account')
+        if (auditTargetTypeFilter === 'service_account')
           return (
             act.startsWith('service_account.') ||
             act === 'auth.service_account_key_used'
@@ -674,66 +1090,170 @@ export function AdminPanel({
         return true
       })
       .sort()
-  }, [auditEvents, auditTargetType])
-
+  }, [auditEvents, auditTargetTypeFilter])
   const hasActiveAuditFilters = Boolean(
-    auditSearchQuery.trim() ||
-      auditActorId !== 'all' ||
-      auditActorRole !== '' ||
-      auditTargetType !== 'all' ||
-      auditAction !== 'all' ||
-      auditPeriod !== 'all',
+    auditSearchQuery.trim() || auditColumnFilters.length > 0,
   )
-
   const resetAuditFilters = () => {
     setAuditSearchQuery('')
-    setAuditActorId('all')
-    setAuditActorRole('')
-    setAuditTargetType('all')
-    setAuditAction('all')
-    setAuditPeriod('all')
+    setAuditColumnFilters([])
   }
-
-  const filteredAuditEvents = useMemo(() => {
-    const q = auditSearchQuery.trim().toLowerCase()
-    const nowMs = Date.now()
-    const cutoffMs =
-      auditPeriod === '24h'
-        ? nowMs - 24 * 3600 * 1000
-        : auditPeriod === '7d'
-          ? nowMs - 7 * 24 * 3600 * 1000
-          : auditPeriod === '30d'
-            ? nowMs - 30 * 24 * 3600 * 1000
-            : null
-
-    return auditEvents.filter((ev) => {
-      if (auditActorId !== 'all' && ev.actor_id !== auditActorId) return false
-      if (auditActorRole && ev.actor_role !== auditActorRole) return false
-      if (auditTargetType !== 'all' && ev.target_type !== auditTargetType)
-        return false
-      if (auditAction !== 'all' && ev.action !== auditAction) return false
-      if (cutoffMs !== null) {
-        const ts = new Date(ev.created_at).getTime()
-        if (!Number.isNaN(ts) && ts < cutoffMs) return false
-      }
-      if (q) {
-        const meta = getAuditActionMeta(ev.action)
-        const targetLabel = TARGET_TYPE_LABELS[ev.target_type] ?? ev.target_type
-        const hay =
-          `${ev.actor_name} ${ev.actor_email} ${ev.actor_role} ${ev.action} ${meta.label} ${targetLabel} ${ev.details}`.toLowerCase()
-        if (!hay.includes(q)) return false
-      }
-      return true
-    })
-  }, [
-    auditEvents,
-    auditSearchQuery,
-    auditActorId,
-    auditActorRole,
-    auditTargetType,
-    auditAction,
-    auditPeriod,
-  ])
+  const auditColumns = useMemo<ColumnDef<SystemAuditEvent>[]>(
+    () => [
+      {
+        id: 'actor',
+        accessorFn: (ev) => `${ev.actor_name} ${ev.actor_email}`.toLowerCase(),
+        filterFn: auditActorFilter,
+        header: ({ column }) => (
+          <div className="flex items-center gap-0.5">
+            <AuditSortButton column={column} label="Chi (Attore & Ruolo)" />
+            <ActorColumnFilter column={column} actors={availableActors} />
+          </div>
+        ),
+        cell: ({ row }) => {
+          const event = row.original
+          const isSelf = event.actor_id === currentUser.id
+          const isAdmin = event.actor_role === 'admin'
+          return (
+            <div className="flex min-w-0 items-center gap-3 py-1">
+              <Avatar className="size-9 shrink-0 border border-border/60">
+                <AvatarFallback className="bg-muted text-xs font-semibold">
+                  {getInitials(event.actor_name || event.actor_email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="truncate text-sm font-semibold text-foreground">
+                    {event.actor_name}
+                  </span>
+                  {isSelf && (
+                    <Badge
+                      variant="secondary"
+                      className="px-1.5 py-0 text-[10px] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                    >
+                      Tu
+                    </Badge>
+                  )}
+                  {isAdmin ? (
+                    <Badge
+                      variant="secondary"
+                      className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
+                    >
+                      <ShieldCheck className="size-2.5" />
+                      Admin
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
+                    >
+                      <User className="size-2.5" />
+                      User
+                    </Badge>
+                  )}
+                </div>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {event.actor_email}
+                </p>
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        id: 'action',
+        accessorFn: (ev) => ev.action,
+        filterFn: auditActionFilter,
+        header: ({ column }) => (
+          <div className="flex items-center gap-0.5">
+            <AuditSortButton
+              column={column}
+              label="Cosa (Azione & Dettagli)"
+            />
+            <ActionColumnFilter column={column} actions={availableActions} />
+          </div>
+        ),
+        cell: ({ row }) => {
+          const event = row.original
+          const actionMeta = getAuditActionMeta(event.action)
+          const ActionIcon = actionMeta.icon
+          const targetLabel =
+            TARGET_TYPE_LABELS[event.target_type] ?? event.target_type
+          return (
+            <div className="min-w-0 space-y-1 py-1">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    'gap-1 px-2 py-0.5 text-[11px] font-medium',
+                    getToneBadgeClasses(actionMeta.tone),
+                  )}
+                >
+                  <ActionIcon className="size-3" />
+                  <span>{actionMeta.label}</span>
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="border-border/70 bg-background/50 px-1.5 py-0 text-[10px] text-muted-foreground"
+                >
+                  {targetLabel}
+                </Badge>
+                <code className="rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  {event.action}
+                </code>
+              </div>
+              <p className="text-xs leading-relaxed text-foreground/90">
+                {event.details}
+              </p>
+            </div>
+          )
+        },
+      },
+      {
+        id: 'when',
+        accessorFn: (ev) => ev.created_at,
+        filterFn: auditWhenFilter,
+        header: ({ column }) => (
+          <div className="flex items-center justify-end gap-0.5">
+            <PeriodColumnFilter column={column} />
+            <AuditSortButton column={column} label="Quando (Data e Ora)" />
+          </div>
+        ),
+        cell: ({ row }) => {
+          const event = row.original
+          return (
+            <div className="flex flex-col items-start gap-0.5 py-1 text-xs md:items-end">
+              <div className="inline-flex items-center gap-1.5 font-medium whitespace-nowrap text-foreground">
+                <Clock className="size-3.5 text-emerald-400" />
+                <span>{formatRelativeDate(event.created_at)}</span>
+              </div>
+              <span className="font-mono text-[11px] whitespace-nowrap text-muted-foreground">
+                {formatExactAuditDateTime(event.created_at)}
+              </span>
+            </div>
+          )
+        },
+      },
+    ],
+    [availableActors, availableActions, currentUser.id],
+  )
+  const auditTable = useReactTable({
+    data: auditEvents,
+    columns: auditColumns,
+    state: {
+      sorting: auditSorting,
+      columnFilters: auditColumnFilters,
+      globalFilter: auditSearchQuery,
+    },
+    onSortingChange: setAuditSorting,
+    onColumnFiltersChange: setAuditColumnFilters,
+    onGlobalFilterChange: setAuditSearchQuery,
+    globalFilterFn: auditGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  })
+  const filteredAuditCount = auditTable.getFilteredRowModel().rows.length
 
   return (
     <section className="flex h-full min-w-0 flex-1 flex-col bg-background">
@@ -1460,6 +1980,9 @@ export function AdminPanel({
             </div>
 
             <div className="flex items-center gap-2">
+              <span className="hidden text-[11px] text-muted-foreground sm:inline">
+                {filteredAuditCount} di {auditEvents.length} eventi
+              </span>
               {hasActiveAuditFilters && (
                 <Button
                   type="button"
@@ -1490,340 +2013,116 @@ export function AdminPanel({
           </div>
 
           <ScrollArea className="min-h-0 flex-1 px-5 pb-6 sm:px-6">
-            <div className="space-y-4">
-              {/* Interactive Filter Controls (Chi / Cosa / Quando) */}
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                {/* 1. CHI (Attore & Ruolo) */}
-                <div className="flex flex-col justify-between gap-2.5 border border-border/70 bg-card/45 p-3.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <User className="size-3.5 text-foreground sync-security:text-[#ff9c00]" />
-                      <span>CHI (Attore & Ruolo)</span>
-                    </div>
-                    <div className="flex items-center gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5 sync-security:border-white/15 sync-security:bg-[#000c20]">
-                      {(
-                        [
-                          { value: '', label: 'Tutti' },
-                          { value: 'admin', label: 'Admin' },
-                          { value: 'user', label: 'User' },
-                        ] as const
-                      ).map((pill) => {
-                        const active = auditActorRole === pill.value
-                        return (
-                          <button
-                            key={pill.label}
-                            type="button"
-                            onClick={() => setAuditActorRole(pill.value)}
-                            className={cn(
-                              'px-2 py-0.5 text-[11px] font-medium transition-colors rounded-md',
-                              active
-                                ? 'bg-foreground text-background sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
-                                : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
-                            )}
-                          >
-                            {pill.label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  <Select
-                    value={auditActorId}
-                    onValueChange={(val) => setAuditActorId(val)}
-                  >
-                    <SelectTrigger className="h-8 w-full rounded-lg bg-background/60 text-xs">
-                      <SelectValue placeholder="Tutti gli utenti" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tutti gli utenti</SelectItem>
-                      {availableActors.map((actor) => (
-                        <SelectItem key={actor.id} value={actor.id}>
-                          {actor.name} ({actor.email})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 2. COSA (Azione & Risorsa) */}
-                <div className="flex flex-col justify-between gap-2.5 border border-border/70 bg-card/45 p-3.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <Activity className="size-3.5 text-sky-400" />
-                      <span>COSA (Azione & Risorsa)</span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">
-                      {auditTargetType === 'all'
-                        ? 'Tutte le categorie'
-                        : TARGET_TYPE_LABELS[auditTargetType] ?? auditTargetType}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <Select
-                      value={auditTargetType}
-                      onValueChange={(val) => {
-                        setAuditTargetType(val)
-                        setAuditAction('all')
-                      }}
+            <div className="overflow-hidden border border-border/70 bg-card/30 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+              <Table className="min-w-[780px]">
+                <TableHeader className="bg-muted/40 sync-security:bg-[#1a2c4b]/60">
+                  {auditTable.getHeaderGroups().map((headerGroup) => (
+                    <TableRow
+                      key={headerGroup.id}
+                      className="border-b border-border/70 hover:bg-transparent sync-security:border-white/15"
                     >
-                      <SelectTrigger className="h-8 w-full rounded-lg bg-background/60 text-xs">
-                        <SelectValue placeholder="Risorsa" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tutte le risorse</SelectItem>
-                        <SelectItem value="auth">Autenticazione</SelectItem>
-                        <SelectItem value="user">Utenti & RBAC</SelectItem>
-                        <SelectItem value="vault">Cartelle</SelectItem>
-                        <SelectItem value="credential">Credenziali</SelectItem>
-                        <SelectItem value="api_key">API Key</SelectItem>
-                        <SelectItem value="service_account">
-                          Service Account
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select
-                      value={auditAction}
-                      onValueChange={(val) => setAuditAction(val)}
-                    >
-                      <SelectTrigger className="h-8 w-full rounded-lg bg-background/60 text-xs">
-                        <SelectValue placeholder="Azione" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Tutte le azioni</SelectItem>
-                        {availableActions.map((act) => {
-                          const meta = getAuditActionMeta(act)
-                          return (
-                            <SelectItem key={act} value={act}>
-                              {meta.label} ({act})
-                            </SelectItem>
-                          )
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                {/* 3. QUANDO (Timestamp) */}
-                <div className="flex flex-col justify-between gap-2.5 border border-border/70 bg-card/45 p-3.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <Clock className="size-3.5 text-emerald-400" />
-                      <span>QUANDO (Intervallo)</span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">
-                      {filteredAuditEvents.length} di {auditEvents.length}{' '}
-                      eventi
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-1 rounded-lg border border-border/60 bg-background/50 p-1 sync-security:border-white/15 sync-security:bg-[#000c20]">
-                    {(
-                      [
-                        { value: 'all', label: 'Tutto' },
-                        { value: '24h', label: '24 ore' },
-                        { value: '7d', label: '7 giorni' },
-                        { value: '30d', label: '30 giorni' },
-                      ] as const
-                    ).map((period) => {
-                      const active = auditPeriod === period.value
-                      return (
-                        <button
-                          key={period.value}
-                          type="button"
-                          onClick={() => setAuditPeriod(period.value)}
+                      {headerGroup.headers.map((header) => (
+                        <TableHead
+                          key={header.id}
                           className={cn(
-                            'inline-flex h-6 items-center justify-center px-2 text-[11px] font-medium transition-colors rounded-md',
-                            active
-                              ? 'bg-foreground text-background shadow-2xs sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
-                              : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
+                            'h-11 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground sync-security:text-[#ff9c00]',
+                            header.column.id === 'when' && 'text-right',
                           )}
                         >
-                          {period.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* System Audit Events Table */}
-              <div className="overflow-hidden border border-border/70 bg-card/30 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-                <div className="hidden grid-cols-12 border-b border-border/70 bg-muted/40 px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase sync-security:border-white/15 sync-security:bg-[#1a2c4b]/60 tracking-[0.14em] sync-security:text-[#ff9c00] md:grid">
-                  <div className="col-span-4">Chi (Attore & Ruolo)</div>
-                  <div className="col-span-5">Cosa (Azione & Dettagli)</div>
-                  <div className="col-span-3 text-right">
-                    Quando (Data e Ora)
-                  </div>
-                </div>
-
-                {auditLoading ? (
-                  <div className="divide-y divide-border/50">
-                    {[1, 2, 3, 4, 5].map((i) => (
-                      <div
-                        key={i}
-                        className="grid grid-cols-1 gap-3 px-4 py-3.5 md:grid-cols-12 md:items-center"
-                      >
-                        <div className="flex items-center gap-3 md:col-span-4">
-                          <Skeleton className="size-9 rounded-full" />
-                          <div className="space-y-1.5">
-                            <Skeleton className="h-3.5 w-32" />
-                            <Skeleton className="h-3 w-44" />
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {auditLoading ? (
+                    <>
+                      {[1, 2, 3, 4, 5].map((i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="flex items-center gap-3 py-1">
+                            <Skeleton className="size-9 rounded-full" />
+                            <div className="space-y-1.5">
+                              <Skeleton className="h-3.5 w-32" />
+                              <Skeleton className="h-3 w-44" />
+                            </div>
                           </div>
-                        </div>
-                        <div className="space-y-1.5 md:col-span-5">
-                          <Skeleton className="h-4 w-40 rounded-md" />
-                          <Skeleton className="h-3 w-64" />
-                        </div>
-                        <div className="flex flex-col items-start gap-1.5 md:col-span-3 md:items-end">
-                          <Skeleton className="h-3.5 w-20" />
-                          <Skeleton className="h-3 w-32" />
-                        </div>
-                      </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1.5 py-1">
+                            <Skeleton className="h-4 w-40 rounded-md" />
+                            <Skeleton className="h-3 w-64" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1.5 py-1">
+                            <Skeleton className="h-3.5 w-20" />
+                            <Skeleton className="h-3 w-32" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     ))}
-                  </div>
-                ) : filteredAuditEvents.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div className="flex size-12 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
-                      <FileClock className="size-6" />
-                    </div>
-                    <p className="mt-3 text-sm font-semibold">
-                      {hasActiveAuditFilters
-                        ? 'Nessun evento trovato con i filtri selezionati'
-                        : 'Nessun evento di audit registrato'}
-                    </p>
-                    <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-                      {hasActiveAuditFilters
-                        ? 'Prova a modificare o reimpostare i filtri Chi / Cosa / Quando per visualizzare gli eventi.'
-                        : 'Tutte le operazioni di autenticazione, modifica ruoli RBAC, gestione cartelle, credenziali e API Key appariranno qui in tempo reale.'}
-                    </p>
-                    {hasActiveAuditFilters && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={resetAuditFilters}
-                        className="mt-4 h-8 gap-1.5 text-xs"
-                      >
-                        <FilterX className="size-3.5" />
-                        Reimposta filtri
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="divide-y divide-border/60">
-                    {filteredAuditEvents.map((event) => {
-                      const isSelf = event.actor_id === currentUser.id
-                      const isAdmin = event.actor_role === 'admin'
-                      const actionMeta = getAuditActionMeta(event.action)
-                      const ActionIcon = actionMeta.icon
-                      const targetLabel =
-                        TARGET_TYPE_LABELS[event.target_type] ??
-                        event.target_type
-
-                      return (
-                        <div
-                          key={event.id}
-                          className="grid grid-cols-1 gap-3 px-4 py-3.5 transition-colors hover:bg-card/60 md:grid-cols-12 md:items-center"
-                        >
-                          {/* Col 1: CHI (Attore & Ruolo) */}
-                          <div className="flex min-w-0 items-center gap-3 md:col-span-4">
-                            <Avatar className="size-9 shrink-0 border border-border/60">
-                              <AvatarFallback className="bg-muted text-xs font-semibold">
-                                {getInitials(
-                                  event.actor_name || event.actor_email,
-                                )}
-                              </AvatarFallback>
-                            </Avatar>
-
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="truncate text-sm font-semibold text-foreground">
-                                  {event.actor_name}
-                                </span>
-                                {isSelf && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="px-1.5 py-0 text-[10px] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
-                                  >
-                                    Tu
-                                  </Badge>
-                                )}
-                                {isAdmin ? (
-                                  <Badge
-                                    variant="secondary"
-                                    className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
-                                  >
-                                    <ShieldCheck className="size-2.5" />
-                                    Admin
-                                  </Badge>
-                                ) : (
-                                  <Badge
-                                    variant="outline"
-                                    className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
-                                  >
-                                    <User className="size-2.5" />
-                                    User
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                {event.actor_email}
-                              </p>
-                            </div>
+                    </>
+                  ) : auditTable.getRowModel().rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                          <div className="flex size-12 items-center justify-center rounded-full bg-muted text-foreground sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+                            <FileClock className="size-6" />
                           </div>
-
-                          {/* Col 2: COSA (Azione & Dettagli) */}
-                          <div className="min-w-0 space-y-1 md:col-span-5">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <Badge
-                                variant="outline"
-                                className={cn(
-                                  'gap-1 px-2 py-0.5 text-[11px] font-medium',
-                                  getToneBadgeClasses(actionMeta.tone),
-                                )}
-                              >
-                                <ActionIcon className="size-3" />
-                                <span>{actionMeta.label}</span>
-                              </Badge>
-
-                              <Badge
-                                variant="outline"
-                                className="border-border/70 bg-background/50 px-1.5 py-0 text-[10px] text-muted-foreground"
-                              >
-                                {targetLabel}
-                              </Badge>
-
-                              <code className="rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                                {event.action}
-                              </code>
-                            </div>
-
-                            <p className="text-xs leading-relaxed text-foreground/90">
-                              {event.details}
-                            </p>
-                          </div>
-
-                          {/* Col 3: QUANDO (Data e Ora) */}
-                          <div className="flex flex-row items-center justify-between gap-2 text-xs md:col-span-3 md:flex-col md:items-end md:justify-center md:gap-0.5">
-                            <div className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                              <Clock className="size-3.5 text-emerald-400" />
-                              <span>
-                                {formatRelativeDate(event.created_at)}
-                              </span>
-                            </div>
-                            <span className="font-mono text-[11px] text-muted-foreground">
-                              {formatExactAuditDateTime(event.created_at)}
-                            </span>
-                          </div>
+                          <p className="mt-3 text-sm font-semibold">
+                            {hasActiveAuditFilters
+                              ? 'Nessun evento trovato con i filtri selezionati'
+                              : 'Nessun evento di audit registrato'}
+                          </p>
+                          <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
+                            {hasActiveAuditFilters
+                              ? 'Prova a modificare i filtri nelle intestazioni delle colonne (Chi / Cosa / Quando) o a svuotare la ricerca.'
+                              : 'Tutte le operazioni di autenticazione, modifica ruoli RBAC, gestione cartelle, credenziali e API Key appariranno qui in tempo reale.'}
+                          </p>
+                          {hasActiveAuditFilters && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={resetAuditFilters}
+                              className="mt-4 h-8 gap-1.5 text-xs"
+                            >
+                              <FilterX className="size-3.5" />
+                              Reimposta filtri
+                            </Button>
+                          )}
                         </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    auditTable.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id} className="hover:bg-card/60">
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell
+                            key={cell.id}
+                            className={cn(
+                              'align-top',
+                              cell.column.id === 'when' && 'text-right',
+                            )}
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </ScrollArea>
         </div>
