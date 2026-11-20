@@ -742,12 +742,6 @@ export function AppSidebar({
             <SidebarGroup className="py-1">
               <SidebarGroupLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                 <span>Pannello Admin</span>
-                <Badge
-                  variant="secondary"
-                  className="h-4 px-1.5 py-0 text-[9px] font-semibold sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
-                >
-                  Admin
-                </Badge>
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">

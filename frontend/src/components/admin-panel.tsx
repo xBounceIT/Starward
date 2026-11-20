@@ -749,12 +749,6 @@ export function AdminPanel({
               <h2 className="truncate text-xl font-bold tracking-tight sync-security:text-lg sync-security:tracking-normal">
                 Pannello Admin
               </h2>
-              <Badge
-                variant="secondary"
-                className="text-[11px] font-semibold sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
-              >
-                RBAC · Admin
-              </Badge>
             </div>
             <p className="mt-1 truncate pl-10 text-xs text-muted-foreground">
               Gestione centralizzata degli utenti, Service Account di sistema
