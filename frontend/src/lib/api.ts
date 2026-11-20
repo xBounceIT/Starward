@@ -406,7 +406,7 @@ export const vaultApi = {
     name: string
     description?: string
     color?: string
-    member_emails?: string[]
+    member_ids?: string[]
   }) =>
     request<Group>('/groups', {
       method: 'POST',
@@ -433,7 +433,7 @@ export const vaultApi = {
 
   addGroupMember: (
     groupId: string,
-    payload: { email: string; role?: GroupRole },
+    payload: { user_id: string; role?: GroupRole },
   ) =>
     request<Group>(`/groups/${groupId}/members`, {
       method: 'POST',

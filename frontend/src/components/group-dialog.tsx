@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, UserCheck, Users, X } from 'lucide-react'
+import { UserCheck, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ export function GroupDialog({
   const [description, setDescription] = useState('')
   const [color, setColor] = useState('indigo')
   const [memberInput, setMemberInput] = useState('')
-  const [memberEmails, setMemberEmails] = useState<string[]>([])
+  const [selectedMembers, setSelectedMembers] = useState<UserSummary[]>([])
   const [suggestions, setSuggestions] = useState<UserSummary[]>([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -45,7 +45,7 @@ export function GroupDialog({
       setDescription(editingGroup?.description ?? '')
       setColor(editingGroup?.color ?? 'indigo')
       setMemberInput('')
-      setMemberEmails([])
+      setSelectedMembers([])
       setSuggestions([])
     }
   }, [open, editingGroup])
@@ -57,8 +57,8 @@ export function GroupDialog({
       try {
         const users = await vaultApi.searchUsers(memberInput)
         if (!active) return
-        const added = new Set(memberEmails.map((e) => e.toLowerCase()))
-        setSuggestions(users.filter((u) => !added.has(u.email.toLowerCase())))
+        const added = new Set(selectedMembers.map((u) => u.id))
+        setSuggestions(users.filter((u) => !added.has(u.id)))
       } catch {
         // ignore autocomplete errors
       }
@@ -68,24 +68,17 @@ export function GroupDialog({
       active = false
       clearTimeout(timer)
     }
-  }, [memberInput, memberEmails, open, editingGroup])
+  }, [memberInput, selectedMembers, open, editingGroup])
 
-  const addEmailToList = (raw: string) => {
-    const clean = raw.trim().toLowerCase()
-    if (!clean || !clean.includes('@')) {
-      toast.error('Inserisci un indirizzo email valido')
-      return
-    }
-    if (memberEmails.includes(clean)) {
-      setMemberInput('')
-      return
-    }
-    setMemberEmails((prev) => [...prev, clean])
+  const addMember = (user: UserSummary) => {
+    setSelectedMembers((prev) =>
+      prev.some((m) => m.id === user.id) ? prev : [...prev, user],
+    )
     setMemberInput('')
   }
 
-  const removeEmailFromList = (email: string) => {
-    setMemberEmails((prev) => prev.filter((e) => e !== email))
+  const removeMember = (userId: string) => {
+    setSelectedMembers((prev) => prev.filter((m) => m.id !== userId))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,12 +87,6 @@ export function GroupDialog({
       toast.error('Inserisci un nome per il gruppo')
       return
     }
-
-    const pendingEmail = memberInput.trim().toLowerCase()
-    const finalEmails =
-      !editingGroup && pendingEmail && pendingEmail.includes('@')
-        ? Array.from(new Set([...memberEmails, pendingEmail]))
-        : memberEmails
 
     setSubmitting(true)
     try {
@@ -113,7 +100,7 @@ export function GroupDialog({
             name: name.trim(),
             description: description.trim(),
             color,
-            member_emails: finalEmails,
+            member_ids: selectedMembers.map((u) => u.id),
           })
 
       toast.success(
@@ -198,48 +185,41 @@ export function GroupDialog({
               <Label htmlFor="group-initial-member">
                 Aggiungi membri iniziali (opzionale)
               </Label>
-              <div className="flex gap-2">
-                <Input
-                  id="group-initial-member"
-                  type="email"
-                  placeholder="collega@azienda.it"
-                  value={memberInput}
-                  onChange={(e) => setMemberInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      if (memberInput.trim()) {
-                        addEmailToList(memberInput)
-                      }
+              <Input
+                id="group-initial-member"
+                type="text"
+                placeholder="Cerca utenti per nome o email..."
+                value={memberInput}
+                onChange={(e) => setMemberInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    if (suggestions.length > 0) {
+                      addMember(suggestions[0])
                     }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (memberInput.trim()) addEmailToList(memberInput)
-                  }}
-                >
-                  <Plus className="size-4" />
-                  Aggiungi
-                </Button>
-              </div>
+                  }
+                }}
+              />
 
-              {memberEmails.length > 0 && (
+              {selectedMembers.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {memberEmails.map((email) => (
+                  {selectedMembers.map((u) => (
                     <Badge
-                      key={email}
+                      key={u.id}
                       variant="secondary"
                       className="gap-1 pr-1 pl-2 text-xs"
                     >
-                      <span>{email}</span>
+                      <span>
+                        {u.name}{' '}
+                        <span className="text-muted-foreground">
+                          ({u.email})
+                        </span>
+                      </span>
                       <button
                         type="button"
-                        onClick={() => removeEmailFromList(email)}
+                        onClick={() => removeMember(u.id)}
                         className="rounded-full p-0.5 hover:bg-background/60"
-                        aria-label={`Rimuovi ${email}`}
+                        aria-label={`Rimuovi ${u.name}`}
                       >
                         <X className="size-3" />
                       </button>
@@ -251,21 +231,22 @@ export function GroupDialog({
               {suggestions.length > 0 && (
                 <div className="rounded-lg border bg-muted/30 p-2">
                   <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                    Utenti registrati
+                    Utenti della piattaforma
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {suggestions.slice(0, 6).map((u) => (
-                      <Button
+                  <div className="flex flex-col gap-1">
+                    {suggestions.slice(0, 8).map((u) => (
+                      <button
                         key={u.id}
                         type="button"
-                        variant="outline"
-                        size="xs"
-                        className="rounded-full"
-                        onClick={() => addEmailToList(u.email)}
+                        onClick={() => addMember(u)}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
                       >
-                        <UserCheck className="size-3" />
-                        <span className="font-medium">{u.name}</span>
-                      </Button>
+                        <UserCheck className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate font-medium">{u.name}</span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {u.email}
+                        </span>
+                      </button>
                     ))}
                   </div>
                 </div>

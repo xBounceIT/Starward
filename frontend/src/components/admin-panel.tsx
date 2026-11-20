@@ -12,7 +12,6 @@ import {
   Folder,
   KeyRound,
   Lock,
-  MailPlus,
   Pencil,
   Plus,
   RefreshCw,
@@ -22,6 +21,7 @@ import {
   ShieldCheck,
   Trash2,
   User,
+  UserCheck,
   Users,
   X,
 } from 'lucide-react'
@@ -336,7 +336,8 @@ export function AdminPanel({
     null,
   )
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null)
-  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [memberSearch, setMemberSearch] = useState('')
+  const [memberSuggestions, setMemberSuggestions] = useState<UserSummary[]>([])
   const [newMemberRole, setNewMemberRole] = useState<GroupRole>('member')
   const [busyGroupKey, setBusyGroupKey] = useState<string | null>(null)
 
@@ -446,27 +447,49 @@ export function AdminPanel({
     })
   }, [adminGroups, groupSearchQuery])
 
-  const handleAdminAddGroupMember = async (
-    e: React.FormEvent,
-    group: Group,
-  ) => {
-    e.preventDefault()
-    const cleanEmail = newMemberEmail.trim().toLowerCase()
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      toast.error('Inserisci un indirizzo email valido')
+  useEffect(() => {
+    if (!expandedGroupId) {
+      setMemberSuggestions([])
       return
     }
+    let active = true
+    const timer = setTimeout(async () => {
+      try {
+        const users = await vaultApi.searchUsers(memberSearch)
+        if (!active) return
+        const group = adminGroups.find((g) => g.id === expandedGroupId)
+        const memberKeys = new Set(
+          (group?.members ?? []).map((m) => m.user_id ?? m.email.toLowerCase()),
+        )
+        setMemberSuggestions(
+          users.filter(
+            (u) =>
+              !memberKeys.has(u.id) && !memberKeys.has(u.email.toLowerCase()),
+          ),
+        )
+      } catch {
+        // ignore autocomplete errors
+      }
+    }, 150)
+
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [memberSearch, expandedGroupId, adminGroups])
+
+  const handleAdminAddGroupMember = async (user: UserSummary, group: Group) => {
     setBusyGroupKey(`add:${group.id}`)
     try {
       const updated = await vaultApi.addGroupMember(group.id, {
-        email: cleanEmail,
+        user_id: user.id,
         role: newMemberRole,
       })
       setAdminGroups((prev) =>
         prev.map((g) => (g.id === updated.id ? updated : g)),
       )
-      setNewMemberEmail('')
-      toast.success(`${cleanEmail} aggiunto al gruppo "${group.name}"`)
+      setMemberSearch('')
+      toast.success(`${user.name} aggiunto al gruppo "${group.name}"`)
       onUsersChanged?.()
     } catch (err) {
       toast.error(
@@ -1288,7 +1311,7 @@ export function AdminPanel({
                             className="h-8 gap-1.5 rounded-lg text-xs"
                             onClick={() => {
                               setExpandedGroupId(isExpanded ? null : g.id)
-                              setNewMemberEmail('')
+                              setMemberSearch('')
                               setNewMemberRole('member')
                             }}
                           >
@@ -1329,17 +1352,25 @@ export function AdminPanel({
 
                       {isExpanded && (
                         <div className="space-y-3 border-t border-border/60 bg-muted/20 px-4 py-3.5">
-                          <form
-                            onSubmit={(e) => handleAdminAddGroupMember(e, g)}
-                            className="flex flex-wrap gap-2"
-                          >
+                          <div className="flex flex-wrap gap-2">
                             <Input
-                              type="email"
-                              placeholder="Aggiungi utente tramite email..."
-                              value={newMemberEmail}
+                              type="text"
+                              placeholder="Cerca utente per nome o email..."
+                              value={memberSearch}
                               onChange={(e) =>
-                                setNewMemberEmail(e.target.value)
+                                setMemberSearch(e.target.value)
                               }
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  if (memberSuggestions.length > 0) {
+                                    handleAdminAddGroupMember(
+                                      memberSuggestions[0],
+                                      g,
+                                    )
+                                  }
+                                }
+                              }}
                               className="h-9 min-w-[200px] flex-1 bg-background text-xs"
                             />
                             <Select
@@ -1356,16 +1387,36 @@ export function AdminPanel({
                                 <SelectItem value="owner">Gestore</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button
-                              type="submit"
-                              size="sm"
-                              disabled={busyGroupKey === `add:${g.id}`}
-                              className="h-9 gap-1.5 text-xs"
-                            >
-                              <MailPlus className="size-3.5" />
-                              Aggiungi
-                            </Button>
-                          </form>
+                          </div>
+
+                          {memberSuggestions.length > 0 && (
+                            <div className="rounded-lg border border-border/60 bg-background/80 p-2">
+                              <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                                Utenti della piattaforma
+                              </p>
+                              <div className="flex flex-col gap-1">
+                                {memberSuggestions.slice(0, 8).map((u) => (
+                                  <button
+                                    key={u.id}
+                                    type="button"
+                                    disabled={busyGroupKey === `add:${g.id}`}
+                                    onClick={() =>
+                                      handleAdminAddGroupMember(u, g)
+                                    }
+                                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                                  >
+                                    <UserCheck className="size-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="truncate font-medium">
+                                      {u.name}
+                                    </span>
+                                    <span className="truncate text-[11px] text-muted-foreground">
+                                      {u.email}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
                           <div className="space-y-1.5">
                             {g.members.map((m) => (

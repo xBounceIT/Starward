@@ -5,20 +5,18 @@ WORKDIR /app
 
 # Cache Rust dependencies in a separate layer
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src migrations \
+RUN mkdir -p src \
     && echo "fn main() {}" > src/main.rs \
-    && touch migrations/001_init.sql \
     && cargo build --release --locked \
     && cargo clean --release --locked -p starward-backend \
-    && rm -rf src migrations
+    && rm -rf src
 
 # Build the real application binary
 ARG APP_VERSION=0.0.0-dev
 ENV APP_VERSION=${APP_VERSION}
 COPY build.rs ./build.rs
-COPY migrations ./migrations
 COPY src ./src
-RUN touch build.rs src/main.rs migrations/001_init.sql \
+RUN touch build.rs src/main.rs \
     && cargo build --release --locked
 
 FROM debian:bookworm-slim AS runtime

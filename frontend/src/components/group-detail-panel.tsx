@@ -6,7 +6,6 @@ import {
   FolderPlus,
   KeyRound,
   LogOut,
-  MailPlus,
   Pencil,
   Share2,
   Trash2,
@@ -64,7 +63,7 @@ export function GroupDetailPanel({
   onSelectVault,
   onDataChanged,
 }: GroupDetailPanelProps) {
-  const [email, setEmail] = useState('')
+  const [memberSearch, setMemberSearch] = useState('')
   const [role, setRole] = useState<GroupRole>('member')
   const [suggestions, setSuggestions] = useState<UserSummary[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -107,13 +106,16 @@ export function GroupDetailPanel({
     let active = true
     const timer = setTimeout(async () => {
       try {
-        const users = await vaultApi.searchUsers(email)
+        const users = await vaultApi.searchUsers(memberSearch)
         if (!active) return
-        const memberEmails = new Set(
-          group.members.map((m) => m.email.toLowerCase()),
+        const memberKeys = new Set(
+          group.members.map((m) => m.user_id ?? m.email.toLowerCase()),
         )
         setSuggestions(
-          users.filter((u) => !memberEmails.has(u.email.toLowerCase())),
+          users.filter(
+            (u) =>
+              !memberKeys.has(u.id) && !memberKeys.has(u.email.toLowerCase()),
+          ),
         )
       } catch {
         // ignore autocomplete errors
@@ -124,25 +126,18 @@ export function GroupDetailPanel({
       active = false
       clearTimeout(timer)
     }
-  }, [email, canManage, group.members])
+  }, [memberSearch, canManage, group.members])
 
-  const handleAddMember = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const cleanEmail = email.trim().toLowerCase()
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      toast.error('Inserisci un indirizzo email valido')
-      return
-    }
-
+  const handleAddMember = async (user: UserSummary) => {
     setSubmitting(true)
     try {
       const updated = await vaultApi.addGroupMember(group.id, {
-        email: cleanEmail,
+        user_id: user.id,
         role,
       })
       onGroupUpdated(updated)
-      setEmail('')
-      toast.success(`${cleanEmail} aggiunto al gruppo "${group.name}"`)
+      setMemberSearch('')
+      toast.success(`${user.name} aggiunto al gruppo "${group.name}"`)
       onDataChanged()
     } catch (err) {
       toast.error(
@@ -537,21 +532,26 @@ export function GroupDetailPanel({
             </div>
 
             {canManage && (
-              <form
-                onSubmit={handleAddMember}
-                className="space-y-3 rounded-xl border border-border/70 bg-card/40 p-3.5"
-              >
+              <div className="space-y-3 rounded-xl border border-border/70 bg-card/40 p-3.5">
                 <div className="space-y-1.5">
-                  <Label htmlFor="group-member-email" className="text-xs">
-                    Aggiungi membro tramite email
+                  <Label htmlFor="group-member-search" className="text-xs">
+                    Aggiungi membro dalla piattaforma
                   </Label>
                   <div className="flex flex-wrap gap-2">
                     <Input
-                      id="group-member-email"
-                      type="email"
-                      placeholder="collega@azienda.it"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      id="group-member-search"
+                      type="text"
+                      placeholder="Cerca utente per nome o email..."
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (suggestions.length > 0) {
+                            handleAddMember(suggestions[0])
+                          }
+                        }
+                      }}
                       className="min-w-[160px] flex-1"
                     />
                     <Select
@@ -566,39 +566,34 @@ export function GroupDetailPanel({
                         <SelectItem value="owner">Gestore</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button type="submit" disabled={submitting}>
-                      <MailPlus className="size-4" />
-                      Aggiungi
-                    </Button>
                   </div>
                 </div>
 
                 {suggestions.length > 0 && (
                   <div className="rounded-lg border bg-muted/30 p-2">
                     <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                      Utenti registrati in Starward
+                      Utenti della piattaforma
                     </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {suggestions.slice(0, 6).map((u) => (
-                        <Button
+                    <div className="flex flex-col gap-1">
+                      {suggestions.slice(0, 8).map((u) => (
+                        <button
                           key={u.id}
                           type="button"
-                          variant="outline"
-                          size="xs"
-                          className="rounded-full"
-                          onClick={() => setEmail(u.email)}
+                          disabled={submitting}
+                          onClick={() => handleAddMember(u)}
+                          className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
                         >
-                          <UserCheck className="size-3" />
-                          <span className="font-medium">{u.name}</span>
-                          <span className="text-muted-foreground">
-                            ({u.email})
+                          <UserCheck className="size-4 shrink-0 text-muted-foreground" />
+                          <span className="truncate font-medium">{u.name}</span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {u.email}
                           </span>
-                        </Button>
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
-              </form>
+              </div>
             )}
 
             <div className="space-y-2">

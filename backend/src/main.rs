@@ -30,7 +30,7 @@ pub struct AppState {
     pub crypto: VaultCrypto,
 }
 
-const INIT_MIGRATION_SQL: &str = include_str!("../migrations/001_init.sql");
+const SCHEMA_SQL: &str = include_str!("schema.sql");
 
 pub async fn init_db(database_url: &str) -> Result<PgPool, sqlx::Error> {
     let pool = PgPoolOptions::new()
@@ -38,7 +38,7 @@ pub async fn init_db(database_url: &str) -> Result<PgPool, sqlx::Error> {
         .connect(database_url)
         .await?;
 
-    sqlx::raw_sql(INIT_MIGRATION_SQL).execute(&pool).await?;
+    sqlx::raw_sql(SCHEMA_SQL).execute(&pool).await?;
 
     Ok(pool)
 }
@@ -232,7 +232,7 @@ async fn main() {
     let config = Config::from_env();
     let db = init_db(&config.database_url)
         .await
-        .expect("Failed to connect to PostgreSQL and run migrations");
+        .expect("Failed to connect to PostgreSQL and apply the schema");
     let crypto = VaultCrypto::from_master_key(&config.master_key);
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port)
@@ -1106,7 +1106,7 @@ mod tests {
                             "name": format!("DevOps-{suffix}"),
                             "description": "Team infrastruttura",
                             "color": "emerald",
-                            "member_emails": [bob_email]
+                            "member_ids": [bob_id]
                         })
                         .to_string(),
                     ))
@@ -1219,7 +1219,22 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::CREATED);
 
-        // Add Dave (pending, before first login) to the group -> Dave automatically gains access upon login!
+        // Ensure Dave exists as a platform user (JIT provisioning on first authenticated call)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {dave_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Add Dave to the group by platform user id
         let res = app
             .clone()
             .oneshot(
@@ -1229,7 +1244,7 @@ mod tests {
                     .header("Authorization", format!("Bearer {alice_token}"))
                     .header("Content-Type", "application/json")
                     .body(Body::from(
-                        json!({ "email": dave_email, "role": "member" }).to_string(),
+                        json!({ "user_id": dave_id, "role": "member" }).to_string(),
                     ))
                     .unwrap(),
             )

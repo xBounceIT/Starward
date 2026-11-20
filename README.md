@@ -37,9 +37,9 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
 Starward/
 ├── docker-compose.yml       # Istanza PostgreSQL 19 dedicata con volume persistente
 ├── backend/                 # Backend Rust (Axum + SQLx PostgreSQL + AES-256-GCM)
-│   ├── migrations/001_init.sql
 │   └── src/
-│       ├── main.rs          # Router Axum, CORS, migrazioni PostgreSQL e test
+│       ├── schema.sql       # Schema PostgreSQL applicato all'avvio
+│       ├── main.rs          # Router Axum, CORS, applicazione schema PostgreSQL e test
 │       ├── auth.rs          # Validazione JWT HS256, sync utenti e collegamento inviti pendenti
 │       ├── crypto.rs        # Cifratura AES-256-GCM + HKDF-SHA256
 │       └── routes/          # API REST /api/vaults, /api/credentials, /api/users, /api/health
@@ -134,7 +134,7 @@ cp frontend/.env.example frontend/.env
 cd backend
 cargo run
 ```
-All'avvio il backend applica automaticamente lo schema PostgreSQL in `backend/migrations/001_init.sql`.
+All'avvio il backend applica automaticamente lo schema PostgreSQL in `backend/src/schema.sql`.
 
 ### 4. Avvia il frontend TanStack Start (porta `3000`)
 ```bash

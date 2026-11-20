@@ -480,21 +480,29 @@ pub async fn create_group(
     .execute(&mut *tx)
     .await?;
 
-    // Optionally add initial members
-    let mut seen_emails = std::collections::HashSet::new();
-    seen_emails.insert(user.email.to_lowercase());
+    // Optionally add initial members by platform user id
+    let mut seen_user_ids = std::collections::HashSet::new();
+    seen_user_ids.insert(user.id.clone());
 
-    for raw_email in &payload.member_emails {
-        let email = raw_email.trim().to_lowercase();
-        if email.is_empty() || !email.contains('@') || !seen_emails.insert(email.clone()) {
+    for raw_id in &payload.member_ids {
+        let target_id = raw_id.trim();
+        if target_id.is_empty() || !seen_user_ids.insert(target_id.to_string()) {
             continue;
         }
 
-        let existing_user: Option<(String,)> =
-            sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = LOWER($1)")
-                .bind(&email)
-                .fetch_optional(&mut *tx)
-                .await?;
+        let existing_user: Option<(String, String)> = sqlx::query_as(
+            "SELECT id, LOWER(email) FROM users WHERE id = $1 AND is_service_account = FALSE",
+        )
+        .bind(target_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        let Some((target_user_id, target_email)) = existing_user else {
+            return Err(AppError::BadRequest(format!(
+                "Utente '{}' non trovato sulla piattaforma",
+                target_id
+            )));
+        };
 
         let member_id = Uuid::new_v4().to_string();
         sqlx::query(
@@ -506,8 +514,8 @@ pub async fn create_group(
         )
         .bind(&member_id)
         .bind(&group_id)
-        .bind(existing_user.map(|(id,)| id))
-        .bind(&email)
+        .bind(&target_user_id)
+        .bind(&target_email)
         .bind(&user.id)
         .bind(now)
         .execute(&mut *tx)
@@ -692,10 +700,10 @@ pub async fn add_group_member(
 ) -> AppResult<(StatusCode, Json<GroupDto>)> {
     require_group_manager(&state.db, &group_id, &user).await?;
 
-    let target_email = payload.email.trim().to_lowercase();
-    if target_email.is_empty() || !target_email.contains('@') {
+    let target_user_id = payload.user_id.trim();
+    if target_user_id.is_empty() {
         return Err(AppError::BadRequest(
-            "Inserisci un indirizzo email valido".to_string(),
+            "Seleziona un utente della piattaforma".to_string(),
         ));
     }
 
@@ -706,10 +714,24 @@ pub async fn add_group_member(
         ));
     }
 
+    let target_user: Option<(String, String)> = sqlx::query_as(
+        "SELECT id, LOWER(email) FROM users WHERE id = $1 AND is_service_account = FALSE",
+    )
+    .bind(target_user_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let Some((target_user_id, target_email)) = target_user else {
+        return Err(AppError::BadRequest(
+            "Utente non trovato sulla piattaforma".to_string(),
+        ));
+    };
+
     let existing: Option<(String,)> = sqlx::query_as(
-        "SELECT id FROM group_members WHERE group_id = $1 AND LOWER(member_email) = LOWER($2)",
+        "SELECT id FROM group_members WHERE group_id = $1 AND (user_id = $2 OR LOWER(member_email) = LOWER($3))",
     )
     .bind(&group_id)
+    .bind(&target_user_id)
     .bind(&target_email)
     .fetch_optional(&state.db)
     .await?;
@@ -719,12 +741,6 @@ pub async fn add_group_member(
             "Questo utente fa già parte del gruppo".to_string(),
         ));
     }
-
-    let existing_user: Option<(String,)> =
-        sqlx::query_as("SELECT id FROM users WHERE LOWER(email) = LOWER($1)")
-            .bind(&target_email)
-            .fetch_optional(&state.db)
-            .await?;
 
     let member_id = Uuid::new_v4().to_string();
     let now = Utc::now();
@@ -737,7 +753,7 @@ pub async fn add_group_member(
     )
     .bind(&member_id)
     .bind(&group_id)
-    .bind(existing_user.map(|(id,)| id))
+    .bind(&target_user_id)
     .bind(&target_email)
     .bind(&role)
     .bind(&user.id)

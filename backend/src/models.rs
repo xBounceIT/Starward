@@ -166,7 +166,7 @@ pub struct CreateGroupRequest {
     #[serde(default = "default_color")]
     pub color: String,
     #[serde(default)]
-    pub member_emails: Vec<String>,
+    pub member_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -178,7 +178,7 @@ pub struct UpdateGroupRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AddGroupMemberRequest {
-    pub email: String,
+    pub user_id: String,
     #[serde(default = "default_group_member_role")]
     pub role: String,
 }
