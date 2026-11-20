@@ -467,20 +467,7 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader className="gap-3.5 p-3.5 border-b sync-security:border-white/20">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex size-9 shrink-0 items-center justify-center border border-border/80 bg-muted/50 text-foreground rounded-full sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
-              <ShieldCheck className="size-4.5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate font-semibold leading-none text-[13px] tracking-normal">
-                Starward Vault
-              </h1>
-              <p className="mt-1 truncate text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
-                Vault · v{APP_VERSION}
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center justify-end gap-2">
           <Button
             type="button"
             variant="ghost"
@@ -907,6 +894,10 @@ export function AppSidebar({
           </>
         )}
       </SidebarContent>
+
+      <div className="shrink-0 px-3 py-2 text-center text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
+        Starward v{APP_VERSION}
+      </div>
 
       <SidebarFooter className="border-t border-sidebar-border p-2.5">
         <SidebarMenu>
