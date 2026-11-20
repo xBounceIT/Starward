@@ -9,8 +9,7 @@ import {
   Layers,
   LogOut,
   MoreHorizontal,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelLeft,
   Pencil,
   Plus,
   Settings,
@@ -64,7 +63,9 @@ import { APP_VERSION } from '@/lib/version'
 // right-3 rispetto al gruppo (che ha p-2), cioè la stessa colonna delle "...".
 const menuTrailingBadgeClass =
   'top-1/2! right-1 h-6 min-w-6 -translate-y-1/2 text-xs'
-const groupActionClass = 'top-3 right-3 h-6 w-6'
+// top-2 allinea il centro del pulsante (8+12=20px) al centro del label
+// del gruppo (py-1 + h-8/2 = 4+16=20px)
+const groupActionClass = 'top-2 right-3 h-6 w-6'
 
 // Stato di collasso dei gruppi nella sidebar, persistito in localStorage
 const COLLAPSED_GROUPS_STORAGE_KEY = 'starward-collapsed-groups'
@@ -464,534 +465,561 @@ export function AppSidebar({
     setOpenMobile(false)
   }
 
+  // Icona del toggle: piena quando la sidebar è visibile, vuota quando è collassata
+  const toggleIcon = (
+    <PanelLeft
+      className="size-4"
+      fill={sidebarCollapsed ? 'none' : 'currentColor'}
+    />
+  )
+
+  const toggleLabel = sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'
+
   return (
-    <Sidebar collapsible="offcanvas">
-      <SidebarHeader className="gap-3.5 p-3.5 border-b sync-security:border-white/20">
-        <div className="flex items-center justify-end gap-2">
+    <>
+      {/* Toggle fisso in alto a sinistra, fuori dalla Sidebar: resta visibile
+          anche quando la sidebar collassa (offcanvas + fade), così si riapre. */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="fixed top-3.5 left-3.5 z-30 hidden text-muted-foreground hover:text-foreground md:inline-flex"
+        onClick={toggleSidebar}
+        title={toggleLabel}
+        aria-label={toggleLabel}
+        aria-expanded={!sidebarCollapsed}
+      >
+        {toggleIcon}
+      </Button>
+
+      <Sidebar collapsible="offcanvas">
+        <SidebarHeader className="gap-3.5 p-3.5 border-b sync-security:border-white/20">
+          <div className="flex items-center justify-start gap-2">
+            {/* Su desktop il toggle è il pulsante fisso renderizzato sopra;
+                qui resta uno spacer delle stesse dimensioni per l'allineamento. */}
+            <div aria-hidden className="hidden size-8 md:block" />
+            {/* Su mobile la sidebar è uno sheet: il toggle resta qui per chiuderlo. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="-ml-1.5 text-muted-foreground hover:text-foreground md:hidden"
+              onClick={toggleSidebar}
+              title={toggleLabel}
+              aria-label={toggleLabel}
+            >
+              {toggleIcon}
+            </Button>
+          </div>
+
           <Button
             type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="-mr-1.5 text-muted-foreground hover:text-foreground"
-            onClick={toggleSidebar}
-            title={sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'}
-            aria-label={sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'}
+            className="h-9 w-full justify-center gap-2 font-medium shadow-xs"
+            onClick={() => {
+              setOpenMobile(false)
+              onNewCredential()
+            }}
           >
-            {sidebarCollapsed ? (
-              <PanelLeftOpen className="size-4" />
-            ) : (
-              <PanelLeftClose className="size-4" />
-            )}
+            <Plus className="size-4" />
+            Nuova credenziale
           </Button>
-        </div>
+        </SidebarHeader>
 
-        <Button
-          type="button"
-          className="h-9 w-full justify-center gap-2 font-medium shadow-xs"
-          onClick={() => {
-            setOpenMobile(false)
-            onNewCredential()
-          }}
-        >
-          <Plus className="size-4" />
-          Nuova credenziale
-        </Button>
-      </SidebarHeader>
-
-      <SidebarContent>
-        <SidebarGroup className="py-1">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={selection.type === 'all'}
-                  onClick={() => handleSelect({ type: 'all' })}
-                  className="h-9 pr-8 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
-                >
-                  <Layers
-                    className={cn(
-                      'size-4',
-                      selection.type === 'all'
-                        ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
-                        : 'text-muted-foreground',
-                    )}
-                  />
-                  <span>Tutte le credenziali</span>
-                </SidebarMenuButton>
-                <SidebarMenuBadge
-                  className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
-                >
-                  {totalCredentialsCount}
-                </SidebarMenuBadge>
-              </SidebarMenuItem>
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={selection.type === 'favorites'}
-                  onClick={() => handleSelect({ type: 'favorites' })}
-                  className="h-9 pr-8 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
-                >
-                  <Star className="size-4 text-amber-400 sync-security:text-[#ff9c00]" />
-                  <span>Preferiti</span>
-                </SidebarMenuButton>
-                <SidebarMenuBadge
-                  className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
-                >
-                  {favoritesCount}
-                </SidebarMenuBadge>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator className="my-1" />
-
-        <SidebarGroup className="py-1">
-          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
-            Le mie cartelle
-          </SidebarGroupLabel>
-          <SidebarGroupAction
-            className={groupActionClass}
-            title="Nuova cartella"
-            onClick={() => {
-              setOpenMobile(false)
-              onNewVault()
-            }}
-          >
-            <FolderPlus className="size-4 text-muted-foreground" />
-            <span className="sr-only">Nuova cartella</span>
-          </SidebarGroupAction>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {myVaults.map((vault) => {
-                const active =
-                  selection.type === 'vault' && selection.vaultId === vault.id
-                return (
-                  <VaultSidebarMenuItem
-                    key={vault.id}
-                    vault={vault}
-                    active={active}
-                    onSelect={() =>
-                      handleSelect({ type: 'vault', vaultId: vault.id })
-                    }
-                    onNewCredential={() => {
-                      setOpenMobile(false)
-                      onNewCredential(vault.id)
-                    }}
-                    onEditVault={() => {
-                      setOpenMobile(false)
-                      onEditVault(vault)
-                    }}
-                    onShareVault={() => {
-                      setOpenMobile(false)
-                      onShareVault(vault)
-                    }}
-                    onOpenAudit={() => {
-                      setOpenMobile(false)
-                      onOpenAudit(vault)
-                    }}
-                    onDeleteVault={() => {
-                      setOpenMobile(false)
-                      onDeleteVault(vault)
-                    }}
-                  />
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator className="my-1" />
-
-        <SidebarGroup className="py-1">
-          <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
-            Gruppi
-          </SidebarGroupLabel>
-          <SidebarGroupAction
-            className={groupActionClass}
-            title="Nuovo gruppo"
-            onClick={() => {
-              setOpenMobile(false)
-              onNewGroup()
-            }}
-          >
-            <Plus className="size-4 text-muted-foreground" />
-            <span className="sr-only">Nuovo gruppo</span>
-          </SidebarGroupAction>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {groups.length === 0 ? (
+        <SidebarContent>
+          <SidebarGroup className="py-1">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    className="h-8 rounded-lg text-xs text-muted-foreground hover:text-foreground"
+                    isActive={selection.type === 'all'}
+                    onClick={() => handleSelect({ type: 'all' })}
+                    className="h-9 pr-8 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
+                  >
+                    <Layers
+                      className={cn(
+                        'size-4',
+                        selection.type === 'all'
+                          ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
+                          : 'text-muted-foreground',
+                      )}
+                    />
+                    <span>Tutte le credenziali</span>
+                  </SidebarMenuButton>
+                  <SidebarMenuBadge
+                    className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
+                  >
+                    {totalCredentialsCount}
+                  </SidebarMenuBadge>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={selection.type === 'favorites'}
+                    onClick={() => handleSelect({ type: 'favorites' })}
+                    className="h-9 pr-8 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
+                  >
+                    <Star className="size-4 text-amber-400 sync-security:text-[#ff9c00]" />
+                    <span>Preferiti</span>
+                  </SidebarMenuButton>
+                  <SidebarMenuBadge
+                    className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
+                  >
+                    {favoritesCount}
+                  </SidebarMenuBadge>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarSeparator className="my-1" />
+
+          <SidebarGroup className="py-1">
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
+              Le mie cartelle
+            </SidebarGroupLabel>
+            <SidebarGroupAction
+              className={groupActionClass}
+              title="Nuova cartella"
+              onClick={() => {
+                setOpenMobile(false)
+                onNewVault()
+              }}
+            >
+              <FolderPlus className="size-4 text-muted-foreground" />
+              <span className="sr-only">Nuova cartella</span>
+            </SidebarGroupAction>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                {myVaults.map((vault) => {
+                  const active =
+                    selection.type === 'vault' && selection.vaultId === vault.id
+                  return (
+                    <VaultSidebarMenuItem
+                      key={vault.id}
+                      vault={vault}
+                      active={active}
+                      onSelect={() =>
+                        handleSelect({ type: 'vault', vaultId: vault.id })
+                      }
+                      onNewCredential={() => {
+                        setOpenMobile(false)
+                        onNewCredential(vault.id)
+                      }}
+                      onEditVault={() => {
+                        setOpenMobile(false)
+                        onEditVault(vault)
+                      }}
+                      onShareVault={() => {
+                        setOpenMobile(false)
+                        onShareVault(vault)
+                      }}
+                      onOpenAudit={() => {
+                        setOpenMobile(false)
+                        onOpenAudit(vault)
+                      }}
+                      onDeleteVault={() => {
+                        setOpenMobile(false)
+                        onDeleteVault(vault)
+                      }}
+                    />
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarSeparator className="my-1" />
+
+          <SidebarGroup className="py-1">
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
+              Gruppi
+            </SidebarGroupLabel>
+            <SidebarGroupAction
+              className={groupActionClass}
+              title="Nuovo gruppo"
+              onClick={() => {
+                setOpenMobile(false)
+                onNewGroup()
+              }}
+            >
+              <Plus className="size-4 text-muted-foreground" />
+              <span className="sr-only">Nuovo gruppo</span>
+            </SidebarGroupAction>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                {groups.length === 0 ? (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="h-8 rounded-lg text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setOpenMobile(false)
+                        onNewGroup()
+                      }}
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Crea un gruppo</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ) : (
+                  groups.map((group) => {
+                    const groupActive =
+                      selection.type === 'group' &&
+                      selection.groupId === group.id
+                    const groupVaults = vaults.filter(
+                      (v) => v.owner_group_id === group.id,
+                    )
+                    const childVaultActive =
+                      selection.type === 'vault' &&
+                      groupVaults.some((v) => v.id === selection.vaultId)
+                    // Se una cartella del gruppo è selezionata, il gruppo resta espanso
+                    const collapsed =
+                      collapsedGroupIds.has(group.id) && !childVaultActive
+                    return (
+                      <div key={group.id} className="space-y-0.5">
+                        <GroupSidebarMenuItem
+                          group={group}
+                          active={groupActive}
+                          collapsed={collapsed}
+                          onToggleCollapsed={() => toggleGroupCollapsed(group.id)}
+                          onSelect={() =>
+                            handleSelect({ type: 'group', groupId: group.id })
+                          }
+                          onNewGroupVault={() => {
+                            setOpenMobile(false)
+                            onNewGroupVault(group)
+                          }}
+                          onEditGroup={() => {
+                            setOpenMobile(false)
+                            onEditGroup(group)
+                          }}
+                          onDeleteGroup={() => {
+                            setOpenMobile(false)
+                            onDeleteGroup(group)
+                          }}
+                        />
+                        {!collapsed &&
+                          groupVaults.map((vault) => {
+                            const active =
+                              selection.type === 'vault' &&
+                              selection.vaultId === vault.id
+                            return (
+                              <VaultSidebarMenuItem
+                                key={vault.id}
+                                vault={vault}
+                                active={active}
+                                indented
+                                onSelect={() =>
+                                  handleSelect({
+                                    type: 'vault',
+                                    vaultId: vault.id,
+                                  })
+                                }
+                                onNewCredential={() => {
+                                  setOpenMobile(false)
+                                  onNewCredential(vault.id)
+                                }}
+                                onEditVault={() => {
+                                  setOpenMobile(false)
+                                  onEditVault(vault)
+                                }}
+                                onShareVault={() => {
+                                  setOpenMobile(false)
+                                  onShareVault(vault)
+                                }}
+                                onOpenAudit={() => {
+                                  setOpenMobile(false)
+                                  onOpenAudit(vault)
+                                }}
+                                onDeleteVault={() => {
+                                  setOpenMobile(false)
+                                  onDeleteVault(vault)
+                                }}
+                              />
+                            )
+                          })}
+                      </div>
+                    )
+                  })
+                )}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarSeparator className="my-1" />
+
+          <SidebarGroup className="py-1">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                <SidebarMenuItem>
+                  <div className="flex h-9 items-center gap-2 px-2 pr-8 text-sm text-muted-foreground sync-security:text-[#ff9c00]">
+                    <Share2 className="size-4 shrink-0" />
+                    <span className="truncate text-[11px] font-bold tracking-[0.14em] uppercase">
+                      Condivise con me
+                    </span>
+                  </div>
+                  <SidebarMenuBadge
+                    className={cn(
+                      menuTrailingBadgeClass,
+                      'text-muted-foreground sync-security:text-white/75',
+                    )}
+                    title={`${sharedWithMe.length} ${
+                      sharedWithMe.length === 1 ? 'cartella condivisa' : 'cartelle condivise'
+                    }`}
+                  >
+                    {sharedWithMe.length}
+                  </SidebarMenuBadge>
+                </SidebarMenuItem>
+
+                {sharedWithMe.map((vault) => {
+                  const active =
+                    selection.type === 'vault' && selection.vaultId === vault.id
+                  return (
+                    <VaultSidebarMenuItem
+                      key={vault.id}
+                      vault={vault}
+                      active={active}
+                      indented
+                      showGroupBadge={vault.owner_group_id !== null}
+                      onSelect={() =>
+                        handleSelect({ type: 'vault', vaultId: vault.id })
+                      }
+                      onNewCredential={() => {
+                        setOpenMobile(false)
+                        onNewCredential(vault.id)
+                      }}
+                      onEditVault={() => {
+                        setOpenMobile(false)
+                        onEditVault(vault)
+                      }}
+                      onShareVault={() => {
+                        setOpenMobile(false)
+                        onShareVault(vault)
+                      }}
+                      onOpenAudit={() => {
+                        setOpenMobile(false)
+                        onOpenAudit(vault)
+                      }}
+                      onDeleteVault={() => {
+                        setOpenMobile(false)
+                        onDeleteVault(vault)
+                      }}
+                    />
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          {user.role === 'admin' && (
+            <>
+              <SidebarSeparator className="my-1" />
+
+              <SidebarGroup className="py-1">
+                <SidebarGroupLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                  <span>Pannello Admin</span>
+                </SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="gap-1">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={
+                          selection.type === 'admin' && selection.tab === 'users'
+                        }
+                        onClick={() =>
+                          handleSelect({ type: 'admin', tab: 'users' })
+                        }
+                        className="h-9 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
+                      >
+                        <User
+                          className={cn(
+                            'size-4',
+                            selection.type === 'admin' &&
+                              selection.tab === 'users'
+                              ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span>Utenti</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={
+                          selection.type === 'admin' && selection.tab === 'groups'
+                        }
+                        onClick={() =>
+                          handleSelect({ type: 'admin', tab: 'groups' })
+                        }
+                        className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      >
+                        <Users
+                          className={cn(
+                            'size-4',
+                            selection.type === 'admin' &&
+                              selection.tab === 'groups'
+                              ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span>Gruppi</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={
+                          selection.type === 'admin' &&
+                          selection.tab === 'service-accounts'
+                        }
+                        onClick={() =>
+                          handleSelect({
+                            type: 'admin',
+                            tab: 'service-accounts',
+                          })
+                        }
+                        className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
+                      >
+                        <Bot
+                          className={cn(
+                            'size-4',
+                            selection.type === 'admin' &&
+                              selection.tab === 'service-accounts'
+                              ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span>Service Account</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={
+                          selection.type === 'admin' && selection.tab === 'audit'
+                        }
+                        onClick={() =>
+                          handleSelect({ type: 'admin', tab: 'audit' })
+                        }
+                        className="h-9 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
+                      >
+                        <FileClock
+                          className={cn(
+                            'size-4',
+                            selection.type === 'admin' &&
+                              selection.tab === 'audit'
+                              ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span>Audit di sistema</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </>
+          )}
+        </SidebarContent>
+
+        <div className="shrink-0 px-3 py-2 text-left text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
+          Starward v{APP_VERSION}
+        </div>
+
+        <SidebarFooter className="border-t border-sidebar-border p-2.5">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className="rounded-xl data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  >
+                    <Avatar className="size-8 rounded-full border border-border/60">
+                      <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate text-xs font-semibold">
+                          {user.name}
+                        </span>
+                        {user.role === 'admin' ? (
+                          <Badge
+                            variant="secondary"
+                            className="h-4 shrink-0 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[9px] font-semibold text-amber-300"
+                          >
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="h-4 shrink-0 px-1.5 py-0 text-[9px] text-muted-foreground"
+                          >
+                            User
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="truncate text-[11px] text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </div>
+                    <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" side="top" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-medium text-foreground">
+                          {user.name}
+                        </span>
+                        {user.role === 'admin' ? (
+                          <Badge
+                            variant="secondary"
+                            className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
+                          >
+                            <ShieldCheck className="size-3" />
+                            Admin
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
+                          >
+                            <User className="size-3" />
+                            User
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
                     onClick={() => {
                       setOpenMobile(false)
-                      onNewGroup()
+                      onOpenSettings('profile')
                     }}
                   >
-                    <Plus className="size-3.5" />
-                    <span>Crea un gruppo</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ) : (
-                groups.map((group) => {
-                  const groupActive =
-                    selection.type === 'group' &&
-                    selection.groupId === group.id
-                  const groupVaults = vaults.filter(
-                    (v) => v.owner_group_id === group.id,
-                  )
-                  const childVaultActive =
-                    selection.type === 'vault' &&
-                    groupVaults.some((v) => v.id === selection.vaultId)
-                  // Se una cartella del gruppo è selezionata, il gruppo resta espanso
-                  const collapsed =
-                    collapsedGroupIds.has(group.id) && !childVaultActive
-                  return (
-                    <div key={group.id} className="space-y-0.5">
-                      <GroupSidebarMenuItem
-                        group={group}
-                        active={groupActive}
-                        collapsed={collapsed}
-                        onToggleCollapsed={() => toggleGroupCollapsed(group.id)}
-                        onSelect={() =>
-                          handleSelect({ type: 'group', groupId: group.id })
-                        }
-                        onNewGroupVault={() => {
-                          setOpenMobile(false)
-                          onNewGroupVault(group)
-                        }}
-                        onEditGroup={() => {
-                          setOpenMobile(false)
-                          onEditGroup(group)
-                        }}
-                        onDeleteGroup={() => {
-                          setOpenMobile(false)
-                          onDeleteGroup(group)
-                        }}
-                      />
-                      {!collapsed &&
-                        groupVaults.map((vault) => {
-                          const active =
-                            selection.type === 'vault' &&
-                            selection.vaultId === vault.id
-                          return (
-                            <VaultSidebarMenuItem
-                              key={vault.id}
-                              vault={vault}
-                              active={active}
-                              indented
-                              onSelect={() =>
-                                handleSelect({
-                                  type: 'vault',
-                                  vaultId: vault.id,
-                                })
-                              }
-                              onNewCredential={() => {
-                                setOpenMobile(false)
-                                onNewCredential(vault.id)
-                              }}
-                              onEditVault={() => {
-                                setOpenMobile(false)
-                                onEditVault(vault)
-                              }}
-                              onShareVault={() => {
-                                setOpenMobile(false)
-                                onShareVault(vault)
-                              }}
-                              onOpenAudit={() => {
-                                setOpenMobile(false)
-                                onOpenAudit(vault)
-                              }}
-                              onDeleteVault={() => {
-                                setOpenMobile(false)
-                                onDeleteVault(vault)
-                              }}
-                            />
-                          )
-                        })}
-                    </div>
-                  )
-                })
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarSeparator className="my-1" />
-
-        <SidebarGroup className="py-1">
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              <SidebarMenuItem>
-                <div className="flex h-9 items-center gap-2 px-2 pr-8 text-sm text-muted-foreground sync-security:text-[#ff9c00]">
-                  <Share2 className="size-4 shrink-0" />
-                  <span className="truncate text-[11px] font-bold tracking-[0.14em] uppercase">
-                    Condivise con me
-                  </span>
-                </div>
-                <SidebarMenuBadge
-                  className={cn(
-                    menuTrailingBadgeClass,
-                    'text-muted-foreground sync-security:text-white/75',
-                  )}
-                  title={`${sharedWithMe.length} ${
-                    sharedWithMe.length === 1 ? 'cartella condivisa' : 'cartelle condivise'
-                  }`}
-                >
-                  {sharedWithMe.length}
-                </SidebarMenuBadge>
-              </SidebarMenuItem>
-
-              {sharedWithMe.map((vault) => {
-                const active =
-                  selection.type === 'vault' && selection.vaultId === vault.id
-                return (
-                  <VaultSidebarMenuItem
-                    key={vault.id}
-                    vault={vault}
-                    active={active}
-                    indented
-                    showGroupBadge={vault.owner_group_id !== null}
-                    onSelect={() =>
-                      handleSelect({ type: 'vault', vaultId: vault.id })
-                    }
-                    onNewCredential={() => {
-                      setOpenMobile(false)
-                      onNewCredential(vault.id)
-                    }}
-                    onEditVault={() => {
-                      setOpenMobile(false)
-                      onEditVault(vault)
-                    }}
-                    onShareVault={() => {
-                      setOpenMobile(false)
-                      onShareVault(vault)
-                    }}
-                    onOpenAudit={() => {
-                      setOpenMobile(false)
-                      onOpenAudit(vault)
-                    }}
-                    onDeleteVault={() => {
-                      setOpenMobile(false)
-                      onDeleteVault(vault)
-                    }}
-                  />
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {user.role === 'admin' && (
-          <>
-            <SidebarSeparator className="my-1" />
-
-            <SidebarGroup className="py-1">
-              <SidebarGroupLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span>Pannello Admin</span>
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-1">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={
-                        selection.type === 'admin' && selection.tab === 'users'
-                      }
-                      onClick={() =>
-                        handleSelect({ type: 'admin', tab: 'users' })
-                      }
-                      className="h-9 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
-                    >
-                      <User
-                        className={cn(
-                          'size-4',
-                          selection.type === 'admin' &&
-                            selection.tab === 'users'
-                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
-                            : 'text-muted-foreground',
-                        )}
-                      />
-                      <span>Utenti</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={
-                        selection.type === 'admin' && selection.tab === 'groups'
-                      }
-                      onClick={() =>
-                        handleSelect({ type: 'admin', tab: 'groups' })
-                      }
-                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
-                    >
-                      <Users
-                        className={cn(
-                          'size-4',
-                          selection.type === 'admin' &&
-                            selection.tab === 'groups'
-                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
-                            : 'text-muted-foreground',
-                        )}
-                      />
-                      <span>Gruppi</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={
-                        selection.type === 'admin' &&
-                        selection.tab === 'service-accounts'
-                      }
-                      onClick={() =>
-                        handleSelect({
-                          type: 'admin',
-                          tab: 'service-accounts',
-                        })
-                      }
-                      className="h-9 rounded-lg sync-security:data-[active=true]:bg-[#ff9c00]/15"
-                    >
-                      <Bot
-                        className={cn(
-                          'size-4',
-                          selection.type === 'admin' &&
-                            selection.tab === 'service-accounts'
-                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
-                            : 'text-muted-foreground',
-                        )}
-                      />
-                      <span>Service Account</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={
-                        selection.type === 'admin' && selection.tab === 'audit'
-                      }
-                      onClick={() =>
-                        handleSelect({ type: 'admin', tab: 'audit' })
-                      }
-                      className="h-9 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
-                    >
-                      <FileClock
-                        className={cn(
-                          'size-4',
-                          selection.type === 'admin' &&
-                            selection.tab === 'audit'
-                            ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
-                            : 'text-muted-foreground',
-                        )}
-                      />
-                      <span>Audit di sistema</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        )}
-      </SidebarContent>
-
-      <div className="shrink-0 px-3 py-2 text-center text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90">
-        Starward v{APP_VERSION}
-      </div>
-
-      <SidebarFooter className="border-t border-sidebar-border p-2.5">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="rounded-xl data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <Avatar className="size-8 rounded-full border border-border/60">
-                    <AvatarFallback className="rounded-full bg-muted text-xs font-semibold">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-xs font-semibold">
-                        {user.name}
-                      </span>
-                      {user.role === 'admin' ? (
-                        <Badge
-                          variant="secondary"
-                          className="h-4 shrink-0 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[9px] font-semibold text-amber-300"
-                        >
-                          Admin
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="h-4 shrink-0 px-1.5 py-0 text-[9px] text-muted-foreground"
-                        >
-                          User
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="truncate text-[11px] text-muted-foreground">
-                      {user.email}
-                    </span>
-                  </div>
-                  <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side="top" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-medium text-foreground">
-                        {user.name}
-                      </span>
-                      {user.role === 'admin' ? (
-                        <Badge
-                          variant="secondary"
-                          className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
-                        >
-                          <ShieldCheck className="size-3" />
-                          Admin
-                        </Badge>
-                      ) : (
-                        <Badge
-                          variant="outline"
-                          className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
-                        >
-                          <User className="size-3" />
-                          User
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {user.email}
-                    </span>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setOpenMobile(false)
-                    onOpenSettings('profile')
-                  }}
-                >
-                  <Settings className="size-4" />
-                  Impostazioni account
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onClick={onSignOut}>
-                  <LogOut className="size-4" />
-                  Disconnetti
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
+                    <Settings className="size-4" />
+                    Impostazioni account
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onClick={onSignOut}>
+                    <LogOut className="size-4" />
+                    Disconnetti
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+    </>
   )
 }

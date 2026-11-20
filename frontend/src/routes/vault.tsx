@@ -89,7 +89,9 @@ function VaultWorkspace() {
   const [selectedCredentialId, setSelectedCredentialId] = useState<
     string | null
   >(null)
-  const [detailClosed, setDetailClosed] = useState(false)
+  // Parte chiuso: il pannello dettaglio si apre solo quando l'utente
+  // seleziona una credenziale (o ne salva una), non subito dopo il login.
+  const [detailClosed, setDetailClosed] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [sortBy, setSortBy] = useState<CredentialSortOption>('updated_desc')
