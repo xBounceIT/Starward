@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Calendar,
   Check,
   Clock,
   Copy,
@@ -627,7 +626,7 @@ export function CredentialDetail({
           <div className="space-y-2.5 border-t border-border/60 pt-4 text-xs">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="size-3.5 shrink-0" />
+                <Plus className="size-3.5 shrink-0" />
                 <span>Creata</span>
               </div>
               <span className="font-medium text-foreground/90">
@@ -637,7 +636,7 @@ export function CredentialDetail({
 
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="size-3.5 shrink-0" />
+                <Pencil className="size-3.5 shrink-0" />
                 <span>Ultima modifica</span>
               </div>
               <span className="font-medium text-foreground/90">
