@@ -161,12 +161,8 @@ mod tests {
             image: None,
             exp: (Utc::now().timestamp() + 3600) as usize,
         };
-        encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(secret.as_bytes()),
-        )
-        .unwrap()
+        let encoding_key = EncodingKey::from_secret(secret.as_bytes()).unwrap();
+        encode(&Header::default(), &claims, &encoding_key).unwrap()
     }
 
     async fn read_json(res: axum::response::Response) -> Value {

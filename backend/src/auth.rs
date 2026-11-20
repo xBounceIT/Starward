@@ -46,12 +46,11 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let mut validation = Validation::new(Algorithm::HS256);
         validation.validate_exp = true;
 
-        let token_data = decode::<AuthClaims>(
-            token,
-            &DecodingKey::from_secret(state.config.auth_secret.as_bytes()),
-            &validation,
-        )
-        .map_err(|e| AppError::Unauthorized(format!("Token non valido: {e}")))?;
+        let decoding_key = DecodingKey::from_secret(state.config.auth_secret.as_bytes())
+            .map_err(|e| AppError::Internal(format!("Configurazione JWT non valida: {e}")))?;
+
+        let token_data = decode::<AuthClaims>(token, &decoding_key, &validation)
+            .map_err(|e| AppError::Unauthorized(format!("Token non valido: {e}")))?;
 
         let claims = token_data.claims;
         let email_normalized = claims.email.trim().to_lowercase();

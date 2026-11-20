@@ -1,10 +1,10 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
+    aead::{Aead, KeyInit},
     Aes256Gcm, Nonce,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use hkdf::Hkdf;
-use rand::RngCore;
+use rand::{rngs::SysRng, TryRng};
 use sha2::Sha256;
 
 use crate::error::{AppError, AppResult};
@@ -36,11 +36,13 @@ impl VaultCrypto {
             .map_err(|e| AppError::Internal(format!("Cipher init error: {e}")))?;
 
         let mut nonce_bytes = [0u8; 12];
-        OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        SysRng
+            .try_fill_bytes(&mut nonce_bytes)
+            .map_err(|e| AppError::Internal(format!("Nonce generation failed: {e}")))?;
+        let nonce = Nonce::from(nonce_bytes);
 
         let ciphertext = cipher
-            .encrypt(nonce, plaintext.as_bytes())
+            .encrypt(&nonce, plaintext.as_bytes())
             .map_err(|e| AppError::Internal(format!("Encryption failed: {e}")))?;
 
         Ok(EncryptedField {
@@ -60,13 +62,10 @@ impl VaultCrypto {
             .decode(nonce_b64)
             .map_err(|e| AppError::Internal(format!("Invalid nonce base64: {e}")))?;
 
-        if nonce_bytes.len() != 12 {
-            return Err(AppError::Internal("Invalid nonce length".to_string()));
-        }
-
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::try_from(nonce_bytes.as_slice())
+            .map_err(|_| AppError::Internal("Invalid nonce length".to_string()))?;
         let plaintext = cipher
-            .decrypt(nonce, ciphertext.as_ref())
+            .decrypt(&nonce, ciphertext.as_ref())
             .map_err(|e| AppError::Internal(format!("Decryption failed: {e}")))?;
 
         String::from_utf8(plaintext)
