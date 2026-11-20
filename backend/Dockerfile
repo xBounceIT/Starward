@@ -9,7 +9,8 @@ RUN mkdir -p src migrations \
     && echo "fn main() {}" > src/main.rs \
     && touch migrations/001_init.sql \
     && cargo build --release --locked \
-    && rm -rf src migrations target/release/deps/starward_backend* target/release/starward-backend* target/release/.fingerprint/starward-backend*
+    && cargo clean --release --locked -p starward-backend \
+    && rm -rf src migrations
 
 # Build the real application binary
 ARG APP_VERSION=0.0.0-dev
@@ -17,7 +18,8 @@ ENV APP_VERSION=${APP_VERSION}
 COPY build.rs ./build.rs
 COPY migrations ./migrations
 COPY src ./src
-RUN cargo build --release --locked
+RUN touch build.rs src/main.rs migrations/001_init.sql \
+    && cargo build --release --locked
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update \
