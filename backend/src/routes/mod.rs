@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod credentials;
 pub mod health;
 pub mod users;

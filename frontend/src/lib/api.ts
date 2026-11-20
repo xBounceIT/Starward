@@ -1,8 +1,39 @@
+export type UserRole = 'admin' | 'user'
+
 export interface UserSummary {
   id: string
   email: string
   name: string
   image: string | null
+  role: UserRole
+}
+
+export interface AdminUser {
+  id: string
+  email: string
+  name: string
+  image: string | null
+  role: UserRole
+  vault_count: number
+  credential_count: number
+  created_at: string
+  last_seen_at: string
+}
+
+/**
+ * Predisposizione modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
+ */
+export interface SystemAuditEvent {
+  id: string
+  actor_id: string
+  actor_email: string
+  actor_name: string
+  actor_role: UserRole
+  action: string
+  target_type: string
+  target_id: string | null
+  details: string
+  created_at: string
 }
 
 export interface VaultMember {
@@ -118,6 +149,27 @@ export const vaultApi = {
 
   searchUsers: (q: string) =>
     request<UserSummary[]>(`/users?q=${encodeURIComponent(q)}`),
+
+  listAdminUsers: (params?: { q?: string; role?: string }) => {
+    const search = new URLSearchParams()
+    if (params?.q) search.set('q', params.q)
+    if (params?.role) search.set('role', params.role)
+    const qs = search.toString()
+    return request<AdminUser[]>(`/admin/users${qs ? `?${qs}` : ''}`)
+  },
+
+  updateUserRole: (userId: string, role: UserRole) =>
+    request<AdminUser>(`/admin/users/${userId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  deleteUser: (userId: string) =>
+    request<void>(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    }),
+
+  listSystemAudit: () => request<SystemAuditEvent[]>('/admin/audit'),
 
   listVaults: () => request<Vault[]>('/vaults'),
 

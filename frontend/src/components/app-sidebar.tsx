@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   ChevronDown,
+  FileClock,
   FolderPlus,
   History,
   Layers,
@@ -14,9 +15,12 @@ import {
   Star,
   Sun,
   Trash2,
+  User,
   Users,
 } from 'lucide-react'
+import type { AdminPanelTab } from '@/components/admin-panel'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -45,7 +49,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { VaultIcon } from '@/components/vault-icon'
-import type { Vault } from '@/lib/api'
+import type { UserRole, Vault } from '@/lib/api'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
@@ -55,9 +59,10 @@ export type VaultSelection =
   | { type: 'all' }
   | { type: 'favorites' }
   | { type: 'vault'; vaultId: string }
+  | { type: 'admin'; tab: AdminPanelTab }
 
 interface AppSidebarProps {
-  user: { id: string; name: string; email: string }
+  user: { id: string; name: string; email: string; role?: UserRole }
   vaults: Vault[]
   totalCredentialsCount: number
   favoritesCount: number
@@ -440,6 +445,73 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {user.role === 'admin' && (
+          <>
+            <SidebarSeparator className="my-1" />
+
+            <SidebarGroup className="py-1">
+              <SidebarGroupLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span>Pannello Admin</span>
+                <Badge
+                  variant="outline"
+                  className="h-4 border-violet-500/40 bg-violet-500/10 px-1.5 py-0 text-[9px] font-semibold text-violet-300"
+                >
+                  Admin
+                </Badge>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-1">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={
+                        selection.type === 'admin' && selection.tab === 'users'
+                      }
+                      onClick={() =>
+                        handleSelect({ type: 'admin', tab: 'users' })
+                      }
+                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground"
+                    >
+                      <Users
+                        className={cn(
+                          'size-4',
+                          selection.type === 'admin' &&
+                            selection.tab === 'users'
+                            ? 'text-violet-400'
+                            : 'text-muted-foreground',
+                        )}
+                      />
+                      <span>Lista utenti</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={
+                        selection.type === 'admin' && selection.tab === 'audit'
+                      }
+                      onClick={() =>
+                        handleSelect({ type: 'admin', tab: 'audit' })
+                      }
+                      className="h-9 rounded-lg data-[active=true]:bg-violet-500/15 data-[active=true]:font-medium data-[active=true]:text-foreground"
+                    >
+                      <FileClock
+                        className={cn(
+                          'size-4',
+                          selection.type === 'admin' &&
+                            selection.tab === 'audit'
+                            ? 'text-violet-400'
+                            : 'text-muted-foreground',
+                        )}
+                      />
+                      <span>Audit di sistema</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-2.5">
@@ -457,9 +529,26 @@ export function AppSidebar({
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid min-w-0 flex-1 text-left text-sm leading-tight">
-                    <span className="truncate text-xs font-semibold">
-                      {user.name}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-xs font-semibold">
+                        {user.name}
+                      </span>
+                      {user.role === 'admin' ? (
+                        <Badge
+                          variant="secondary"
+                          className="h-4 shrink-0 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[9px] font-semibold text-amber-300"
+                        >
+                          Admin
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="h-4 shrink-0 px-1.5 py-0 text-[9px] text-muted-foreground"
+                        >
+                          User
+                        </Badge>
+                      )}
+                    </div>
                     <span className="truncate text-[11px] text-muted-foreground">
                       {user.email}
                     </span>
@@ -469,15 +558,47 @@ export function AppSidebar({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="top" className="w-56">
                 <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-0.5">
-                    <span className="font-medium text-foreground">
-                      {user.name}
-                    </span>
+                  <div className="flex flex-col space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-medium text-foreground">
+                        {user.name}
+                      </span>
+                      {user.role === 'admin' ? (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
+                        >
+                          <ShieldCheck className="size-3" />
+                          Admin
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant="outline"
+                          className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
+                        >
+                          <User className="size-3" />
+                          User
+                        </Badge>
+                      )}
+                    </div>
                     <span className="truncate text-xs text-muted-foreground">
                       {user.email}
                     </span>
                   </div>
                 </DropdownMenuLabel>
+                {user.role === 'admin' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() =>
+                        handleSelect({ type: 'admin', tab: 'users' })
+                      }
+                    >
+                      <ShieldCheck className="size-4 text-violet-400" />
+                      Pannello Admin
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={onSignOut}>
                   <LogOut className="size-4" />

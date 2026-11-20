@@ -24,6 +24,23 @@ pub struct AuthenticatedUser {
     pub email: String,
     pub name: String,
     pub image: Option<String>,
+    pub role: String,
+}
+
+impl AuthenticatedUser {
+    pub fn is_admin(&self) -> bool {
+        self.role == "admin"
+    }
+
+    pub fn require_admin(&self) -> Result<(), AppError> {
+        if self.is_admin() {
+            Ok(())
+        } else {
+            Err(AppError::Forbidden(
+                "Accesso riservato agli amministratori".to_string(),
+            ))
+        }
+    }
 }
 
 impl FromRequestParts<AppState> for AuthenticatedUser {
@@ -69,17 +86,35 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         };
 
         let now = Utc::now();
+        let is_env_admin = state.config.is_admin_email(&email_normalized);
 
-        // Sync user into the centralized vault directory
-        sqlx::query(
+        // Sync user into the centralized vault directory and resolve RBAC role
+        let (role,): (String,) = sqlx::query_as(
             r#"
-            INSERT INTO users (id, email, name, image, created_at, last_seen_at)
-            VALUES ($1, $2, $3, $4, $5, $5)
+            INSERT INTO users (id, email, name, image, role, created_at, last_seen_at)
+            VALUES (
+                $1,
+                $2,
+                $3,
+                $4,
+                CASE
+                    WHEN $6 OR NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'admin'
+                    ELSE 'user'
+                END,
+                $5,
+                $5
+            )
             ON CONFLICT (id) DO UPDATE SET
                 email = EXCLUDED.email,
                 name = EXCLUDED.name,
                 image = EXCLUDED.image,
+                role = CASE
+                    WHEN $6 THEN 'admin'
+                    WHEN NOT EXISTS (SELECT 1 FROM users WHERE role = 'admin') THEN 'admin'
+                    ELSE users.role
+                END,
                 last_seen_at = EXCLUDED.last_seen_at
+            RETURNING role
             "#,
         )
         .bind(&claims.sub)
@@ -87,7 +122,8 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         .bind(&name)
         .bind(&claims.image)
         .bind(now)
-        .execute(&state.db)
+        .bind(is_env_admin)
+        .fetch_one(&state.db)
         .await?;
 
         // Automatically attach any pending shared folders invited by email before first login
@@ -155,6 +191,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             email: email_normalized,
             name,
             image: claims.image,
+            role,
         })
     }
 }

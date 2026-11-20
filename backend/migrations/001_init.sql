@@ -3,8 +3,22 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL,
     name TEXT NOT NULL,
     image TEXT,
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'user'
+    CHECK (role IN ('admin', 'user'));
+
+UPDATE users
+SET role = 'admin'
+WHERE id = (
+    SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1
+)
+AND NOT EXISTS (
+    SELECT 1 FROM users WHERE role = 'admin'
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));

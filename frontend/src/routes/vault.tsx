@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { AdminPanel } from '@/components/admin-panel'
 import { AppSidebar, type VaultSelection } from '@/components/app-sidebar'
 import { AuditDialog } from '@/components/audit-dialog'
 import { CredentialDetail } from '@/components/credential-detail'
@@ -30,7 +31,12 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { VaultDialog } from '@/components/vault-dialog'
-import { vaultApi, type Credential, type Vault } from '@/lib/api'
+import {
+  vaultApi,
+  type Credential,
+  type UserSummary,
+  type Vault,
+} from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
 import { getServerSessionFn } from '@/lib/auth-server'
 import {
@@ -56,6 +62,13 @@ function VaultWorkspace() {
   const { user } = Route.useRouteContext()
   const navigate = useNavigate()
 
+  const [currentUser, setCurrentUser] = useState<UserSummary>(() => ({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    image: user.image,
+    role: 'user',
+  }))
   const [vaults, setVaults] = useState<Vault[]>([])
   const [allCredentials, setAllCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
@@ -120,10 +133,12 @@ function VaultWorkspace() {
 
   const refreshData = useCallback(async () => {
     try {
-      const [vaultList, credList] = await Promise.all([
+      const [meProfile, vaultList, credList] = await Promise.all([
+        vaultApi.me(),
         vaultApi.listVaults(),
         vaultApi.listCredentials(),
       ])
+      setCurrentUser(meProfile)
       setVaults(vaultList)
       setAllCredentials(credList)
     } catch (err) {
@@ -140,6 +155,16 @@ function VaultWorkspace() {
   useEffect(() => {
     refreshData()
   }, [refreshData])
+
+  useEffect(() => {
+    if (
+      !loading &&
+      selection.type === 'admin' &&
+      currentUser.role !== 'admin'
+    ) {
+      setSelection({ type: 'all' })
+    }
+  }, [loading, selection.type, currentUser.role])
 
   const activeVault = useMemo(() => {
     if (selection.type !== 'vault') return null
@@ -307,7 +332,7 @@ function VaultWorkspace() {
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar
-        user={user}
+        user={currentUser}
         vaults={vaults}
         totalCredentialsCount={allCredentials.length}
         favoritesCount={favoritesCount}
@@ -336,7 +361,7 @@ function VaultWorkspace() {
         {/* Mobile & Tablet Header */}
         <header className="flex h-12 shrink-0 items-center justify-between border-b px-3 lg:hidden">
           <div className="flex items-center gap-2">
-            {mobileDetailOpen ? (
+            {selection.type !== 'admin' && mobileDetailOpen ? (
               <Button
                 variant="ghost"
                 size="sm"
@@ -354,102 +379,119 @@ function VaultWorkspace() {
                 />
               </>
             )}
-            <span className="text-sm font-semibold">Starward Vault</span>
+            <span className="text-sm font-semibold">
+              {selection.type === 'admin'
+                ? 'Pannello Admin'
+                : 'Starward Vault'}
+            </span>
           </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditingCredential(null)
-              setCredDialogOpen(true)
-            }}
-          >
-            Nuova
-          </Button>
-        </header>
-
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          {/* Center Credential List */}
-          <div
-            className={
-              mobileDetailOpen
-                ? 'hidden h-full min-w-0 flex-1 lg:flex'
-                : 'flex h-full min-w-0 flex-1'
-            }
-          >
-            <CredentialList
-              selection={selection}
-              activeVault={activeVault}
-              credentials={filteredCredentials}
-              stats={stats}
-              selectedCredentialId={selectedCredential?.id ?? null}
-              searchQuery={searchQuery}
-              categoryFilter={categoryFilter}
-              sortBy={sortBy}
-              loading={loading}
-              onSearchChange={setSearchQuery}
-              onCategoryFilterChange={setCategoryFilter}
-              onSortChange={setSortBy}
-              onSelectCredential={(cred) => {
-                setSelectedCredentialId(cred.id)
-                setDetailClosed(false)
-                setMobileDetailOpen(true)
-                recordAccess(cred.id)
-              }}
-              onToggleFavorite={handleToggleFavorite}
-              onEditCredential={(cred) => {
-                setEditingCredential(cred)
-                setCredDialogOpen(true)
-              }}
-              onDeleteCredential={(cred) => setPendingDeleteCred(cred)}
-              onNewCredential={() => {
+          {selection.type !== 'admin' && (
+            <Button
+              size="sm"
+              onClick={() => {
                 setEditingCredential(null)
                 setCredDialogOpen(true)
               }}
-              onShareVault={(vault) => setShareVaultTarget(vault)}
-              onEditVault={(vault) => {
-                setEditingVault(vault)
-                setVaultDialogOpen(true)
-              }}
-              onDeleteVault={(vault) => setPendingDeleteVault(vault)}
-              onOpenAudit={(vault) => setAuditVaultTarget(vault)}
+            >
+              Nuova
+            </Button>
+          )}
+        </header>
+
+        {selection.type === 'admin' && currentUser.role === 'admin' ? (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            <AdminPanel
+              currentUser={currentUser}
+              activeTab={selection.tab}
+              onTabChange={(tab) => setSelection({ type: 'admin', tab })}
+              onUsersChanged={refreshData}
             />
           </div>
-
-          {/* Right Detail Panel */}
-          {!detailClosed && (
+        ) : (
+          <div className="flex min-h-0 flex-1 overflow-hidden">
+            {/* Center Credential List */}
             <div
               className={
                 mobileDetailOpen
-                  ? 'flex h-full w-full lg:w-auto'
-                  : 'hidden h-full lg:flex'
+                  ? 'hidden h-full min-w-0 flex-1 lg:flex'
+                  : 'flex h-full min-w-0 flex-1'
               }
             >
-              <CredentialDetail
-                credential={selectedCredential}
-                lastAccessedAt={
-                  selectedCredential
-                    ? lastAccessedMap[selectedCredential.id]
-                    : undefined
-                }
-                onEdit={(cred) => {
+              <CredentialList
+                selection={selection}
+                activeVault={activeVault}
+                credentials={filteredCredentials}
+                stats={stats}
+                selectedCredentialId={selectedCredential?.id ?? null}
+                searchQuery={searchQuery}
+                categoryFilter={categoryFilter}
+                sortBy={sortBy}
+                loading={loading}
+                onSearchChange={setSearchQuery}
+                onCategoryFilterChange={setCategoryFilter}
+                onSortChange={setSortBy}
+                onSelectCredential={(cred) => {
+                  setSelectedCredentialId(cred.id)
+                  setDetailClosed(false)
+                  setMobileDetailOpen(true)
+                  recordAccess(cred.id)
+                }}
+                onToggleFavorite={handleToggleFavorite}
+                onEditCredential={(cred) => {
                   setEditingCredential(cred)
                   setCredDialogOpen(true)
                 }}
-                onDelete={(cred) => setPendingDeleteCred(cred)}
-                onToggleFavorite={handleToggleFavorite}
-                onUpdateTags={handleUpdateTags}
-                onSelectVault={(vaultId) =>
-                  handleSelectNavigation({ type: 'vault', vaultId })
-                }
-                onClose={() => {
-                  setMobileDetailOpen(false)
-                  setDetailClosed(true)
-                  setSelectedCredentialId(null)
+                onDeleteCredential={(cred) => setPendingDeleteCred(cred)}
+                onNewCredential={() => {
+                  setEditingCredential(null)
+                  setCredDialogOpen(true)
                 }}
+                onShareVault={(vault) => setShareVaultTarget(vault)}
+                onEditVault={(vault) => {
+                  setEditingVault(vault)
+                  setVaultDialogOpen(true)
+                }}
+                onDeleteVault={(vault) => setPendingDeleteVault(vault)}
+                onOpenAudit={(vault) => setAuditVaultTarget(vault)}
               />
             </div>
-          )}
-        </div>
+
+            {/* Right Detail Panel */}
+            {!detailClosed && (
+              <div
+                className={
+                  mobileDetailOpen
+                    ? 'flex h-full w-full lg:w-auto'
+                    : 'hidden h-full lg:flex'
+                }
+              >
+                <CredentialDetail
+                  credential={selectedCredential}
+                  lastAccessedAt={
+                    selectedCredential
+                      ? lastAccessedMap[selectedCredential.id]
+                      : undefined
+                  }
+                  onEdit={(cred) => {
+                    setEditingCredential(cred)
+                    setCredDialogOpen(true)
+                  }}
+                  onDelete={(cred) => setPendingDeleteCred(cred)}
+                  onToggleFavorite={handleToggleFavorite}
+                  onUpdateTags={handleUpdateTags}
+                  onSelectVault={(vaultId) =>
+                    handleSelectNavigation({ type: 'vault', vaultId })
+                  }
+                  onClose={() => {
+                    setMobileDetailOpen(false)
+                    setDetailClosed(true)
+                    setSelectedCredentialId(null)
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </SidebarInset>
 
       {/* Dialogs */}

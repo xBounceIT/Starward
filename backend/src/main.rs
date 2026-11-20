@@ -101,6 +101,12 @@ pub fn build_app(state: AppState) -> Router {
         .route("/api/health", get(routes::health::health_check))
         .route("/api/me", get(routes::users::get_me))
         .route("/api/users", get(routes::users::list_users))
+        .route("/api/admin/users", get(routes::admin::list_admin_users))
+        .route(
+            "/api/admin/users/{user_id}",
+            patch(routes::admin::update_user_role).delete(routes::admin::delete_user),
+        )
+        .route("/api/admin/audit", get(routes::admin::list_system_audit))
         .route(
             "/api/vaults",
             get(routes::vaults::list_vaults).post(routes::vaults::create_vault),
@@ -226,12 +232,41 @@ mod tests {
         assert!(!is_wildcard_cors_origin("http://192.168.1.50:3000"));
     }
 
+    #[test]
+    fn admin_emails_parsing_and_matching_works() {
+        let parsed = crate::config::parse_admin_emails(" Admin@Starward.io , ops@starward.io ,, ");
+        assert_eq!(
+            parsed,
+            vec!["admin@starward.io".to_string(), "ops@starward.io".to_string()]
+        );
+
+        let cfg = Config {
+            host: "127.0.0.1".to_string(),
+            port: 8080,
+            database_url: String::new(),
+            auth_secret: String::new(),
+            master_key: String::new(),
+            cors_origin: String::new(),
+            admin_emails: parsed,
+        };
+        assert!(cfg.is_admin_email("ADMIN@starward.io"));
+        assert!(cfg.is_admin_email(" ops@starward.io "));
+        assert!(!cfg.is_admin_email("user@starward.io"));
+        assert!(!cfg.is_admin_email(""));
+    }
+
     #[tokio::test]
     async fn shared_folder_workflow_and_permissions_postgres() {
         let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
             eprintln!("Skipping PostgreSQL integration test: TEST_DATABASE_URL not set");
             return;
         };
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let alice_id = format!("test-alice-{suffix}");
+        let bob_id = format!("test-bob-{suffix}");
+        let alice_email = format!("alice-{suffix}@starward.io");
+        let bob_email = format!("bob-{suffix}@starward.io");
 
         let config = Config {
             host: "127.0.0.1".to_string(),
@@ -240,6 +275,7 @@ mod tests {
             auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
             master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
             cors_origin: "http://localhost:3000".to_string(),
+            admin_emails: vec![alice_email.clone()],
         };
 
         let db = init_db(&config.database_url).await.unwrap();
@@ -249,12 +285,6 @@ mod tests {
             config: config.clone(),
             crypto,
         });
-
-        let suffix = Uuid::new_v4().simple().to_string();
-        let alice_id = format!("test-alice-{suffix}");
-        let bob_id = format!("test-bob-{suffix}");
-        let alice_email = format!("alice-{suffix}@starward.io");
-        let bob_email = format!("bob-{suffix}@starward.io");
 
         let alice_token = make_token(&config.auth_secret, &alice_id, &alice_email, "Alice");
         let bob_token = make_token(&config.auth_secret, &bob_id, &bob_email, "Bob");
@@ -521,6 +551,169 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
         let patched_note = read_json(res).await;
         assert_eq!(patched_note["favorite"], true);
+
+        // 10. RBAC: Alice has 'admin' role, Bob has 'user' role
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let alice_me = read_json(res).await;
+        assert_eq!(alice_me["role"], "admin");
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let bob_me = read_json(res).await;
+        assert_eq!(bob_me["role"], "user");
+
+        // Bob (user) is forbidden from accessing admin endpoints
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/users")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/audit")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // Alice (admin) can list users, access predisposed system audit endpoint, update roles, and delete users
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/users")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let admin_users = read_json(res).await;
+        assert!(admin_users
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|u| u["id"] == bob_id && u["role"] == "user"));
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/audit")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Alice cannot demote herself
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/users/{alice_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "role": "user" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        // Alice promotes Bob to admin, then demotes him back to user
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/users/{bob_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "role": "admin" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let updated_bob = read_json(res).await;
+        assert_eq!(updated_bob["role"], "admin");
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/users/{bob_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "role": "user" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let demoted_bob = read_json(res).await;
+        assert_eq!(demoted_bob["role"], "user");
+
+        // Alice deletes Charlie
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/admin/users/{charlie_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
 
         // Clean up test users (cascades vaults, members, credentials, audit logs)
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3)")
