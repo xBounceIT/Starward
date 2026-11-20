@@ -76,6 +76,7 @@ export function CredentialList({
   onOpenAudit,
 }: CredentialListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const categoryScrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -86,6 +87,24 @@ export function CredentialList({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  useEffect(() => {
+    const el = categoryScrollRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (
+        el.scrollWidth > el.clientWidth &&
+        Math.abs(e.deltaY) > Math.abs(e.deltaX)
+      ) {
+        e.preventDefault()
+        const delta =
+          e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaY
+        el.scrollLeft += delta
+      }
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
   const copyQuick = async (
@@ -125,9 +144,9 @@ export function CredentialList({
     activeVault.role === 'editor'
 
   return (
-    <section className="flex h-full w-full flex-col border-r bg-background lg:w-96 lg:shrink-0">
+    <section className="flex h-full w-full min-w-0 flex-col border-r bg-background lg:w-96 lg:shrink-0">
       {/* Header */}
-      <div className="space-y-3 border-b px-4 py-3.5">
+      <div className="space-y-3 border-b px-4 pt-3.5 pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -272,33 +291,40 @@ export function CredentialList({
         </div>
 
         {/* Category filter buttons */}
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-          <Button
-            type="button"
-            size="xs"
-            variant={categoryFilter === '' ? 'default' : 'secondary'}
-            className="shrink-0 rounded-full"
-            onClick={() => onCategoryFilterChange('')}
-          >
-            Tutte
-          </Button>
-          {CREDENTIAL_CATEGORIES.map((cat) => (
+        <ScrollArea
+          type="auto"
+          orientation="horizontal"
+          viewportRef={categoryScrollRef}
+          className="w-full whitespace-nowrap"
+        >
+          <div className="flex w-max gap-1.5 pb-3.5">
             <Button
-              key={cat.value}
               type="button"
               size="xs"
-              variant={categoryFilter === cat.value ? 'default' : 'secondary'}
+              variant={categoryFilter === '' ? 'default' : 'secondary'}
               className="shrink-0 rounded-full"
-              onClick={() =>
-                onCategoryFilterChange(
-                  categoryFilter === cat.value ? '' : cat.value,
-                )
-              }
+              onClick={() => onCategoryFilterChange('')}
             >
-              {cat.label}
+              Tutte
             </Button>
-          ))}
-        </div>
+            {CREDENTIAL_CATEGORIES.map((cat) => (
+              <Button
+                key={cat.value}
+                type="button"
+                size="xs"
+                variant={categoryFilter === cat.value ? 'default' : 'secondary'}
+                className="shrink-0 rounded-full"
+                onClick={() =>
+                  onCategoryFilterChange(
+                    categoryFilter === cat.value ? '' : cat.value,
+                  )
+                }
+              >
+                {cat.label}
+              </Button>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
       {/* Credential items */}
