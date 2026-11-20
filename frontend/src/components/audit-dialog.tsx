@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { History } from 'lucide-react'
+import { Clock, History } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { vaultApi, type AuditLog, type Vault } from '@/lib/api'
-import { formatRelativeDate } from '@/lib/vault-utils'
+import { formatRelativeDate, formatShortDate } from '@/lib/vault-utils'
 
 interface AuditDialogProps {
   open: boolean
@@ -76,15 +77,29 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
               {logs.map((log) => (
                 <div
                   key={log.id}
-                  className="rounded-lg border bg-card px-3 py-2.5 text-sm"
+                  className="rounded-xl border border-border/70 bg-card/60 px-3.5 py-2.5 text-sm"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium">{log.actor_name}</span>
-                    <span className="text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">
+                        {log.actor_name}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="px-1.5 py-0 font-mono text-[10px] text-muted-foreground"
+                      >
+                        {log.action}
+                      </Badge>
+                    </div>
+                    <span
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                      title={formatShortDate(log.created_at)}
+                    >
+                      <Clock className="size-3" />
                       {formatRelativeDate(log.created_at)}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {log.details}
                   </p>
                 </div>

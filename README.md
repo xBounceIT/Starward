@@ -19,7 +19,7 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
    - Controllo degli accessi basato sui ruoli con ruoli globali **Admin** e **User** (il primo utente registrato diventa automaticamente **Admin**, con supporto opzionale per la variabile d'ambiente `ADMIN_EMAILS`).
    - **Pannello Admin** integrato nella sidebar (visibile esclusivamente agli utenti con ruolo **Admin**) con:
      - **Lista utenti**: visualizzazione dettagli utenti, statistiche cartelle/credenziali, modifica del ruolo (`Admin` / `User`) ed eliminazione utenti.
-     - **Audit di sistema**: sezione predisposta (*chi ha fatto cosa e quando*) pronta per il tracciamento globale degli eventi di sistema.
+     - **Audit di sistema**: registro globale degli eventi di sicurezza e amministrazione (*chi ha fatto cosa e quando*) con filtri per attore/ruolo, categoria risorsa, codice azione e intervallo temporale.
 
 4. **Sicurezza & UI Intuitiva**
    - Password e note cifrate a riposo in Rust con **AES-256-GCM**, nonce casuali a 96-bit per ogni salvataggio e derivazione chiave **HKDF-SHA256**.

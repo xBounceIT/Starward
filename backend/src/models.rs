@@ -42,8 +42,8 @@ pub struct UpdateUserRoleRequest {
     pub role: String,
 }
 
-/// Predisposizione modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Modello evento di Audit di Sistema ("chi ha fatto cosa e quando").
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SystemAuditEventDto {
     pub id: String,
     pub actor_id: String,

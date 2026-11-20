@@ -3,12 +3,14 @@ use axum::{
     http::StatusCode,
     Json,
 };
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::{
     auth::AuthenticatedUser,
     error::{AppError, AppResult},
     models::{AdminUserDto, SystemAuditEventDto, UpdateUserRoleRequest},
+    routes::record_system_audit,
     AppState,
 };
 
@@ -16,6 +18,18 @@ use crate::{
 pub struct ListAdminUsersQuery {
     pub q: Option<String>,
     pub role: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListSystemAuditQuery {
+    pub q: Option<String>,
+    pub actor_id: Option<String>,
+    pub actor_role: Option<String>,
+    pub action: Option<String>,
+    pub target_type: Option<String>,
+    pub from: Option<DateTime<Utc>>,
+    pub to: Option<DateTime<Utc>>,
+    pub limit: Option<i64>,
 }
 
 async fn fetch_admin_user_dto(
@@ -142,6 +156,21 @@ pub async fn update_user_role(
         .await?
         .ok_or_else(|| AppError::NotFound("Utente non trovato".to_string()))?;
 
+    if existing.role != new_role {
+        record_system_audit(
+            &state.db,
+            &user,
+            "rbac.role_changed",
+            "user",
+            Some(&target_user_id),
+            &format!(
+                "Ruolo di '{}' ({}) modificato da '{}' a '{}'",
+                updated.name, updated.email, existing.role, new_role
+            ),
+        )
+        .await?;
+    }
+
     Ok(Json(updated))
 }
 
@@ -158,13 +187,13 @@ pub async fn delete_user(
         ));
     }
 
-    let existing: Option<(String, String)> =
-        sqlx::query_as("SELECT email, role FROM users WHERE id = $1")
+    let existing: Option<(String, String, String)> =
+        sqlx::query_as("SELECT name, email, role FROM users WHERE id = $1")
             .bind(&target_user_id)
             .fetch_optional(&state.db)
             .await?;
 
-    let (target_email, target_role) =
+    let (target_name, target_email, target_role) =
         existing.ok_or_else(|| AppError::NotFound("Utente non trovato".to_string()))?;
 
     if target_role == "admin" {
@@ -245,14 +274,80 @@ pub async fn delete_user(
 
     tx.commit().await?;
 
+    record_system_audit(
+        &state.db,
+        &user,
+        "user.deleted",
+        "user",
+        Some(&target_user_id),
+        &format!(
+            "Utente '{}' ({}, ruolo: {}) eliminato dal sistema",
+            target_name, target_email, target_role
+        ),
+    )
+    .await?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Endpoint predisposto per gli audit di sistema (chi ha fatto cosa e quando).
-/// Attualmente non implementato come da specifiche: restituisce una lista vuota riservata agli Admin.
+/// Restituisce il registro globale di Audit di Sistema ("chi ha fatto cosa e quando"), riservato agli Admin.
 pub async fn list_system_audit(
+    State(state): State<AppState>,
     user: AuthenticatedUser,
+    Query(query): Query<ListSystemAuditQuery>,
 ) -> AppResult<Json<Vec<SystemAuditEventDto>>> {
     user.require_admin()?;
-    Ok(Json(Vec::new()))
+
+    let search = query.q.unwrap_or_default().trim().to_lowercase();
+    let search_pattern = format!("%{}%", search);
+    let actor_id = query.actor_id.unwrap_or_default().trim().to_string();
+    let actor_role = query.actor_role.unwrap_or_default().trim().to_lowercase();
+    let action = query.action.unwrap_or_default().trim().to_lowercase();
+    let target_type = query.target_type.unwrap_or_default().trim().to_lowercase();
+    let limit = query.limit.unwrap_or(200).clamp(1, 500);
+
+    let events: Vec<SystemAuditEventDto> = sqlx::query_as(
+        r#"
+        SELECT
+            id,
+            actor_id,
+            actor_email,
+            actor_name,
+            actor_role,
+            action,
+            target_type,
+            target_id,
+            details,
+            created_at
+        FROM system_audit_logs
+        WHERE (
+            $1 = '%%'
+            OR actor_name ILIKE $1
+            OR actor_email ILIKE $1
+            OR action ILIKE $1
+            OR details ILIKE $1
+            OR target_type ILIKE $1
+        )
+          AND ($2 = '' OR actor_id = $2)
+          AND ($3 = '' OR LOWER(actor_role) = $3)
+          AND ($4 = '' OR LOWER(action) = $4)
+          AND ($5 = '' OR LOWER(target_type) = $5)
+          AND ($6::TIMESTAMPTZ IS NULL OR created_at >= $6)
+          AND ($7::TIMESTAMPTZ IS NULL OR created_at <= $7)
+        ORDER BY created_at DESC
+        LIMIT $8
+        "#,
+    )
+    .bind(&search_pattern)
+    .bind(&actor_id)
+    .bind(&actor_role)
+    .bind(&action)
+    .bind(&target_type)
+    .bind(query.from)
+    .bind(query.to)
+    .bind(limit)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(events))
 }

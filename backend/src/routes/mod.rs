@@ -62,6 +62,46 @@ pub async fn require_vault_role(
     Ok(role)
 }
 
+pub async fn record_system_audit(
+    db: &PgPool,
+    actor: &AuthenticatedUser,
+    action: &str,
+    target_type: &str,
+    target_id: Option<&str>,
+    details: &str,
+) -> AppResult<()> {
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now();
+    let actor_role = if actor.role == "admin" {
+        "admin"
+    } else {
+        "user"
+    };
+
+    sqlx::query(
+        r#"
+        INSERT INTO system_audit_logs (
+            id, actor_id, actor_email, actor_name, actor_role, action, target_type, target_id, details, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        "#,
+    )
+    .bind(id)
+    .bind(&actor.id)
+    .bind(&actor.email)
+    .bind(&actor.name)
+    .bind(actor_role)
+    .bind(action)
+    .bind(target_type)
+    .bind(target_id)
+    .bind(details)
+    .bind(now)
+    .execute(db)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn record_audit(
     db: &PgPool,
     vault_id: &str,
@@ -89,6 +129,13 @@ pub async fn record_audit(
     .bind(now)
     .execute(db)
     .await?;
+
+    let (target_type, target_id) = match credential_id {
+        Some(cid) => ("credential", Some(cid)),
+        None => ("vault", Some(vault_id)),
+    };
+
+    record_system_audit(db, actor, action, target_type, target_id, details).await?;
 
     Ok(())
 }

@@ -938,8 +938,70 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
-        // Clean up test users (cascades vaults, members, credentials, audit logs)
+        // 13. System Audit Log: verify recorded events and filtering (Chi / Cosa / Quando)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/admin/audit?actor_id={alice_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let alice_audit = read_json(res).await;
+        let alice_events = alice_audit.as_array().unwrap();
+        let recorded_actions: Vec<&str> = alice_events
+            .iter()
+            .filter_map(|e| e["action"].as_str())
+            .collect();
+
+        assert!(recorded_actions.contains(&"auth.login"));
+        assert!(recorded_actions.contains(&"vault.created"));
+        assert!(recorded_actions.contains(&"vault.shared"));
+        assert!(recorded_actions.contains(&"credential.created"));
+        assert!(recorded_actions.contains(&"rbac.role_changed"));
+        assert!(recorded_actions.contains(&"user.deleted"));
+        assert!(recorded_actions.contains(&"user.settings_updated"));
+        assert!(recorded_actions.contains(&"user.profile_updated"));
+        assert!(recorded_actions.contains(&"api_key.created"));
+        assert!(recorded_actions.contains(&"auth.api_key_used"));
+        assert!(recorded_actions.contains(&"credential.accessed"));
+        assert!(recorded_actions.contains(&"api_key.revoked"));
+
+        // Filter system audit by action & actor_id
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!(
+                        "/api/admin/audit?actor_id={alice_id}&action=user.deleted&target_type=user"
+                    ))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let deleted_audit = read_json(res).await;
+        let deleted_events = deleted_audit.as_array().unwrap();
+        assert_eq!(deleted_events.len(), 1);
+        assert_eq!(deleted_events[0]["target_id"], charlie_id);
+        assert_eq!(deleted_events[0]["actor_role"], "admin");
+
+        // Clean up test users and system audit logs
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3)")
+            .bind(&alice_id)
+            .bind(&bob_id)
+            .bind(&charlie_id)
+            .execute(&db)
+            .await;
+        let _ = sqlx::query("DELETE FROM system_audit_logs WHERE actor_id IN ($1, $2, $3)")
             .bind(&alice_id)
             .bind(&bob_id)
             .bind(&charlie_id)

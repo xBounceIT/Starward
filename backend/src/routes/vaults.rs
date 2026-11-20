@@ -14,7 +14,7 @@ use crate::{
         AuditLogDto, CreateVaultRequest, ShareVaultRequest, UpdateMemberRoleRequest,
         UpdateVaultRequest, VaultDto, VaultMemberDto,
     },
-    routes::{record_audit, require_vault_role},
+    routes::{record_audit, record_system_audit, require_vault_role},
     AppState,
 };
 
@@ -359,12 +359,13 @@ pub async fn delete_vault(
 ) -> AppResult<StatusCode> {
     require_vault_role(&state.db, &vault_id, &user, &["owner"]).await?;
 
-    let row: Option<(bool,)> = sqlx::query_as("SELECT is_personal FROM vaults WHERE id = $1")
-        .bind(&vault_id)
-        .fetch_optional(&state.db)
-        .await?;
+    let row: Option<(String, bool)> =
+        sqlx::query_as("SELECT name, is_personal FROM vaults WHERE id = $1")
+            .bind(&vault_id)
+            .fetch_optional(&state.db)
+            .await?;
 
-    let (is_personal,) =
+    let (vault_name, is_personal) =
         row.ok_or_else(|| AppError::NotFound("Cartella non trovata".to_string()))?;
 
     if is_personal {
@@ -377,6 +378,16 @@ pub async fn delete_vault(
         .bind(&vault_id)
         .execute(&state.db)
         .await?;
+
+    record_system_audit(
+        &state.db,
+        &user,
+        "vault.deleted",
+        "vault",
+        Some(&vault_id),
+        &format!("Cartella '{}' eliminata", vault_name),
+    )
+    .await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
