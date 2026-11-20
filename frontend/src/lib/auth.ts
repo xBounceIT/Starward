@@ -1,5 +1,5 @@
 import '@/lib/env'
-import { betterAuth } from 'better-auth'
+import { betterAuth, type BetterAuthOptions } from 'better-auth'
 import { getMigrations } from 'better-auth/db/migration'
 import { genericOAuth } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
@@ -58,9 +58,33 @@ if (process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET) {
   }
 }
 
+function isWildcardBindHost(hostname: string): boolean {
+  const normalized = hostname.replace(/^\[|\]$/g, '').toLowerCase()
+  return normalized === '0.0.0.0' || normalized === '::' || normalized === '*'
+}
+
+function resolveAuthBaseURL(): BetterAuthOptions['baseURL'] {
+  const raw = process.env.BETTER_AUTH_URL?.trim() || 'http://0.0.0.0:3000'
+  try {
+    const parsed = new URL(raw)
+    if (isWildcardBindHost(parsed.hostname)) {
+      const protocol = parsed.protocol === 'https:' ? 'https' : 'http'
+      const portSuffix = parsed.port ? `:${parsed.port}` : ''
+      return {
+        allowedHosts: ['*'],
+        protocol,
+        fallback: `${protocol}://localhost${portSuffix}`,
+      }
+    }
+    return raw
+  } catch {
+    return raw
+  }
+}
+
 export const auth = betterAuth({
   appName: 'Starward',
-  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
+  baseURL: resolveAuthBaseURL(),
   secret:
     process.env.BETTER_AUTH_SECRET ||
     'dev-better-auth-secret-change-in-production-32chars',

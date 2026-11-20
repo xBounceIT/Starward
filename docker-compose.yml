@@ -36,10 +36,10 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD:-starward}@postgres:5432/${POSTGRES_DB:-starward}
       STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:-dev-starward-auth-secret-change-in-production-32chars}
       STARWARD_MASTER_KEY: ${STARWARD_MASTER_KEY:-dev-starward-master-key-change-in-production-32chars}
-      CORS_ORIGIN: ${BETTER_AUTH_URL:-http://localhost:3000}
+      CORS_ORIGIN: ${BETTER_AUTH_URL:-http://0.0.0.0:3000}
       RUST_LOG: ${RUST_LOG:-starward_backend=info,tower_http=info}
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      - "0.0.0.0:${BACKEND_PORT:-8080}:8080"
     networks:
       - starward-net
     healthcheck:
@@ -66,7 +66,7 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://0.0.0.0:3000}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production-32chars}
       DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD:-starward}@postgres:5432/${POSTGRES_DB:-starward}
       RUST_BACKEND_URL: http://backend:8080
@@ -83,7 +83,7 @@ services:
       MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
       MICROSOFT_TENANT_ID: ${MICROSOFT_TENANT_ID:-common}
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "0.0.0.0:${FRONTEND_PORT:-3000}:3000"
     networks:
       - starward-net
     healthcheck:

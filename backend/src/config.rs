@@ -27,7 +27,7 @@ impl Config {
             "dev-starward-master-key-change-in-production-32chars".to_string()
         });
         let cors_origin =
-            env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://localhost:3000".to_string());
+            env::var("CORS_ORIGIN").unwrap_or_else(|_| "http://0.0.0.0:3000".to_string());
 
         Self {
             host,

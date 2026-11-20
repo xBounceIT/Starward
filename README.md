@@ -83,9 +83,11 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-- **App Web**: [http://localhost:3000](http://localhost:3000)
-- **Backend Rust Health**: [http://localhost:8080/api/health](http://localhost:8080/api/health)
+- **App Web**: `http://0.0.0.0:3000` (raggiungibile da altri PC in rete tramite `http://<IP-DEL-SERVER>:3000`, o in locale su [http://localhost:3000](http://localhost:3000))
+- **Backend Rust Health**: `http://0.0.0.0:8080/api/health` (`http://<IP-DEL-SERVER>:8080/api/health`)
 - **PostgreSQL dedicato**: `localhost:5432` (volume persistente `starward_pgdata`)
+
+> Con `BETTER_AUTH_URL=http://0.0.0.0:3000` (impostazione predefinita in `.env.example`), frontend e backend accettano automaticamente le richieste provenienti da qualsiasi dispositivo sulla rete locale tramite l'IP/hostname del server. In produzione dietro dominio/HTTPS imposta l'URL esatto (es. `BETTER_AUTH_URL=https://vault.esempio.it`).
 
 Per fermare tutto (mantenendo i dati nel volume PostgreSQL):
 ```bash

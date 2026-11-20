@@ -13,7 +13,10 @@ use axum::{
     Router,
 };
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    trace::TraceLayer,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{config::Config, crypto::VaultCrypto};
@@ -40,15 +43,50 @@ pub async fn init_db(database_url: &str) -> Result<PgPool, sqlx::Error> {
     Ok(pool)
 }
 
-pub fn build_app(state: AppState) -> Router {
-    let cors_origin = state
-        .config
-        .cors_origin
-        .parse::<HeaderValue>()
-        .unwrap_or_else(|_| HeaderValue::from_static("http://localhost:3000"));
+fn is_wildcard_cors_origin(origin: &str) -> bool {
+    let trimmed = origin.trim();
+    if trimmed.is_empty() || trimmed == "*" {
+        return true;
+    }
 
+    let without_scheme = trimmed
+        .strip_prefix("http://")
+        .or_else(|| trimmed.strip_prefix("https://"))
+        .unwrap_or(trimmed);
+    let authority = without_scheme.split('/').next().unwrap_or("");
+
+    authority == "0.0.0.0"
+        || authority.starts_with("0.0.0.0:")
+        || authority == "[::]"
+        || authority.starts_with("[::]:")
+        || authority == "*"
+        || authority.starts_with("*:")
+}
+
+fn build_cors_origin(raw: &str) -> AllowOrigin {
+    if is_wildcard_cors_origin(raw) {
+        return AllowOrigin::mirror_request();
+    }
+
+    let origins: Vec<HeaderValue> = raw
+        .split(',')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .filter_map(|s| s.parse::<HeaderValue>().ok())
+        .collect();
+
+    if origins.is_empty() {
+        AllowOrigin::exact(HeaderValue::from_static("http://localhost:3000"))
+    } else if origins.len() == 1 {
+        AllowOrigin::exact(origins.into_iter().next().unwrap())
+    } else {
+        AllowOrigin::list(origins)
+    }
+}
+
+pub fn build_app(state: AppState) -> Router {
     let cors = CorsLayer::new()
-        .allow_origin(cors_origin)
+        .allow_origin(build_cors_origin(&state.config.cors_origin))
         .allow_methods([
             Method::GET,
             Method::POST,
@@ -174,6 +212,18 @@ mod tests {
     fn app_version_is_populated() {
         assert!(!APP_VERSION.is_empty());
         assert!(!APP_VERSION.starts_with('v'));
+    }
+
+    #[test]
+    fn wildcard_cors_origin_detection_works() {
+        assert!(is_wildcard_cors_origin("http://0.0.0.0:3000"));
+        assert!(is_wildcard_cors_origin("https://0.0.0.0:3000"));
+        assert!(is_wildcard_cors_origin("http://0.0.0.0"));
+        assert!(is_wildcard_cors_origin("http://[::]:3000"));
+        assert!(is_wildcard_cors_origin("*"));
+        assert!(!is_wildcard_cors_origin("http://localhost:3000"));
+        assert!(!is_wildcard_cors_origin("https://vault.example.com"));
+        assert!(!is_wildcard_cors_origin("http://192.168.1.50:3000"));
     }
 
     #[tokio::test]
