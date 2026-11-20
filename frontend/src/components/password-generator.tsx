@@ -13,24 +13,24 @@ import {
 
 interface PasswordGeneratorProps {
   onSelect: (password: string) => void
+  defaultOptions?: PasswordOptions
 }
 
-export function PasswordGenerator({ onSelect }: PasswordGeneratorProps) {
-  const [options, setOptions] = useState<PasswordOptions>({
-    length: 20,
-    uppercase: true,
-    lowercase: true,
-    numbers: true,
-    symbols: true,
-  })
+const DEFAULT_PASSWORD_OPTIONS: PasswordOptions = {
+  length: 20,
+  uppercase: true,
+  lowercase: true,
+  numbers: true,
+  symbols: true,
+}
+
+export function PasswordGenerator({
+  onSelect,
+  defaultOptions = DEFAULT_PASSWORD_OPTIONS,
+}: PasswordGeneratorProps) {
+  const [options, setOptions] = useState<PasswordOptions>(defaultOptions)
   const [generated, setGenerated] = useState(() =>
-    generateSecurePassword({
-      length: 20,
-      uppercase: true,
-      lowercase: true,
-      numbers: true,
-      symbols: true,
-    }),
+    generateSecurePassword(defaultOptions),
   )
 
   const strength = evaluatePasswordStrength(generated)

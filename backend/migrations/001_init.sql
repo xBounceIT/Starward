@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY NOT NULL,
     email TEXT NOT NULL,
     name TEXT NOT NULL,
+    name_customized BOOLEAN NOT NULL DEFAULT FALSE,
     image TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -77,3 +78,31 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_vault_id ON audit_logs (vault_id);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id TEXT PRIMARY KEY NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    theme TEXT NOT NULL DEFAULT 'dark' CHECK (theme IN ('light', 'dark')),
+    password_generator_length INTEGER NOT NULL DEFAULT 20 CHECK (password_generator_length BETWEEN 8 AND 64),
+    password_generator_uppercase BOOLEAN NOT NULL DEFAULT TRUE,
+    password_generator_lowercase BOOLEAN NOT NULL DEFAULT TRUE,
+    password_generator_numbers BOOLEAN NOT NULL DEFAULT TRUE,
+    password_generator_symbols BOOLEAN NOT NULL DEFAULT TRUE,
+    default_vault_id TEXT REFERENCES vaults(id) ON DELETE SET NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+    id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    key_prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    permission TEXT NOT NULL DEFAULT 'read' CHECK (permission IN ('read', 'read_write')),
+    vault_ids TEXT[] NOT NULL DEFAULT '{}',
+    expires_at TIMESTAMPTZ,
+    last_used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys (user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys (key_hash);

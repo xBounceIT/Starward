@@ -29,15 +29,25 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
+import {
+  UserSettingsDialog,
+  type SettingsTab,
+} from '@/components/user-settings-dialog'
 import { VaultDialog } from '@/components/vault-dialog'
-import { vaultApi, type Credential, type Vault } from '@/lib/api'
+import {
+  vaultApi,
+  type Credential,
+  type UserSettings,
+  type Vault,
+} from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
 import { getServerSessionFn } from '@/lib/auth-server'
 import {
   getSearchableMetadata,
   serializeCredentialTags,
 } from '@/lib/credential-types'
-import { isRecentlyAdded } from '@/lib/vault-utils'
+import { useTheme } from '@/lib/theme'
+import { isRecentlyAdded, type PasswordOptions } from '@/lib/vault-utils'
 
 const LAST_ACCESSED_STORAGE_KEY = 'starward-last-accessed'
 
@@ -53,9 +63,12 @@ export const Route = createFileRoute('/vault')({
 })
 
 function VaultWorkspace() {
-  const { user } = Route.useRouteContext()
+  const { user: initialUser } = Route.useRouteContext()
   const navigate = useNavigate()
+  const { setTheme } = useTheme()
 
+  const [currentUser, setCurrentUser] = useState(initialUser)
+  const [userSettings, setUserSettings] = useState<UserSettings | null>(null)
   const [vaults, setVaults] = useState<Vault[]>([])
   const [allCredentials, setAllCredentials] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
@@ -83,6 +96,8 @@ function VaultWorkspace() {
   const [editingVault, setEditingVault] = useState<Vault | null>(null)
   const [shareVaultTarget, setShareVaultTarget] = useState<Vault | null>(null)
   const [auditVaultTarget, setAuditVaultTarget] = useState<Vault | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
   const [pendingDeleteCred, setPendingDeleteCred] =
     useState<Credential | null>(null)
   const [pendingDeleteVault, setPendingDeleteVault] = useState<Vault | null>(
@@ -120,12 +135,25 @@ function VaultWorkspace() {
 
   const refreshData = useCallback(async () => {
     try {
-      const [vaultList, credList] = await Promise.all([
+      const [vaultList, credList, meData, settingsData] = await Promise.all([
         vaultApi.listVaults(),
         vaultApi.listCredentials(),
+        vaultApi.me().catch(() => null),
+        vaultApi.getSettings().catch(() => null),
       ])
       setVaults(vaultList)
       setAllCredentials(credList)
+      if (meData) {
+        setCurrentUser((prev) => ({
+          ...prev,
+          name: meData.name,
+          email: meData.email,
+          image: meData.image,
+        }))
+      }
+      if (settingsData) {
+        setUserSettings(settingsData)
+      }
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -140,6 +168,23 @@ function VaultWorkspace() {
   useEffect(() => {
     refreshData()
   }, [refreshData])
+
+  useEffect(() => {
+    if (userSettings?.theme) {
+      setTheme(userSettings.theme)
+    }
+  }, [userSettings?.theme])
+
+  const defaultPasswordOptions: PasswordOptions | undefined = useMemo(() => {
+    if (!userSettings) return undefined
+    return {
+      length: userSettings.password_generator_length,
+      uppercase: userSettings.password_generator_uppercase,
+      lowercase: userSettings.password_generator_lowercase,
+      numbers: userSettings.password_generator_numbers,
+      symbols: userSettings.password_generator_symbols,
+    }
+  }, [userSettings])
 
   const activeVault = useMemo(() => {
     if (selection.type !== 'vault') return null
@@ -307,7 +352,7 @@ function VaultWorkspace() {
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar
-        user={user}
+        user={currentUser}
         vaults={vaults}
         totalCredentialsCount={allCredentials.length}
         favoritesCount={favoritesCount}
@@ -329,6 +374,10 @@ function VaultWorkspace() {
         onShareVault={(vault) => setShareVaultTarget(vault)}
         onOpenAudit={(vault) => setAuditVaultTarget(vault)}
         onDeleteVault={(vault) => setPendingDeleteVault(vault)}
+        onOpenSettings={(tab = 'profile') => {
+          setSettingsTab(tab)
+          setSettingsOpen(true)
+        }}
         onSignOut={handleSignOut}
       />
 
@@ -462,14 +511,37 @@ function VaultWorkspace() {
         vaults={vaults}
         defaultVaultId={
           credDefaultVaultId ??
-          (selection.type === 'vault' ? selection.vaultId : undefined)
+          (selection.type === 'vault'
+            ? selection.vaultId
+            : (userSettings?.default_vault_id ?? undefined))
         }
+        defaultPasswordOptions={defaultPasswordOptions}
         editingCredential={editingCredential}
         onSaved={async (saved) => {
           await refreshData()
           setSelectedCredentialId(saved.id)
           setDetailClosed(false)
           recordAccess(saved.id)
+        }}
+      />
+
+      <UserSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        initialTab={settingsTab}
+        user={currentUser}
+        vaults={vaults}
+        settings={userSettings}
+        onUserUpdated={(updated) => {
+          setCurrentUser((prev) => ({
+            ...prev,
+            name: updated.name,
+            email: updated.email,
+            image: updated.image,
+          }))
+        }}
+        onSettingsUpdated={(updated) => {
+          setUserSettings(updated)
         }}
       />
 
@@ -489,7 +561,7 @@ function VaultWorkspace() {
           if (!open) setShareVaultTarget(null)
         }}
         vault={shareVaultTarget}
-        currentUserId={user.id}
+        currentUserId={currentUser.id}
         onVaultUpdated={handleVaultUpdated}
         onLeftVault={async (leftVaultId) => {
           if (

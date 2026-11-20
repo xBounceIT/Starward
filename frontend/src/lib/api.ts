@@ -71,6 +71,36 @@ export interface AuditLog {
   created_at: string
 }
 
+export interface UserSettings {
+  theme: 'light' | 'dark'
+  password_generator_length: number
+  password_generator_uppercase: boolean
+  password_generator_lowercase: boolean
+  password_generator_numbers: boolean
+  password_generator_symbols: boolean
+  default_vault_id: string | null
+  updated_at: string
+}
+
+export type ApiKeyPermission = 'read' | 'read_write'
+
+export interface ApiKeyItem {
+  id: string
+  name: string
+  key_prefix: string
+  permission: ApiKeyPermission
+  vault_ids: string[]
+  expires_at: string | null
+  last_used_at: string | null
+  is_expired: boolean
+  created_at: string
+}
+
+export interface CreatedApiKey {
+  api_key: ApiKeyItem
+  secret_key: string
+}
+
 export class ApiError extends Error {
   status: number
   code: string
@@ -115,6 +145,46 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const vaultApi = {
   me: () => request<UserSummary>('/me'),
+
+  updateProfile: (payload: { name: string }) =>
+    request<UserSummary>('/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  getSettings: () => request<UserSettings>('/settings'),
+
+  updateSettings: (payload: {
+    theme?: 'light' | 'dark'
+    password_generator_length?: number
+    password_generator_uppercase?: boolean
+    password_generator_lowercase?: boolean
+    password_generator_numbers?: boolean
+    password_generator_symbols?: boolean
+    default_vault_id?: string
+  }) =>
+    request<UserSettings>('/settings', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  listApiKeys: () => request<ApiKeyItem[]>('/api-keys'),
+
+  createApiKey: (payload: {
+    name: string
+    permission: ApiKeyPermission
+    vault_ids?: string[]
+    expires_in_days?: number | null
+  }) =>
+    request<CreatedApiKey>('/api-keys', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteApiKey: (keyId: string) =>
+    request<void>(`/api-keys/${keyId}`, {
+      method: 'DELETE',
+    }),
 
   searchUsers: (q: string) =>
     request<UserSummary[]>(`/users?q=${encodeURIComponent(q)}`),

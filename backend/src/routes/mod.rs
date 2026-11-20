@@ -1,3 +1,4 @@
+pub mod api_keys;
 pub mod credentials;
 pub mod health;
 pub mod users;
@@ -44,6 +45,12 @@ pub async fn require_vault_role(
     let role = get_user_vault_role(db, vault_id, user)
         .await?
         .ok_or_else(|| AppError::NotFound("Cartella non trovata o accesso negato".to_string()))?;
+
+    user.ensure_vault_allowed(vault_id)?;
+
+    if !allowed_roles.contains(&"viewer") {
+        user.require_write_permission()?;
+    }
 
     if !allowed_roles.contains(&role.as_str()) {
         return Err(AppError::Forbidden(

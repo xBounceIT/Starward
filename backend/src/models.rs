@@ -22,6 +22,64 @@ pub struct UserSummary {
     pub image: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateProfileRequest {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct UserSettingsDto {
+    pub theme: String,
+    pub password_generator_length: i32,
+    pub password_generator_uppercase: bool,
+    pub password_generator_lowercase: bool,
+    pub password_generator_numbers: bool,
+    pub password_generator_symbols: bool,
+    pub default_vault_id: Option<String>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateUserSettingsRequest {
+    pub theme: Option<String>,
+    pub password_generator_length: Option<i32>,
+    pub password_generator_uppercase: Option<bool>,
+    pub password_generator_lowercase: Option<bool>,
+    pub password_generator_numbers: Option<bool>,
+    pub password_generator_symbols: Option<bool>,
+    pub default_vault_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiKeyDto {
+    pub id: String,
+    pub name: String,
+    pub key_prefix: String,
+    pub permission: String,
+    pub vault_ids: Vec<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub is_expired: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatedApiKeyDto {
+    pub api_key: ApiKeyDto,
+    pub secret_key: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateApiKeyRequest {
+    pub name: String,
+    #[serde(default = "default_api_key_permission")]
+    pub permission: String,
+    #[serde(default)]
+    pub vault_ids: Vec<String>,
+    pub expires_in_days: Option<i64>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultMemberDto {
     pub id: String,
@@ -170,4 +228,8 @@ fn default_share_role() -> String {
 
 fn default_category() -> String {
     "login".to_string()
+}
+
+fn default_api_key_permission() -> String {
+    "read".to_string()
 }

@@ -140,6 +140,7 @@ async fn fetch_credential_dto(
     .await?;
 
     let row = row.ok_or_else(|| AppError::NotFound("Credenziale non trovata".to_string()))?;
+    user.ensure_vault_allowed(&row.vault_id)?;
     decrypt_credential_row(state, row)
 }
 
@@ -212,6 +213,9 @@ pub async fn list_credentials(
 
     let mut credentials = Vec::with_capacity(rows.len());
     for row in rows {
+        if !user.can_access_vault(&row.vault_id) {
+            continue;
+        }
         credentials.push(decrypt_credential_row(&state, row)?);
     }
 

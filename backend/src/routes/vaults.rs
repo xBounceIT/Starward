@@ -191,6 +191,9 @@ pub async fn list_vaults(
 
     let mut vaults = Vec::with_capacity(rows.len());
     for row in rows {
+        if !user.can_access_vault(&row.id) {
+            continue;
+        }
         vaults.push(build_vault_dto(&state.db, row, &user.id).await?);
     }
 
@@ -202,6 +205,14 @@ pub async fn create_vault(
     user: AuthenticatedUser,
     Json(payload): Json<CreateVaultRequest>,
 ) -> AppResult<(StatusCode, Json<VaultDto>)> {
+    user.require_write_permission()?;
+    if user.is_vault_restricted_api_key() {
+        return Err(AppError::Forbidden(
+            "Questa API Key è limitata a cartelle specifiche e non può creare nuove cartelle"
+                .to_string(),
+        ));
+    }
+
     let name = payload.name.trim();
     if name.is_empty() || name.len() > 80 {
         return Err(AppError::BadRequest(
@@ -509,6 +520,7 @@ pub async fn remove_member(
     user: AuthenticatedUser,
     Path((vault_id, member_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
+    user.require_write_permission()?;
     let caller_role =
         require_vault_role(&state.db, &vault_id, &user, &["owner", "editor", "viewer"]).await?;
 

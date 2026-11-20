@@ -10,7 +10,31 @@ const STARWARD_AUTH_SECRET =
   process.env.STARWARD_AUTH_SECRET ||
   'dev-starward-auth-secret-change-in-production-32chars'
 
-async function proxyToRust(request: Request, splat: string) {
+function extractIncomingApiKey(request: Request): string | null {
+  const xApiKey = request.headers.get('x-api-key')?.trim()
+  if (xApiKey) {
+    return xApiKey
+  }
+
+  const authHeader = request.headers.get('authorization')?.trim()
+  if (authHeader) {
+    const match = authHeader.match(/^Bearer\s+(sw_\S+)$/i)
+    if (match?.[1]) {
+      return match[1]
+    }
+  }
+
+  return null
+}
+
+async function resolveUpstreamAuthHeader(
+  request: Request,
+): Promise<string | Response> {
+  const apiKey = extractIncomingApiKey(request)
+  if (apiKey) {
+    return `Bearer ${apiKey}`
+  }
+
   await ensureAuthMigrated()
   const session = await auth.api.getSession({ headers: request.headers })
 
@@ -19,7 +43,8 @@ async function proxyToRust(request: Request, splat: string) {
       {
         error: {
           code: 'UNAUTHORIZED',
-          message: 'Sessione non valida o scaduta. Effettua il login.',
+          message:
+            'Sessione non valida o API Key mancante. Effettua il login o fornisci una API Key valida.',
         },
       },
       { status: 401 },
@@ -38,6 +63,15 @@ async function proxyToRust(request: Request, splat: string) {
     .setExpirationTime('60s')
     .sign(secretKey)
 
+  return `Bearer ${token}`
+}
+
+async function proxyToRust(request: Request, splat: string) {
+  const authOrResponse = await resolveUpstreamAuthHeader(request)
+  if (authOrResponse instanceof Response) {
+    return authOrResponse
+  }
+
   const incomingUrl = new URL(request.url)
   const targetUrl = new URL(
     `/api/${splat}${incomingUrl.search}`,
@@ -45,7 +79,7 @@ async function proxyToRust(request: Request, splat: string) {
   )
 
   const headers = new Headers()
-  headers.set('Authorization', `Bearer ${token}`)
+  headers.set('Authorization', authOrResponse)
   const contentType = request.headers.get('content-type')
   if (contentType) {
     headers.set('Content-Type', contentType)

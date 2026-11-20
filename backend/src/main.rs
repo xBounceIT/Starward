@@ -8,8 +8,8 @@ mod routes;
 use std::net::SocketAddr;
 
 use axum::{
-    http::{header, HeaderValue, Method},
-    routing::{get, patch, post},
+    http::{header, HeaderName, HeaderValue, Method},
+    routing::{delete, get, patch, post},
     Router,
 };
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -95,11 +95,31 @@ pub fn build_app(state: AppState) -> Router {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT]);
+        .allow_headers([
+            header::AUTHORIZATION,
+            header::CONTENT_TYPE,
+            header::ACCEPT,
+            HeaderName::from_static("x-api-key"),
+        ]);
 
     Router::new()
         .route("/api/health", get(routes::health::health_check))
-        .route("/api/me", get(routes::users::get_me))
+        .route(
+            "/api/me",
+            get(routes::users::get_me).patch(routes::users::update_me),
+        )
+        .route(
+            "/api/settings",
+            get(routes::users::get_settings).patch(routes::users::update_settings),
+        )
+        .route(
+            "/api/api-keys",
+            get(routes::api_keys::list_api_keys).post(routes::api_keys::create_api_key),
+        )
+        .route(
+            "/api/api-keys/{key_id}",
+            delete(routes::api_keys::delete_api_key),
+        )
         .route("/api/users", get(routes::users::list_users))
         .route(
             "/api/vaults",
@@ -521,6 +541,209 @@ mod tests {
         assert_eq!(res.status(), StatusCode::OK);
         let patched_note = read_json(res).await;
         assert_eq!(patched_note["favorite"], true);
+
+        // 10. User settings & display name customization
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let default_settings = read_json(res).await;
+        assert_eq!(default_settings["theme"], "dark");
+        assert_eq!(default_settings["password_generator_length"], 20);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/api/settings")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "theme": "light",
+                            "password_generator_length": 28,
+                            "password_generator_symbols": false,
+                            "default_vault_id": prod_id
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let updated_settings = read_json(res).await;
+        assert_eq!(updated_settings["theme"], "light");
+        assert_eq!(updated_settings["password_generator_length"], 28);
+        assert_eq!(updated_settings["password_generator_symbols"], false);
+        assert_eq!(updated_settings["default_vault_id"], prod_id);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "name": "Alice Security Lead" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let updated_me = read_json(res).await;
+        assert_eq!(updated_me["name"], "Alice Security Lead");
+
+        // Subsequent request with original JWT preserves customized name
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let me_again = read_json(res).await;
+        assert_eq!(me_again["name"], "Alice Security Lead");
+
+        // 11. API Keys: create read-only scoped key, test permissions and vault scope
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/api-keys")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "CI/CD Prod Reader",
+                            "permission": "read",
+                            "vault_ids": [prod_id],
+                            "expires_in_days": 30
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let created_key = read_json(res).await;
+        let api_key_id = created_key["api_key"]["id"].as_str().unwrap().to_string();
+        let secret_key = created_key["secret_key"].as_str().unwrap().to_string();
+        assert!(secret_key.starts_with("sw_live_"));
+
+        // Authenticate with Bearer API Key -> only sees scoped vault
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {secret_key}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let scoped_vaults = read_json(res).await;
+        assert_eq!(scoped_vaults.as_array().unwrap().len(), 1);
+        assert_eq!(scoped_vaults[0]["id"], prod_id);
+
+        // Authenticate with X-API-Key header -> reads credential in allowed vault
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials/{cred_id}"))
+                    .header("X-API-Key", &secret_key)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let api_cred = read_json(res).await;
+        assert_eq!(api_cred["password"], "UltraSecret!Password99");
+
+        // Read-only API Key cannot create or delete credentials
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/credentials/{cred_id}"))
+                    .header("Authorization", format!("Bearer {secret_key}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // API Key cannot create other API keys
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/api-keys")
+                    .header("Authorization", format!("Bearer {secret_key}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "name": "Escalation" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // Revoke API Key and verify it is no longer accepted
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/api-keys/{api_key_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {secret_key}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 
         // Clean up test users (cascades vaults, members, credentials, audit logs)
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3)")

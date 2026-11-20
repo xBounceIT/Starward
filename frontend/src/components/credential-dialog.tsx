@@ -34,7 +34,10 @@ import {
   getCategoryConfig,
   type CredentialFieldDef,
 } from '@/lib/credential-types'
-import { evaluatePasswordStrength } from '@/lib/vault-utils'
+import {
+  evaluatePasswordStrength,
+  type PasswordOptions,
+} from '@/lib/vault-utils'
 import { cn } from '@/lib/utils'
 
 interface CredentialDialogProps {
@@ -42,6 +45,7 @@ interface CredentialDialogProps {
   onOpenChange: (open: boolean) => void
   vaults: Vault[]
   defaultVaultId?: string
+  defaultPasswordOptions?: PasswordOptions
   editingCredential?: Credential | null
   onSaved: (credential: Credential) => void
 }
@@ -67,6 +71,7 @@ export function CredentialDialog({
   onOpenChange,
   vaults,
   defaultVaultId,
+  defaultPasswordOptions,
   editingCredential,
   onSaved,
 }: CredentialDialogProps) {
@@ -302,6 +307,7 @@ export function CredentialDialog({
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80">
                   <PasswordGenerator
+                    defaultOptions={defaultPasswordOptions}
                     onSelect={(generated) => {
                       setCoreValues((prev) => ({
                         ...prev,

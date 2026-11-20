@@ -3,19 +3,23 @@ import {
   ChevronDown,
   FolderPlus,
   History,
+  KeyRound,
   Layers,
   LogOut,
   Moon,
   MoreHorizontal,
   Pencil,
   Plus,
+  Settings,
   Share2,
   ShieldCheck,
+  Sparkles,
   Star,
   Sun,
   Trash2,
   Users,
 } from 'lucide-react'
+import type { SettingsTab } from '@/components/user-settings-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -69,6 +73,7 @@ interface AppSidebarProps {
   onShareVault: (vault: Vault) => void
   onOpenAudit: (vault: Vault) => void
   onDeleteVault: (vault: Vault) => void
+  onOpenSettings: (tab?: SettingsTab) => void
   onSignOut: () => void
 }
 
@@ -226,6 +231,7 @@ export function AppSidebar({
   onShareVault,
   onOpenAudit,
   onDeleteVault,
+  onOpenSettings,
   onSignOut,
 }: AppSidebarProps) {
   const { theme, toggleTheme } = useTheme()
@@ -478,6 +484,34 @@ export function AppSidebar({
                     </span>
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    setOpenMobile(false)
+                    onOpenSettings('profile')
+                  }}
+                >
+                  <Settings className="size-4" />
+                  Impostazioni account
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setOpenMobile(false)
+                    onOpenSettings('preferences')
+                  }}
+                >
+                  <Sparkles className="size-4" />
+                  Preferenze vault
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setOpenMobile(false)
+                    onOpenSettings('api-keys')
+                  }}
+                >
+                  <KeyRound className="size-4" />
+                  API Key
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={onSignOut}>
                   <LogOut className="size-4" />

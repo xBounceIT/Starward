@@ -19,6 +19,11 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
    - Password e note cifrate a riposo in Rust con **AES-256-GCM**, nonce casuali a 96-bit per ogni salvataggio e derivazione chiave **HKDF-SHA256**.
    - Interfaccia master-detail ispirata ai moderni password manager: ricerca istantanea (`Ctrl+K`), filtri per categoria, copia rapida in un clic, generatore di password con indicatore di robustezza, tema chiaro/scuro e layout responsive.
 
+4. **Impostazioni Utente & API Key Personali (`sw_live_...`)**
+   - Pannello impostazioni completo (Profilo, Sicurezza & Sessioni Attive, Preferenze Vault e Generatore Password, Gestione API Key).
+   - Generazione di **API Key personali** salvate esclusivamente come hash **SHA-256**, con scelta dei permessi (`read` o `read_write`), restrizione opzionale a specifiche cartelle e scadenza configurabile.
+   - Autenticazione programmatica diretta tramite header `Authorization: Bearer sw_live_...` o `X-API-Key: sw_live_...` su `/api/v1/*` e `/api/*`.
+
 ## Struttura del progetto
 
 ```text
