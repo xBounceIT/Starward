@@ -13,19 +13,12 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 const STORAGE_KEY = 'starward-theme'
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light')
+  const [theme, setThemeState] = useState<Theme>('dark')
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY)
-    const prefersDark = window.matchMedia(
-      '(prefers-color-scheme: dark)',
-    ).matches
     const resolved: Theme =
-      saved === 'dark' || saved === 'light'
-        ? saved
-        : prefersDark
-          ? 'dark'
-          : 'light'
+      saved === 'dark' || saved === 'light' ? saved : 'dark'
     setThemeState(resolved)
     document.documentElement.classList.toggle('dark', resolved === 'dark')
   }, [])

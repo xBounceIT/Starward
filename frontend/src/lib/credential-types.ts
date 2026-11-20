@@ -647,6 +647,115 @@ export function getCredentialQuickCopy(cred: Credential): {
   }
 }
 
+export function getCredentialListColumns(cred: Credential): {
+  primary: string
+  secondary: string
+} {
+  const fields = cred.fields ?? {}
+
+  switch (cred.category) {
+    case 'database': {
+      const primary = cred.username || fields.database_name || 'db_user'
+      const engine = fields.db_type || 'postgresql'
+      let secondary = ''
+      if (cred.url) {
+        if (cred.url.includes('://')) {
+          secondary = cred.url
+        } else {
+          const portPart =
+            fields.port && fields.port !== '5432' ? `:${fields.port}` : ''
+          secondary = `${engine}://${cred.url}${portPart}`
+        }
+      } else if (fields.database_name) {
+        secondary = `${engine}://localhost/${fields.database_name}`
+      }
+      return { primary, secondary }
+    }
+    case 'ssh': {
+      const primary = cred.username || 'root'
+      let secondary = ''
+      if (cred.url) {
+        if (cred.url.includes('://')) {
+          secondary = cred.url
+        } else {
+          const portPart =
+            fields.port && fields.port !== '22' ? `:${fields.port}` : ''
+          secondary = `ssh://${cred.url}${portPart}`
+        }
+      }
+      return { primary, secondary }
+    }
+    case 'api_key': {
+      let primary = cred.username
+      if (!primary) {
+        const raw = cred.password.trim()
+        const prefixMatch = raw.match(/^([a-zA-Z0-9]{2,5}[-_])/)
+        primary = prefixMatch
+          ? `${prefixMatch[1]}••••••••••••••••`
+          : 'sk-••••••••••••••••'
+      }
+      const secondary = cred.url || fields.provider || ''
+      return { primary, secondary }
+    }
+    case 'card': {
+      const primary = cred.username || fields.brand || 'Carta di pagamento'
+      const secondary = maskSecretValue(cred.password, 'card')
+      return { primary, secondary }
+    }
+    case 'license': {
+      const primary = cred.username || fields.product || 'Licenza software'
+      const secondary =
+        cred.url ||
+        (fields.expires_at ? `Scadenza: ${fields.expires_at}` : '')
+      return { primary, secondary }
+    }
+    case 'note': {
+      const firstLine = cred.notes
+        .split('\n')
+        .map((line) => line.trim())
+        .find(Boolean)
+      return {
+        primary: firstLine || 'Nota sicura',
+        secondary: 'Nota cifrata',
+      }
+    }
+    default: {
+      return {
+        primary: cred.username || cred.url || '—',
+        secondary: cred.username ? cred.url : '',
+      }
+    }
+  }
+}
+
+export function parseCredentialTags(cred: Credential): string[] {
+  const raw = cred.fields?.tags?.trim()
+  if (!raw) return []
+  if (raw.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((t) => String(t).trim())
+          .filter(Boolean)
+      }
+    } catch {
+      // fallback to comma split
+    }
+  }
+  return raw
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+}
+
+export function serializeCredentialTags(tags: string[]): string {
+  const unique = Array.from(
+    new Set(tags.map((t) => t.trim()).filter(Boolean)),
+  )
+  return unique.join(', ')
+}
+
 export function getSearchableMetadata(cred: Credential): string {
   const fields = cred.fields ?? {}
   return [
@@ -656,6 +765,7 @@ export function getSearchableMetadata(cred: Credential): string {
     fields.database_name,
     fields.brand,
     fields.product,
+    fields.tags,
   ]
     .filter(Boolean)
     .join(' ')

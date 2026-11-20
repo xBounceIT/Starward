@@ -215,6 +215,9 @@ export function CredentialDialog({
         }
       }
     }
+    if (extraValues.tags?.trim()) {
+      payloadFields.tags = extraValues.tags.trim()
+    }
 
     const payload = {
       vault_id: vaultId,
@@ -501,6 +504,21 @@ export function CredentialDialog({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {categoryConfig.fields.map(renderField)}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cred-tags">Tag (separati da virgola)</Label>
+              <Input
+                id="cred-tags"
+                placeholder="es. personale, produttività, cloud..."
+                value={extraValues.tags ?? ''}
+                onChange={(e) =>
+                  setExtraValues((prev) => ({
+                    ...prev,
+                    tags: e.target.value,
+                  }))
+                }
+              />
             </div>
 
             <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">

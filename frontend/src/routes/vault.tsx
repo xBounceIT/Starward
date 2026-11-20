@@ -6,7 +6,11 @@ import { AppSidebar, type VaultSelection } from '@/components/app-sidebar'
 import { AuditDialog } from '@/components/audit-dialog'
 import { CredentialDetail } from '@/components/credential-detail'
 import { CredentialDialog } from '@/components/credential-dialog'
-import { CredentialList } from '@/components/credential-list'
+import {
+  CredentialList,
+  type CredentialListStats,
+  type CredentialSortOption,
+} from '@/components/credential-list'
 import { ShareVaultDialog } from '@/components/share-vault-dialog'
 import {
   AlertDialog,
@@ -29,7 +33,13 @@ import { VaultDialog } from '@/components/vault-dialog'
 import { vaultApi, type Credential, type Vault } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
 import { getServerSessionFn } from '@/lib/auth-server'
-import { getSearchableMetadata } from '@/lib/credential-types'
+import {
+  getSearchableMetadata,
+  serializeCredentialTags,
+} from '@/lib/credential-types'
+import { isRecentlyAdded } from '@/lib/vault-utils'
+
+const LAST_ACCESSED_STORAGE_KEY = 'starward-last-accessed'
 
 export const Route = createFileRoute('/vault')({
   beforeLoad: async () => {
@@ -54,8 +64,13 @@ function VaultWorkspace() {
   const [selectedCredentialId, setSelectedCredentialId] = useState<
     string | null
   >(null)
+  const [detailClosed, setDetailClosed] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [sortBy, setSortBy] = useState<CredentialSortOption>('updated_desc')
+  const [lastAccessedMap, setLastAccessedMap] = useState<
+    Record<string, string>
+  >({})
 
   // Modals & confirmation dialogs state
   const [credDialogOpen, setCredDialogOpen] = useState(false)
@@ -72,6 +87,33 @@ function VaultWorkspace() {
   )
 
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LAST_ACCESSED_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          setLastAccessedMap(parsed)
+        }
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [])
+
+  const recordAccess = useCallback((credentialId: string) => {
+    const nowIso = new Date().toISOString()
+    setLastAccessedMap((prev) => {
+      const next = { ...prev, [credentialId]: nowIso }
+      try {
+        localStorage.setItem(LAST_ACCESSED_STORAGE_KEY, JSON.stringify(next))
+      } catch {
+        // ignore storage errors
+      }
+      return next
+    })
+  }, [])
 
   const refreshData = useCallback(async () => {
     try {
@@ -101,9 +143,28 @@ function VaultWorkspace() {
     return vaults.find((v) => v.id === selection.vaultId) ?? null
   }, [vaults, selection])
 
+  const scopedCredentials = useMemo(() => {
+    if (selection.type === 'vault') {
+      return allCredentials.filter((c) => c.vault_id === selection.vaultId)
+    }
+    return allCredentials
+  }, [allCredentials, selection])
+
+  const stats: CredentialListStats = useMemo(
+    () => ({
+      total: scopedCredentials.length,
+      favorites: scopedCredentials.filter((c) => c.favorite).length,
+      vaults: vaults.length,
+      recent: scopedCredentials.filter((c) =>
+        isRecentlyAdded(c.created_at, 7),
+      ).length,
+    }),
+    [scopedCredentials, vaults.length],
+  )
+
   const filteredCredentials = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    return allCredentials.filter((cred) => {
+    const matching = allCredentials.filter((cred) => {
       if (selection.type === 'favorites' && !cred.favorite) return false
       if (selection.type === 'vault' && cred.vault_id !== selection.vaultId)
         return false
@@ -115,15 +176,34 @@ function VaultWorkspace() {
       }
       return true
     })
-  }, [allCredentials, selection, searchQuery, categoryFilter])
 
-  const selectedCredential = useMemo(
-    () =>
+    return [...matching].sort((a, b) => {
+      switch (sortBy) {
+        case 'created_desc':
+          return (
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+        case 'title_asc':
+          return a.title.localeCompare(b.title, 'it')
+        case 'title_desc':
+          return b.title.localeCompare(a.title, 'it')
+        case 'updated_desc':
+        default:
+          return (
+            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+          )
+      }
+    })
+  }, [allCredentials, selection, searchQuery, categoryFilter, sortBy])
+
+  const selectedCredential = useMemo(() => {
+    if (detailClosed) return null
+    return (
       filteredCredentials.find((c) => c.id === selectedCredentialId) ??
       filteredCredentials[0] ??
-      null,
-    [filteredCredentials, selectedCredentialId],
-  )
+      null
+    )
+  }, [filteredCredentials, selectedCredentialId, detailClosed])
 
   const favoritesCount = useMemo(
     () => allCredentials.filter((c) => c.favorite).length,
@@ -170,6 +250,28 @@ function VaultWorkspace() {
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : 'Errore aggiornamento preferito',
+      )
+    }
+  }
+
+  const handleUpdateTags = async (cred: Credential, nextTags: string[]) => {
+    try {
+      const nextFields: Record<string, string> = { ...(cred.fields ?? {}) }
+      const serialized = serializeCredentialTags(nextTags)
+      if (serialized) {
+        nextFields.tags = serialized
+      } else {
+        delete nextFields.tags
+      }
+      const updated = await vaultApi.updateCredential(cred.id, {
+        fields: nextFields,
+      })
+      setAllCredentials((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c)),
+      )
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Errore aggiornamento tag',
       )
     }
   }
@@ -259,24 +361,35 @@ function VaultWorkspace() {
           <div
             className={
               mobileDetailOpen
-                ? 'hidden h-full lg:flex'
-                : 'flex h-full min-w-0 flex-1 lg:flex-none'
+                ? 'hidden h-full min-w-0 flex-1 lg:flex'
+                : 'flex h-full min-w-0 flex-1'
             }
           >
             <CredentialList
               selection={selection}
               activeVault={activeVault}
               credentials={filteredCredentials}
+              stats={stats}
               selectedCredentialId={selectedCredential?.id ?? null}
               searchQuery={searchQuery}
               categoryFilter={categoryFilter}
+              sortBy={sortBy}
               loading={loading}
               onSearchChange={setSearchQuery}
               onCategoryFilterChange={setCategoryFilter}
+              onSortChange={setSortBy}
               onSelectCredential={(cred) => {
                 setSelectedCredentialId(cred.id)
+                setDetailClosed(false)
                 setMobileDetailOpen(true)
+                recordAccess(cred.id)
               }}
+              onToggleFavorite={handleToggleFavorite}
+              onEditCredential={(cred) => {
+                setEditingCredential(cred)
+                setCredDialogOpen(true)
+              }}
+              onDeleteCredential={(cred) => setPendingDeleteCred(cred)}
               onNewCredential={() => {
                 setEditingCredential(null)
                 setCredDialogOpen(true)
@@ -292,26 +405,38 @@ function VaultWorkspace() {
           </div>
 
           {/* Right Detail Panel */}
-          <div
-            className={
-              mobileDetailOpen
-                ? 'flex h-full min-w-0 flex-1'
-                : 'hidden h-full min-w-0 flex-1 lg:flex'
-            }
-          >
-            <CredentialDetail
-              credential={selectedCredential}
-              onEdit={(cred) => {
-                setEditingCredential(cred)
-                setCredDialogOpen(true)
-              }}
-              onDelete={(cred) => setPendingDeleteCred(cred)}
-              onToggleFavorite={handleToggleFavorite}
-              onSelectVault={(vaultId) =>
-                handleSelectNavigation({ type: 'vault', vaultId })
+          {!detailClosed && (
+            <div
+              className={
+                mobileDetailOpen
+                  ? 'flex h-full w-full lg:w-auto'
+                  : 'hidden h-full lg:flex'
               }
-            />
-          </div>
+            >
+              <CredentialDetail
+                credential={selectedCredential}
+                lastAccessedAt={
+                  selectedCredential
+                    ? lastAccessedMap[selectedCredential.id]
+                    : undefined
+                }
+                onEdit={(cred) => {
+                  setEditingCredential(cred)
+                  setCredDialogOpen(true)
+                }}
+                onDelete={(cred) => setPendingDeleteCred(cred)}
+                onToggleFavorite={handleToggleFavorite}
+                onUpdateTags={handleUpdateTags}
+                onSelectVault={(vaultId) =>
+                  handleSelectNavigation({ type: 'vault', vaultId })
+                }
+                onClose={() => {
+                  setMobileDetailOpen(false)
+                  setDetailClosed(true)
+                }}
+              />
+            </div>
+          )}
         </div>
       </SidebarInset>
 
@@ -327,6 +452,8 @@ function VaultWorkspace() {
         onSaved={async (saved) => {
           await refreshData()
           setSelectedCredentialId(saved.id)
+          setDetailClosed(false)
+          recordAccess(saved.id)
         }}
       />
 

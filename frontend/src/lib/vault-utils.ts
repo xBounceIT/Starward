@@ -132,6 +132,104 @@ export function formatRelativeDate(iso: string): string {
   }
 }
 
+export function formatModifiedRelative(iso: string): string {
+  try {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return ''
+
+    const now = new Date()
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    ).getTime()
+    const startOfTarget = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    ).getTime()
+
+    const diffDays = Math.max(
+      0,
+      Math.round((startOfToday - startOfTarget) / 86400000),
+    )
+
+    if (diffDays === 0) return 'Modificata oggi'
+    if (diffDays === 1) return 'Modificata ieri'
+    if (diffDays < 7) return `Modificata ${diffDays} giorni fa`
+
+    const diffWeeks = Math.floor(diffDays / 7)
+    if (diffWeeks === 1) return 'Modificata 1 settimana fa'
+    if (diffWeeks < 5) return `Modificata ${diffWeeks} settimane fa`
+
+    const diffMonths = Math.max(1, Math.floor(diffDays / 30))
+    if (diffMonths === 1) return 'Modificata 1 mese fa'
+    if (diffMonths < 12) return `Modificata ${diffMonths} mesi fa`
+
+    return `Modificata il ${formatShortDate(iso)}`
+  } catch {
+    return ''
+  }
+}
+
+export function formatShortDate(iso: string): string {
+  try {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return iso
+    return new Intl.DateTimeFormat('it-IT', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+      .format(date)
+      .replace('.', '')
+  } catch {
+    return iso
+  }
+}
+
+export function formatAccessTimestamp(iso: string): string {
+  try {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return iso
+
+    const now = new Date()
+    const isToday =
+      date.getFullYear() === now.getFullYear() &&
+      date.getMonth() === now.getMonth() &&
+      date.getDate() === now.getDate()
+
+    const yesterday = new Date(now)
+    yesterday.setDate(now.getDate() - 1)
+    const isYesterday =
+      date.getFullYear() === yesterday.getFullYear() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getDate() === yesterday.getDate()
+
+    const timeStr = new Intl.DateTimeFormat('it-IT', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+
+    if (isToday) return `Oggi, ${timeStr}`
+    if (isYesterday) return `Ieri, ${timeStr}`
+    return `${formatShortDate(iso)}, ${timeStr}`
+  } catch {
+    return iso
+  }
+}
+
+export function isRecentlyAdded(iso: string, withinDays = 7): boolean {
+  try {
+    const date = new Date(iso)
+    if (Number.isNaN(date.getTime())) return false
+    const diffMs = Date.now() - date.getTime()
+    return diffMs >= 0 && diffMs <= withinDays * 86400000
+  } catch {
+    return false
+  }
+}
+
 export const VAULT_COLORS: Record<
   string,
   { label: string; bg: string; text: string; dot: string; ring: string }

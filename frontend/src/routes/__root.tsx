@@ -28,7 +28,7 @@ export const Route = createRootRoute({
 
 function RootDocument() {
   return (
-    <html lang="it" suppressHydrationWarning>
+    <html lang="it" className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
