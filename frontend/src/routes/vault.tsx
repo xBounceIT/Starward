@@ -433,6 +433,7 @@ function VaultWorkspace() {
                 onClose={() => {
                   setMobileDetailOpen(false)
                   setDetailClosed(true)
+                  setSelectedCredentialId(null)
                 }}
               />
             </div>

@@ -116,17 +116,32 @@ export function CredentialDetail({
 
   if (!credential) {
     return (
-      <section className="hidden h-full w-full flex-col items-center justify-center border-l border-border/80 bg-card/20 p-8 text-center lg:flex lg:w-[390px] lg:shrink-0 xl:w-[430px]">
-        <div className="flex size-14 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400">
-          <ShieldCheck className="size-7" />
+      <section className="hidden h-full w-full flex-col border-l border-border/80 bg-card/20 lg:flex lg:w-[390px] lg:shrink-0 xl:w-[430px]">
+        {onClose && (
+          <div className="flex justify-end px-5 pt-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              title="Chiudi pannello"
+              aria-label="Chiudi pannello"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
+        <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400">
+            <ShieldCheck className="size-7" />
+          </div>
+          <h3 className="mt-4 text-base font-semibold">
+            Seleziona una credenziale
+          </h3>
+          <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+            Scegli una voce dalla lista per visualizzare i dettagli, copiare i
+            segreti con un clic o modificarla.
+          </p>
         </div>
-        <h3 className="mt-4 text-base font-semibold">
-          Seleziona una credenziale
-        </h3>
-        <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-          Scegli una voce dalla lista per visualizzare i dettagli, copiare i
-          segreti con un clic o modificarla.
-        </p>
       </section>
     )
   }
