@@ -180,7 +180,7 @@ export function VaultDialog({
                     type="button"
                     onClick={() => setOwnerType('personal')}
                     className={cn(
-                      'flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+                      'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
                       ownerType === 'personal'
                         ? 'border-primary bg-accent text-accent-foreground'
                         : 'text-muted-foreground hover:bg-muted',
@@ -197,7 +197,7 @@ export function VaultDialog({
                       }
                     }}
                     className={cn(
-                      'flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+                      'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
                       ownerType === 'group'
                         ? 'border-primary bg-accent text-accent-foreground'
                         : 'text-muted-foreground hover:bg-muted',
@@ -299,7 +299,7 @@ export function VaultDialog({
                     type="button"
                     onClick={() => setIcon(opt.value)}
                     className={cn(
-                      'flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors',
+                      'flex cursor-pointer flex-col items-center gap-1 rounded-md border p-2 text-xs transition-colors',
                       icon === opt.value
                         ? 'border-primary bg-accent font-medium text-accent-foreground'
                         : 'text-muted-foreground hover:bg-muted',
@@ -321,7 +321,7 @@ export function VaultDialog({
                     type="button"
                     onClick={() => setColor(key)}
                     className={cn(
-                      'flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                      'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
                       color === key
                         ? 'border-primary bg-accent font-medium text-accent-foreground'
                         : 'hover:bg-muted',

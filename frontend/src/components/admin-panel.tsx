@@ -743,10 +743,10 @@ export function AdminPanel({
           <div className="min-w-0">
             <div className="flex items-center gap-2.5">
               <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex lg:hidden" />
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+              <div className="flex size-8 shrink-0 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
                 <ShieldCheck className="size-4.5" />
               </div>
-              <h2 className="truncate text-xl font-bold tracking-tight sync-security:text-lg sync-security:tracking-normal">
+              <h2 className="truncate font-bold text-lg tracking-normal">
                 Pannello Admin
               </h2>
               <Badge
@@ -765,8 +765,8 @@ export function AdminPanel({
 
         {/* Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <User className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -779,8 +779,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 sync-security:rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-amber-500/15 text-amber-400 rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
               <ShieldCheck className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -793,8 +793,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 sync-security:rounded-full">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-sky-500/15 text-sky-400 rounded-full">
               <Users className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -807,8 +807,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
               <Bot className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -821,8 +821,8 @@ export function AdminPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 sync-security:rounded-full">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-emerald-500/15 text-emerald-400 rounded-full">
               <Folder className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -865,7 +865,7 @@ export function AdminPanel({
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+              <div className="flex items-center gap-1 border border-border/70 bg-card/50 p-1 rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
                 {(
                   [
                     { value: '', label: 'Tutti' },
@@ -880,9 +880,9 @@ export function AdminPanel({
                       type="button"
                       onClick={() => setRoleFilter(pill.value)}
                       className={cn(
-                        'inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors sync-security:rounded-[5px]',
+                        'inline-flex h-8 items-center px-3 text-xs font-medium transition-colors rounded-md',
                         active
-                          ? 'bg-foreground text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                          ? 'bg-foreground text-background shadow-xs sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
                           : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
                       )}
                     >
@@ -898,7 +898,7 @@ export function AdminPanel({
                 size="sm"
                 disabled={refreshing}
                 onClick={() => loadData(true)}
-                className="h-10 gap-1.5 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs"
+                className="h-10 gap-1.5 border-border/70 bg-card/50 px-3.5 text-xs"
               >
                 <RefreshCw
                   className={cn('size-3.5', refreshing && 'animate-spin')}
@@ -928,8 +928,8 @@ export function AdminPanel({
                 ))}
               </div>
             ) : filteredUsers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
-                <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+              <div className="flex flex-col items-center justify-center border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+                <div className="flex size-12 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
                   <Users className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
@@ -950,9 +950,9 @@ export function AdminPanel({
                     <div
                       key={u.id}
                       className={cn(
-                        'flex flex-col justify-between gap-4 rounded-xl border px-4 py-3.5 transition-colors sync-security:rounded-lg sm:flex-row sm:items-center',
+                        'flex flex-col justify-between gap-4 border px-4 py-3.5 transition-colors rounded-lg sm:flex-row sm:items-center',
                         isSelf
-                          ? 'border-primary/40 bg-accent/50 sync-security:border-[#ff9c00]/70 sync-security:border-l-2 sync-security:bg-[#132442]'
+                          ? 'border-primary/40 bg-accent/50 sync-security:border-[#ff9c00]/70 sync-security:bg-[#132442]'
                           : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/75 sync-security:border-white/15 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/50 sync-security:hover:bg-[#132442]',
                       )}
                     >
@@ -1062,7 +1062,7 @@ export function AdminPanel({
                             size="icon-sm"
                             disabled={isSelf || isBusy}
                             onClick={() => setPendingDeleteUser(u)}
-                            className="size-8 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:opacity-40"
+                            className="size-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:opacity-40"
                             title={
                               isSelf
                                 ? 'Non puoi eliminare il tuo stesso account'
@@ -1115,7 +1115,7 @@ export function AdminPanel({
                   setEditingGroup(null)
                   setGroupDialogOpen(true)
                 }}
-                className="h-10 gap-1.5 rounded-xl px-3.5 text-xs"
+                className="h-10 gap-1.5 px-3.5 text-xs"
               >
                 <Plus className="size-4" />
                 Nuovo gruppo
@@ -1126,7 +1126,7 @@ export function AdminPanel({
                 size="sm"
                 disabled={refreshing}
                 onClick={() => loadData(true)}
-                className="h-10 gap-1.5 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs"
+                className="h-10 gap-1.5 border-border/70 bg-card/50 px-3.5 text-xs"
               >
                 <RefreshCw
                   className={cn('size-3.5', refreshing && 'animate-spin')}
@@ -1172,7 +1172,7 @@ export function AdminPanel({
                   <Button
                     type="button"
                     size="sm"
-                    className="mt-4 gap-1.5 rounded-lg"
+                    className="mt-4 gap-1.5"
                     onClick={() => {
                       setEditingGroup(null)
                       setGroupDialogOpen(true)
@@ -1235,7 +1235,7 @@ export function AdminPanel({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-8 gap-1.5 rounded-lg text-xs"
+                            className="h-8 gap-1.5 text-xs"
                             onClick={() => {
                               setExpandedGroupId(isExpanded ? null : g.id)
                               setMemberSearch('')
@@ -1254,7 +1254,7 @@ export function AdminPanel({
                             type="button"
                             variant="ghost"
                             size="icon-sm"
-                            className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+                            className="size-8 text-muted-foreground hover:text-foreground"
                             onClick={() => {
                               setEditingGroup(g)
                               setGroupDialogOpen(true)
@@ -1268,7 +1268,7 @@ export function AdminPanel({
                             variant="ghost"
                             size="icon-sm"
                             disabled={busyGroupKey === `del:${g.id}`}
-                            className="size-8 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                            className="size-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
                             onClick={() => setPendingDeleteGroup(g)}
                             title="Elimina gruppo"
                           >
@@ -1449,7 +1449,7 @@ export function AdminPanel({
                 placeholder="Cerca evento per utente, email, codice azione o dettagli..."
                 value={auditSearchQuery}
                 onChange={(e) => setAuditSearchQuery(e.target.value)}
-                className="h-10 rounded-xl border-border/70 bg-card/50 pr-10 pl-10 text-sm sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
+                className="h-10 border-border/70 bg-card/50 pr-10 pl-10 text-sm rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
               />
               {auditSearchQuery && (
                 <Button
@@ -1472,7 +1472,7 @@ export function AdminPanel({
                   variant="ghost"
                   size="sm"
                   onClick={resetAuditFilters}
-                  className="h-10 gap-1.5 rounded-xl px-3 text-xs text-muted-foreground hover:text-foreground sync-security:rounded-lg"
+                  className="h-10 gap-1.5 px-3 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <FilterX className="size-3.5" />
                   <span>Reset filtri</span>
@@ -1485,7 +1485,7 @@ export function AdminPanel({
                 size="sm"
                 disabled={auditRefreshing}
                 onClick={() => loadAudit(true)}
-                className="h-10 gap-1.5 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs sync-security:rounded-lg"
+                className="h-10 gap-1.5 border-border/70 bg-card/50 px-3.5 text-xs"
               >
                 <RefreshCw
                   className={cn('size-3.5', auditRefreshing && 'animate-spin')}
@@ -1500,7 +1500,7 @@ export function AdminPanel({
               {/* Interactive Filter Controls (Chi / Cosa / Quando) */}
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                 {/* 1. CHI (Attore & Ruolo) */}
-                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+                <div className="flex flex-col justify-between gap-2.5 border border-border/70 bg-card/45 p-3.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                       <User className="size-3.5 text-foreground sync-security:text-[#ff9c00]" />
@@ -1521,9 +1521,9 @@ export function AdminPanel({
                             type="button"
                             onClick={() => setAuditActorRole(pill.value)}
                             className={cn(
-                              'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors sync-security:rounded-[4px]',
+                              'px-2 py-0.5 text-[11px] font-medium transition-colors rounded-md',
                               active
-                                ? 'bg-foreground text-background sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                                ? 'bg-foreground text-background sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
                                 : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
                             )}
                           >
@@ -1553,7 +1553,7 @@ export function AdminPanel({
                 </div>
 
                 {/* 2. COSA (Azione & Risorsa) */}
-                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+                <div className="flex flex-col justify-between gap-2.5 border border-border/70 bg-card/45 p-3.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                       <Activity className="size-3.5 text-sky-400" />
@@ -1613,7 +1613,7 @@ export function AdminPanel({
                 </div>
 
                 {/* 3. QUANDO (Timestamp) */}
-                <div className="flex flex-col justify-between gap-2.5 rounded-xl border border-border/70 bg-card/45 p-3.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+                <div className="flex flex-col justify-between gap-2.5 border border-border/70 bg-card/45 p-3.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                       <Clock className="size-3.5 text-emerald-400" />
@@ -1641,9 +1641,9 @@ export function AdminPanel({
                           type="button"
                           onClick={() => setAuditPeriod(period.value)}
                           className={cn(
-                            'inline-flex h-6 items-center justify-center rounded-md px-2 text-[11px] font-medium transition-colors sync-security:rounded-[4px]',
+                            'inline-flex h-6 items-center justify-center px-2 text-[11px] font-medium transition-colors rounded-md',
                             active
-                              ? 'bg-foreground text-background shadow-2xs sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                              ? 'bg-foreground text-background shadow-2xs sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
                               : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
                           )}
                         >
@@ -1656,8 +1656,8 @@ export function AdminPanel({
               </div>
 
               {/* System Audit Events Table */}
-              <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/30 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-                <div className="hidden grid-cols-12 border-b border-border/70 bg-muted/40 px-4 py-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase sync-security:border-white/15 sync-security:bg-[#1a2c4b]/60 sync-security:tracking-[0.14em] sync-security:text-[#ff9c00] md:grid">
+              <div className="overflow-hidden border border-border/70 bg-card/30 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+                <div className="hidden grid-cols-12 border-b border-border/70 bg-muted/40 px-4 py-2.5 text-[11px] font-semibold text-muted-foreground uppercase sync-security:border-white/15 sync-security:bg-[#1a2c4b]/60 tracking-[0.14em] sync-security:text-[#ff9c00] md:grid">
                   <div className="col-span-4">Chi (Attore & Ruolo)</div>
                   <div className="col-span-5">Cosa (Azione & Dettagli)</div>
                   <div className="col-span-3 text-right">
@@ -1692,7 +1692,7 @@ export function AdminPanel({
                   </div>
                 ) : filteredAuditEvents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-                    <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+                    <div className="flex size-12 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
                       <FileClock className="size-6" />
                     </div>
                     <p className="mt-3 text-sm font-semibold">
@@ -1711,7 +1711,7 @@ export function AdminPanel({
                         variant="outline"
                         size="sm"
                         onClick={resetAuditFilters}
-                        className="mt-4 h-8 gap-1.5 rounded-lg text-xs"
+                        className="mt-4 h-8 gap-1.5 text-xs"
                       >
                         <FilterX className="size-3.5" />
                         Reimposta filtri

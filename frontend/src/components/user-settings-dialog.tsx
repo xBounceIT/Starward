@@ -847,7 +847,7 @@ export function UserSettingsDialog({
                           setTheme('dark')
                         }}
                         className={cn(
-                          'flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left text-sm transition-colors',
+                          'flex cursor-pointer items-center gap-2.5 rounded-md border p-3 text-left text-sm transition-colors',
                           prefTheme === 'dark'
                             ? 'border-primary bg-primary/10 font-medium text-foreground'
                             : 'hover:bg-muted/50 text-muted-foreground',
@@ -869,7 +869,7 @@ export function UserSettingsDialog({
                           setTheme('light')
                         }}
                         className={cn(
-                          'flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left text-sm transition-colors',
+                          'flex cursor-pointer items-center gap-2.5 rounded-md border p-3 text-left text-sm transition-colors',
                           prefTheme === 'light'
                             ? 'border-primary bg-primary/10 font-medium text-foreground'
                             : 'hover:bg-muted/50 text-muted-foreground',
@@ -891,7 +891,7 @@ export function UserSettingsDialog({
                           setTheme('sync-security')
                         }}
                         className={cn(
-                          'flex cursor-pointer items-center gap-2.5 rounded-xl border p-3 text-left text-sm transition-colors sync-security:rounded-lg',
+                          'flex cursor-pointer items-center gap-2.5 border p-3 text-left text-sm transition-colors rounded-md',
                           prefTheme === 'sync-security'
                             ? 'border-primary bg-primary/10 font-medium text-foreground sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00]/15'
                             : 'hover:bg-muted/50 text-muted-foreground',
@@ -1207,7 +1207,7 @@ export function UserSettingsDialog({
                               type="button"
                               onClick={() => toggleSelectedVault(v.id)}
                               className={cn(
-                                'flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors',
+                                'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
                                 selected
                                   ? 'border-primary bg-primary/10 font-medium text-foreground'
                                   : 'text-muted-foreground hover:bg-muted',

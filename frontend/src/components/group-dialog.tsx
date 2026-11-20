@@ -167,7 +167,7 @@ export function GroupDialog({
                   type="button"
                   onClick={() => setColor(key)}
                   className={cn(
-                    'flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                    'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
                     color === key
                       ? 'border-primary bg-accent font-medium text-accent-foreground'
                       : 'hover:bg-muted',
@@ -218,7 +218,7 @@ export function GroupDialog({
                       <button
                         type="button"
                         onClick={() => removeMember(u.id)}
-                        className="rounded-full p-0.5 hover:bg-background/60"
+                        className="rounded-md p-0.5 hover:bg-background/60"
                         aria-label={`Rimuovi ${u.name}`}
                       >
                         <X className="size-3" />

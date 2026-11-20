@@ -44,7 +44,8 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
+  --font-sans: 'Bai Jamjuree', ui-sans-serif, system-ui, sans-serif;
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -115,8 +116,6 @@
 }
 
 .sync-security {
-  --radius: 0.5rem;
-  --font-sans: 'Bai Jamjuree', ui-sans-serif, system-ui, sans-serif;
   --background: #000c20;
   --foreground: #ffffff;
   --card: #0e1b33;
@@ -160,18 +159,18 @@
     @apply bg-background text-foreground;
   }
 
-  /* Sync Security site-aligned typography, scrollbars, and brand primitives */
-  .sync-security body {
+  /* Site-aligned typography shared by every theme */
+  body {
     font-family: 'Bai Jamjuree', ui-sans-serif, system-ui, sans-serif;
   }
 
-  .sync-security h1,
-  .sync-security h2,
-  .sync-security h3,
-  .sync-security [data-slot="dialog-title"],
-  .sync-security [data-slot="alert-dialog-title"],
-  .sync-security [data-slot="card-title"],
-  .sync-security [data-slot="sheet-title"] {
+  h1,
+  h2,
+  h3,
+  [data-slot="dialog-title"],
+  [data-slot="alert-dialog-title"],
+  [data-slot="card-title"],
+  [data-slot="sheet-title"] {
     font-family: 'Michroma', 'Bai Jamjuree', sans-serif;
     font-weight: 400;
     letter-spacing: 0.01em;
@@ -205,20 +204,26 @@
   }
 }
 
-.sync-security [data-slot="sidebar-group-label"] {
+[data-slot="sidebar-group-label"] {
   font-family: 'Bai Jamjuree', sans-serif;
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+.sync-security [data-slot="sidebar-group-label"] {
   color: #ff9c00;
+}
+
+[data-slot="button"][data-variant="default"] {
+  font-weight: 700;
 }
 
 .sync-security [data-slot="button"][data-variant="default"] {
   border: 1px solid #ff9c00;
   background-color: #ff9c00;
   color: #1a2c4b;
-  font-weight: 700;
 }
 
 .sync-security [data-slot="button"][data-variant="default"]:hover:not(:disabled) {
@@ -238,11 +243,20 @@
   color: #ff9c00;
 }
 
+[data-slot="card"] {
+  border-radius: 8px;
+  box-shadow: none;
+}
+
 .sync-security [data-slot="card"] {
   background-color: #0e1b33;
   border-color: rgba(255, 255, 255, 0.16);
+}
+
+[data-slot="dialog-content"],
+[data-slot="alert-dialog-content"] {
   border-radius: 8px;
-  box-shadow: none;
+  border-top-width: 2px;
 }
 
 .sync-security [data-slot="dialog-content"],
@@ -250,7 +264,6 @@
   background-color: #0e1b33;
   border-color: rgba(255, 255, 255, 0.22);
   border-top: 2px solid #ff9c00;
-  border-radius: 8px;
 }
 
 .sync-security [data-slot="dropdown-menu-content"],

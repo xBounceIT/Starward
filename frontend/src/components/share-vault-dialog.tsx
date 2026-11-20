@@ -322,7 +322,7 @@ export function ShareVaultDialog({
                   type="button"
                   onClick={() => setShareMode('user')}
                   className={cn(
-                    'flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                    'flex cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors',
                     shareMode === 'user'
                       ? 'bg-background text-foreground shadow-xs'
                       : 'text-muted-foreground hover:text-foreground',
@@ -335,7 +335,7 @@ export function ShareVaultDialog({
                   type="button"
                   onClick={() => setShareMode('group')}
                   className={cn(
-                    'flex cursor-pointer items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-colors',
+                    'flex cursor-pointer items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium transition-colors',
                     shareMode === 'group'
                       ? 'bg-background text-foreground shadow-xs'
                       : 'text-muted-foreground hover:text-foreground',

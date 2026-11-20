@@ -411,7 +411,7 @@ export function ServiceAccountsSection({
                   type="button"
                   onClick={() => setStatusFilter(pill.value)}
                   className={cn(
-                    'inline-flex h-8 items-center rounded-lg px-3 text-xs font-medium transition-colors',
+                    'inline-flex h-8 items-center rounded-md px-3 text-xs font-medium transition-colors',
                     active
                       ? 'bg-foreground text-background shadow-xs sync-security:bg-[#ff9c00] sync-security:text-[#000c20]'
                       : 'text-muted-foreground hover:text-foreground',
@@ -429,7 +429,7 @@ export function ServiceAccountsSection({
             size="sm"
             disabled={refreshing}
             onClick={() => loadData(true)}
-            className="h-10 gap-1.5 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs"
+            className="h-10 gap-1.5 border-border/70 bg-card/50 px-3.5 text-xs"
           >
             <RefreshCw
               className={cn('size-3.5', refreshing && 'animate-spin')}
@@ -441,7 +441,7 @@ export function ServiceAccountsSection({
             type="button"
             size="sm"
             onClick={openCreateDialog}
-            className="h-10 gap-1.5 rounded-xl px-4 text-xs font-semibold"
+            className="h-10 gap-1.5 px-4 text-xs font-semibold"
           >
             <Plus className="size-4" />
             <span>Nuovo Service Account</span>
@@ -582,7 +582,7 @@ export function ServiceAccountsSection({
                   type="button"
                   size="sm"
                   onClick={openCreateDialog}
-                  className="mt-4 gap-1.5 rounded-xl"
+                  className="mt-4 gap-1.5"
                 >
                   <Plus className="size-4" />
                   Crea il primo Service Account
@@ -685,7 +685,7 @@ export function ServiceAccountsSection({
                           size="xs"
                           disabled={isBusy}
                           onClick={() => openEditDialog(sa)}
-                          className="h-8 gap-1 rounded-lg px-2.5 text-xs"
+                          className="h-8 gap-1 px-2.5 text-xs"
                         >
                           <Pencil className="size-3.5" />
                           <span>Modifica scope</span>
@@ -701,7 +701,7 @@ export function ServiceAccountsSection({
                             setNewKeyName('')
                             setNewKeyExpiry('90')
                           }}
-                          className="h-8 gap-1 rounded-lg px-2.5 text-xs"
+                          className="h-8 gap-1 px-2.5 text-xs"
                         >
                           <Plus className="size-3.5" />
                           <span>Chiave API</span>
@@ -713,7 +713,7 @@ export function ServiceAccountsSection({
                           size="icon-sm"
                           disabled={isBusy}
                           onClick={() => setPendingDeleteAccount(sa)}
-                          className="size-8 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                          className="size-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
                           title={`Elimina ${sa.name}`}
                           aria-label={`Elimina ${sa.name}`}
                         >

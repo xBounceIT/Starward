@@ -245,7 +245,7 @@ export function GroupDetailPanel({
               <Button
                 type="button"
                 size="sm"
-                className="h-9 gap-1.5 rounded-lg text-xs"
+                className="h-9 gap-1.5 text-xs"
                 onClick={() => onNewGroupVault(group)}
               >
                 <FolderPlus className="size-3.5" />
@@ -258,7 +258,7 @@ export function GroupDetailPanel({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-9 gap-1.5 rounded-lg text-xs"
+                  className="h-9 gap-1.5 text-xs"
                   onClick={() => onEditGroup(group)}
                 >
                   <Pencil className="size-3.5" />
@@ -268,7 +268,7 @@ export function GroupDetailPanel({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                  className="size-9 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
                   onClick={() => onDeleteGroup(group)}
                   title="Elimina gruppo"
                   aria-label="Elimina gruppo"
@@ -283,7 +283,7 @@ export function GroupDetailPanel({
                 variant="outline"
                 size="sm"
                 disabled={busyMemberId === selfMember.id}
-                className="h-9 gap-1.5 rounded-lg text-xs text-destructive hover:text-destructive"
+                className="h-9 gap-1.5 text-xs text-destructive hover:text-destructive"
                 onClick={() =>
                   handleRemoveMember(selfMember.id, selfMember.email, true)
                 }
@@ -373,7 +373,7 @@ export function GroupDetailPanel({
                   type="button"
                   variant="outline"
                   size="xs"
-                  className="gap-1 rounded-lg"
+                  className="gap-1"
                   onClick={() => onNewGroupVault(group)}
                 >
                   <FolderPlus className="size-3.5" />
@@ -398,7 +398,7 @@ export function GroupDetailPanel({
                   <Button
                     type="button"
                     size="sm"
-                    className="mt-4 gap-1.5 rounded-lg"
+                    className="mt-4 gap-1.5"
                     onClick={() => onNewGroupVault(group)}
                   >
                     <FolderPlus className="size-4" />
@@ -418,7 +418,7 @@ export function GroupDetailPanel({
                       key={vault.id}
                       type="button"
                       onClick={() => onSelectVault(vault.id)}
-                      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/45 px-4 py-3 text-left transition-colors hover:border-border hover:bg-card/80"
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-card/45 px-4 py-3 text-left transition-colors hover:border-border hover:bg-card/80"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div
@@ -476,7 +476,7 @@ export function GroupDetailPanel({
                       key={vault.id}
                       type="button"
                       onClick={() => onSelectVault(vault.id)}
-                      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border border-border/70 bg-card/45 px-4 py-3 text-left transition-colors hover:border-border hover:bg-card/80"
+                      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border/70 bg-card/45 px-4 py-3 text-left transition-colors hover:border-border hover:bg-card/80"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div

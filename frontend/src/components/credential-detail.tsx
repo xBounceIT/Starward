@@ -121,7 +121,7 @@ export function CredentialDetail({
             <button
               type="button"
               onClick={onClose}
-              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               title="Chiudi pannello"
               aria-label="Chiudi pannello"
             >
@@ -130,10 +130,10 @@ export function CredentialDetail({
           </div>
         )}
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+          <div className="flex size-14 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
             <ShieldCheck className="size-7" />
           </div>
-          <h3 className="mt-4 text-base font-semibold sync-security:text-sm sync-security:text-[#ff9c00]">
+          <h3 className="mt-4 font-semibold text-sm sync-security:text-[#ff9c00]">
             Seleziona una credenziale
           </h3>
           <p className="mt-1 max-w-xs text-xs text-muted-foreground">
@@ -274,13 +274,13 @@ export function CredentialDetail({
 
     return (
       <div key={field.key} className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground sync-security:text-[11px] sync-security:font-bold sync-security:tracking-wider sync-security:text-[#ff9c00] sync-security:uppercase">
+        <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
           {label}
         </p>
 
         <div
           className={cn(
-            'flex items-center justify-between gap-2 rounded-xl border border-border/70 bg-card/50 px-3.5 py-2.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]',
+            'flex items-center justify-between gap-2 border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]',
             isMultiline && 'items-start',
           )}
         >
@@ -334,7 +334,7 @@ export function CredentialDetail({
                 <button
                   type="button"
                   onClick={() => toggleReveal(field.key)}
-                  className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                  className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                   title={isRevealed ? 'Nascondi' : 'Mostra'}
                 >
                   {isRevealed ? (
@@ -350,7 +350,7 @@ export function CredentialDetail({
                   href={externalHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                  className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                   title="Apri URL"
                 >
                   <ExternalLink className="size-3.5" />
@@ -360,7 +360,7 @@ export function CredentialDetail({
               <button
                 type="button"
                 onClick={() => copyField(field.key, rawValue, label)}
-                className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                 title={`Copia ${label.toLowerCase()}`}
               >
                 {copiedField === field.key ? (
@@ -379,13 +379,13 @@ export function CredentialDetail({
   return (
     <section className="flex h-full w-full flex-col border-l border-border/80 bg-card/25 sync-security:border-white/20 sync-security:bg-[#000c20] lg:w-[390px] lg:shrink-0 xl:w-[430px]">
       {/* Top Close bar & Header */}
-      <div className="px-5 pt-3 pb-4 sync-security:border-b sync-security:border-white/15">
+      <div className="px-5 pt-3 pb-4 border-b sync-security:border-white/15">
         {onClose && (
           <div className="mb-1 flex justify-end">
             <button
               type="button"
               onClick={onClose}
-              className="flex size-7 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
               title="Chiudi pannello"
               aria-label="Chiudi pannello"
             >
@@ -398,11 +398,11 @@ export function CredentialDetail({
           <div className="flex min-w-0 items-center gap-3.5">
             <CredentialBrandIcon
               credential={credential}
-              className="size-12 rounded-xl sync-security:rounded-lg"
+              className="size-12 rounded-lg"
               iconClassName="size-6"
             />
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-bold leading-tight tracking-tight sync-security:text-base sync-security:tracking-normal">
+              <h2 className="truncate font-bold leading-tight text-base tracking-normal">
                 {credential.title}
               </h2>
               <div className="mt-0.5 flex items-center gap-1.5">
@@ -425,7 +425,7 @@ export function CredentialDetail({
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  className="size-8 rounded-lg border-border/80 bg-card/60 hover:bg-card"
+                  className="size-8 border-border/80 bg-card/60 hover:bg-card"
                   onClick={() => onToggleFavorite(credential)}
                   title={
                     credential.favorite
@@ -447,7 +447,7 @@ export function CredentialDetail({
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 gap-1.5 rounded-lg border-border/80 bg-card/60 px-3 text-xs font-medium hover:bg-card"
+                  className="h-8 gap-1.5 border-border/80 bg-card/60 px-3 text-xs font-medium hover:bg-card"
                   onClick={() => onEdit(credential)}
                 >
                   <Pencil className="size-3.5" />
@@ -462,7 +462,7 @@ export function CredentialDetail({
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  className="size-8 rounded-lg border-border/80 bg-card/60 hover:bg-card"
+                  className="size-8 border-border/80 bg-card/60 hover:bg-card"
                   aria-label="Altre opzioni"
                 >
                   <MoreHorizontal className="size-4" />
@@ -508,17 +508,17 @@ export function CredentialDetail({
         <div className="space-y-4 px-5 pt-4 pb-5">
           {/* Titolo Field */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground sync-security:text-[11px] sync-security:font-bold sync-security:tracking-wider sync-security:text-[#ff9c00] sync-security:uppercase">
+            <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
               Titolo
             </p>
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-border/70 bg-card/50 px-3.5 py-2.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex items-center justify-between gap-2 border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
               <span className="truncate text-sm text-foreground select-all">
                 {credential.title}
               </span>
               <button
                 type="button"
                 onClick={() => copyField('title', credential.title, 'Titolo')}
-                className="flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                 title="Copia titolo"
               >
                 {copiedField === 'title' ? (
@@ -538,7 +538,7 @@ export function CredentialDetail({
           {(credential.notes || categoryConfig.value === 'login' || categoryConfig.value === 'note') && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-muted-foreground sync-security:text-[11px] sync-security:font-bold sync-security:tracking-wider sync-security:text-[#ff9c00] sync-security:uppercase">
+                <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
                   Note
                 </p>
                 {credential.notes && (
@@ -556,7 +556,7 @@ export function CredentialDetail({
                   </button>
                 )}
               </div>
-              <div className="rounded-xl border border-border/70 bg-card/50 px-3.5 py-2.5 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+              <div className="border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                 {credential.notes ? (
                   <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
                     {credential.notes}
@@ -572,14 +572,14 @@ export function CredentialDetail({
 
           {/* Tag Section */}
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground sync-security:text-[11px] sync-security:font-bold sync-security:tracking-wider sync-security:text-[#ff9c00] sync-security:uppercase">
+            <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
               Tag
             </p>
             <div className="flex flex-wrap items-center gap-1.5">
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-border/80 bg-card/60 px-2.5 text-xs text-foreground/90 sync-security:rounded-[5px] sync-security:border-[#ff9c00]/35 sync-security:bg-[#0e1b33]"
+                  className="inline-flex h-7 items-center gap-1.5 border border-border/80 bg-card/60 px-2.5 text-xs text-foreground/90 rounded-[5px] sync-security:border-[#ff9c00]/35 sync-security:bg-[#0e1b33]"
                 >
                   <span>{tag}</span>
                   {canWrite && (
@@ -619,7 +619,7 @@ export function CredentialDetail({
                   <button
                     type="button"
                     onClick={() => setAddingTag(true)}
-                    className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-card/30 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-card/70 hover:text-foreground"
+                    className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-card/30 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-card/70 hover:text-foreground"
                   >
                     <Plus className="size-3" />
                     <span>Aggiungi tag</span>
@@ -677,7 +677,7 @@ export function CredentialDetail({
             const lbl = quickCopy.primary?.label || 'Username'
             if (val) copyField('quick-primary', val, lbl)
           }}
-          className="h-9 flex-1 gap-1.5 rounded-xl border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card sync-security:rounded-lg"
+          className="h-9 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
         >
           <Copy className="size-3.5 shrink-0" />
           <span className="truncate">
@@ -695,7 +695,7 @@ export function CredentialDetail({
             const lbl = quickCopy.secondary?.label || 'Password'
             if (val) copyField('quick-secondary', val, lbl)
           }}
-          className="h-9 flex-1 gap-1.5 rounded-xl border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card sync-security:rounded-lg"
+          className="h-9 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
         >
           <Copy className="size-3.5 shrink-0" />
           <span className="truncate">
@@ -708,7 +708,7 @@ export function CredentialDetail({
             href={normalizedUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 sync-security:rounded-lg sync-security:border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b] sync-security:hover:bg-[#000c20] sync-security:hover:text-[#ff9c00]"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 bg-primary px-3.5 text-xs text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 rounded-md border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b] sync-security:hover:bg-[#000c20] sync-security:hover:text-[#ff9c00]"
           >
             <ExternalLink className="size-3.5 shrink-0" />
             <span>Apri URL</span>
@@ -717,7 +717,7 @@ export function CredentialDetail({
           <button
             type="button"
             disabled
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground opacity-50 sync-security:rounded-lg sync-security:border sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/40 sync-security:text-[#1a2c4b]/70"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 bg-primary px-3.5 text-xs font-semibold text-primary-foreground opacity-50 rounded-md border sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/40 sync-security:text-[#1a2c4b]/70"
           >
             <ExternalLink className="size-3.5 shrink-0" />
             <span>Apri URL</span>

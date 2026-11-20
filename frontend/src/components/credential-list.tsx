@@ -313,7 +313,7 @@ export function CredentialList({
                   )}
                 />
               ) : null}
-              <h2 className="truncate text-xl font-bold tracking-tight sync-security:text-lg sync-security:tracking-normal">
+              <h2 className="truncate font-bold text-lg tracking-normal">
                 {headerTitle}
               </h2>
               {activeVault?.owner_group_name && (
@@ -362,7 +362,7 @@ export function CredentialList({
               <Button
                 variant={activeVault.is_shared ? 'secondary' : 'outline'}
                 size="sm"
-                className="h-8 gap-1.5 rounded-lg text-xs"
+                className="h-8 gap-1.5 text-xs"
                 onClick={() => onShareVault(activeVault)}
               >
                 {activeVault.is_shared ? (
@@ -377,7 +377,7 @@ export function CredentialList({
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" className="rounded-lg">
+                  <Button variant="ghost" size="icon-sm" className="">
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -435,8 +435,8 @@ export function CredentialList({
 
         {/* 4 Summary KPI Cards */}
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <KeyRound className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -449,8 +449,8 @@ export function CredentialList({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 sync-security:rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-amber-500/15 text-amber-400 rounded-full sync-security:bg-[#ff9c00]/20 sync-security:text-[#ff9c00]">
               <Star className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -463,8 +463,8 @@ export function CredentialList({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400 sync-security:rounded-full">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-sky-500/15 text-sky-400 rounded-full">
               <Folder className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -477,8 +477,8 @@ export function CredentialList({
             </div>
           </div>
 
-          <div className="flex items-center gap-3.5 rounded-xl border border-border/70 bg-card/50 px-4 py-3 sync-security:rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 sync-security:rounded-full">
+          <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-emerald-500/15 text-emerald-400 rounded-full">
               <Clock className="size-4.5" />
             </div>
             <div className="min-w-0">
@@ -501,7 +501,7 @@ export function CredentialList({
               placeholder="Cerca titolo, username, URL..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="h-10 rounded-xl border-border/70 bg-card/50 pr-24 pl-10 text-sm sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
+              className="h-10 border-border/70 bg-card/50 pr-24 pl-10 text-sm rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
             />
             <div className="absolute top-1/2 right-2.5 flex -translate-y-1/2 items-center gap-1.5">
               {searchQuery && (
@@ -527,7 +527,7 @@ export function CredentialList({
               <Button
                 type="button"
                 variant="outline"
-                className="h-10 gap-2 rounded-xl border-border/70 bg-card/50 px-3.5 text-xs font-medium hover:bg-card sync-security:rounded-lg"
+                className="h-10 gap-2 border-border/70 bg-card/50 px-3.5 text-xs font-medium hover:bg-card"
               >
                 <ArrowUpDown className="size-3.5 text-muted-foreground" />
                 <span>{currentSortLabel}</span>
@@ -549,16 +549,16 @@ export function CredentialList({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex h-10 items-center gap-0.5 rounded-xl border border-border/70 bg-card/50 p-1 sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+          <div className="flex h-10 items-center gap-0.5 border border-border/70 bg-card/50 p-1 rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
             <button
               type="button"
               onClick={() => setViewMode('list')}
               title="Vista lista"
               aria-label="Vista lista"
               className={cn(
-                'flex size-8 items-center justify-center rounded-lg transition-colors sync-security:rounded-[5px]',
+                'flex size-8 items-center justify-center transition-colors rounded-md',
                 viewMode === 'list'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-border sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b] ring-0'
                   : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
@@ -570,9 +570,9 @@ export function CredentialList({
               title="Vista griglia"
               aria-label="Vista griglia"
               className={cn(
-                'flex size-8 items-center justify-center rounded-lg transition-colors sync-security:rounded-[5px]',
+                'flex size-8 items-center justify-center transition-colors rounded-md',
                 viewMode === 'grid'
-                  ? 'bg-accent text-accent-foreground shadow-xs ring-1 ring-border sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b] sync-security:ring-0'
+                  ? 'bg-accent text-accent-foreground shadow-xs ring-border sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b] ring-0'
                   : 'text-muted-foreground hover:text-foreground sync-security:hover:text-[#ff9c00]',
               )}
             >
@@ -591,9 +591,9 @@ export function CredentialList({
               type="button"
               onClick={() => onCategoryFilterChange('')}
               className={cn(
-                'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs transition-colors sync-security:rounded-[5px]',
+                'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
                 categoryFilter === ''
-                  ? 'bg-foreground font-semibold text-background shadow-xs sync-security:border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                  ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
                   : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
               )}
             >
@@ -609,9 +609,9 @@ export function CredentialList({
                     onCategoryFilterChange(active ? '' : cat.value)
                   }
                   className={cn(
-                    'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-xs transition-colors sync-security:rounded-[5px]',
+                    'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
                     active
-                      ? 'bg-foreground font-semibold text-background shadow-xs sync-security:border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] sync-security:font-bold sync-security:text-[#1a2c4b]'
+                      ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
                       : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
                   )}
                 >
@@ -652,8 +652,8 @@ export function CredentialList({
             ))}
           </div>
         ) : credentials.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center sync-security:rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
-            <div className="flex size-12 items-center justify-center rounded-2xl bg-muted text-foreground sync-security:rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
+          <div className="flex flex-col items-center justify-center border border-dashed border-border/70 bg-card/20 px-6 py-16 text-center rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
+            <div className="flex size-12 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <KeyRound className="size-6" />
             </div>
             <p className="mt-3 text-sm font-semibold">
@@ -667,7 +667,7 @@ export function CredentialList({
             {canCreateInCurrent && !searchQuery && !categoryFilter && (
               <Button
                 size="sm"
-                className="mt-4 rounded-lg"
+                className="mt-4"
                 onClick={onNewCredential}
               >
                 <Plus className="size-4" />
@@ -700,9 +700,9 @@ export function CredentialList({
                     }
                   }}
                   className={cn(
-                    'group relative flex cursor-pointer flex-col justify-between gap-3 rounded-xl border p-4 text-left transition-all sync-security:rounded-lg',
+                    'group relative flex cursor-pointer flex-col justify-between gap-3 border p-4 text-left transition-all rounded-lg',
                     isSelected
-                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00] sync-security:border-l-2 sync-security:bg-[#132442] sync-security:ring-0 sync-security:shadow-none'
+                      ? 'border-primary/60 bg-accent/70 ring-ring/30 sync-security:border-[#ff9c00] sync-security:bg-[#132442] ring-0 shadow-none'
                       : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
                   )}
                 >
@@ -710,7 +710,7 @@ export function CredentialList({
                     <div className="flex min-w-0 items-center gap-3">
                       <CredentialBrandIcon
                         credential={cred}
-                        className="size-10 rounded-xl sync-security:rounded-lg"
+                        className="size-10 rounded-lg"
                         iconClassName="size-5"
                       />
                       <div className="min-w-0">
@@ -799,15 +799,15 @@ export function CredentialList({
                     }
                   }}
                   className={cn(
-                    'group relative flex cursor-pointer items-center gap-4 rounded-xl border px-4 py-3 text-left transition-all sync-security:rounded-lg',
+                    'group relative flex cursor-pointer items-center gap-4 border px-4 py-3 text-left transition-all rounded-lg',
                     isSelected
-                      ? 'border-primary/60 bg-accent/70 shadow-xs ring-1 ring-ring/30 sync-security:border-[#ff9c00] sync-security:border-l-2 sync-security:bg-[#132442] sync-security:ring-0 sync-security:shadow-none'
+                      ? 'border-primary/60 bg-accent/70 ring-ring/30 sync-security:border-[#ff9c00] sync-security:bg-[#132442] ring-0 shadow-none'
                       : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
                   )}
                 >
                   <CredentialBrandIcon
                     credential={cred}
-                    className="size-10 rounded-xl sync-security:rounded-lg"
+                    className="size-10 rounded-lg"
                     iconClassName="size-5"
                   />
 

@@ -428,7 +428,7 @@ export function ServiceAccountDialog({
                             type="button"
                             onClick={() => toggleVault(vault.id)}
                             className={cn(
-                              'flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors',
+                              'flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors',
                               checked
                                 ? 'border-primary/50 bg-primary/10 sync-security:border-[#ff9c00]/50 sync-security:bg-[#ff9c00]/10'
                                 : 'border-transparent bg-card/60 hover:border-border/70 hover:bg-card',
@@ -554,7 +554,7 @@ export function ServiceAccountDialog({
                             type="button"
                             onClick={() => toggleCredential(cred.id)}
                             className={cn(
-                              'flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors',
+                              'flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors',
                               checked
                                 ? 'border-primary/50 bg-primary/10 sync-security:border-[#ff9c00]/50 sync-security:bg-[#ff9c00]/10'
                                 : 'border-transparent bg-card/60 hover:border-border/70 hover:bg-card',
