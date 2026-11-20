@@ -18,6 +18,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{config::Config, crypto::VaultCrypto};
 
+pub const APP_VERSION: &str = env!("STARWARD_APP_VERSION");
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
@@ -121,7 +123,11 @@ async fn main() {
     let state = AppState { db, config, crypto };
     let app = build_app(state);
 
-    tracing::info!("Starward Rust backend (PostgreSQL) listening on http://{}", addr);
+    tracing::info!(
+        "Starward Rust backend v{} (PostgreSQL) listening on http://{}",
+        APP_VERSION,
+        addr
+    );
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Failed to bind TCP listener");
@@ -166,6 +172,12 @@ mod tests {
     async fn read_json(res: axum::response::Response) -> Value {
         let bytes = res.into_body().collect().await.unwrap().to_bytes();
         serde_json::from_slice(&bytes).unwrap()
+    }
+
+    #[test]
+    fn app_version_is_populated() {
+        assert!(!APP_VERSION.is_empty());
+        assert!(!APP_VERSION.starts_with('v'));
     }
 
     #[tokio::test]

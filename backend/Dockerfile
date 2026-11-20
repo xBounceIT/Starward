@@ -9,9 +9,12 @@ RUN mkdir -p src migrations \
     && echo "fn main() {}" > src/main.rs \
     && touch migrations/001_init.sql \
     && cargo build --release --locked \
-    && rm -rf src migrations target/release/deps/starward_backend* target/release/starward-backend*
+    && rm -rf src migrations target/release/deps/starward_backend* target/release/starward-backend* target/release/.fingerprint/starward-backend*
 
 # Build the real application binary
+ARG APP_VERSION=0.0.0-dev
+ENV APP_VERSION=${APP_VERSION}
+COPY build.rs ./build.rs
 COPY migrations ./migrations
 COPY src ./src
 RUN cargo build --release --locked
@@ -22,12 +25,19 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --create-home starward
 
+ARG APP_VERSION=0.0.0-dev
+
 WORKDIR /app
 COPY --from=builder /app/target/release/starward-backend /usr/local/bin/starward-backend
 
 ENV HOST=0.0.0.0
 ENV PORT=8080
 ENV RUST_LOG=starward_backend=info,tower_http=info
+ENV APP_VERSION=${APP_VERSION}
+
+LABEL org.opencontainers.image.title="Starward Backend" \
+      org.opencontainers.image.description="Starward Password Manager - Rust Axum encrypted vault backend" \
+      org.opencontainers.image.version="${APP_VERSION}"
 
 USER starward
 EXPOSE 8080

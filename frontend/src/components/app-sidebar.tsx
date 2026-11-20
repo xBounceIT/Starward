@@ -25,6 +25,7 @@ import { Separator } from '@/components/ui/separator'
 import { VaultIcon } from '@/components/vault-icon'
 import type { Vault } from '@/lib/api'
 import { cn, getInitials, getVaultColor } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 
 export type VaultSelection =
   | { type: 'all' }
@@ -74,7 +75,7 @@ export function AppSidebar({
               Starward
             </h1>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              Password Vault
+              Password Vault · v{APP_VERSION}
             </p>
           </div>
         </div>

@@ -40,6 +40,37 @@ Starward/
         └── components/      # Componenti shadcn/ui e moduli vault/condivisione
 ```
 
+## Deploy da immagini GHCR pre-compilate (Produzione)
+
+Le immagini Docker ufficiali vengono compilate e pubblicate automaticamente su **GitHub Container Registry (GHCR)** ad ogni tag `vX.Y.Z`:
+- `ghcr.io/xbounceit/starward-backend`
+- `ghcr.io/xbounceit/starward-frontend`
+
+Per avviare lo stack senza compilare in locale:
+
+```bash
+# 1. Copia e personalizza .env (opzionalmente imposta STARWARD_VERSION=v1.0.0)
+cp .env.example .env
+
+# 2. Scarica le immagini da GHCR e avvia tutti i servizi
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+## Release automatiche tramite tag (`vX.Y.Z`)
+
+Non è necessario aprire PR per il bump della versione: `Cargo.toml` e `package.json` mantengono `0.0.0-dev` e la versione dell'app (esposta su UI, log di avvio, `/api/health` e metadati OCI delle immagini Docker) viene derivata automaticamente dal tag Git spinto:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Il workflow `.github/workflows/release.yml` esegue automaticamente:
+1. Validazione del tag SemVer (`vX.Y.Z` o prerelease `vX.Y.Z-rc.1`) e derivazione di `APP_VERSION` (`X.Y.Z`).
+2. Build e push parallelo su GHCR delle immagini `starward-backend` e `starward-frontend` con tag SemVer (`X.Y.Z`, `vX.Y.Z`, `X.Y`, `X` e `latest` per le release stabili).
+3. Creazione della GitHub Release con patch notes autogenerate (configurate in `.github/release.yml`), riferimenti alle immagini GHCR e allegato `docker-compose.prod.yml`.
+
 ## Deploy rapido con Docker Compose (build sul momento)
 
 Per compilare e avviare l'intero stack (**PostgreSQL 17 + Backend Rust + Frontend TanStack Start**) con un solo comando:

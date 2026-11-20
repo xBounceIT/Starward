@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { APP_VERSION } from '@/lib/version'
 
 export const Route = createFileRoute('/api/health')({
   server: {
@@ -7,6 +8,7 @@ export const Route = createFileRoute('/api/health')({
         Response.json({
           status: 'ok',
           service: 'starward-frontend',
+          version: APP_VERSION,
         }),
     },
   },

@@ -11,6 +11,7 @@ pub async fn health_check(State(state): State<AppState>) -> AppResult<Json<Value
     Ok(Json(json!({
         "status": "ok",
         "service": "starward-backend",
+        "version": crate::APP_VERSION,
         "database": "postgresql",
         "encryption": "AES-256-GCM"
     })))

@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { Readable } from 'node:stream'
@@ -7,6 +7,18 @@ import serverEntry from './dist/server/server.js'
 const HOST = process.env.HOST || '0.0.0.0'
 const PORT = Number(process.env.PORT || 3000)
 const CLIENT_DIR = resolve(process.cwd(), 'dist/client')
+const APP_VERSION = (() => {
+  const fromEnv = process.env.APP_VERSION?.trim().replace(/^v/, '')
+  if (fromEnv) return fromEnv
+  try {
+    const pkg = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+    )
+    return pkg.version || '0.0.0-dev'
+  } catch {
+    return '0.0.0-dev'
+  }
+})()
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -141,5 +153,7 @@ const server = createServer(async (req, res) => {
 })
 
 server.listen(PORT, HOST, () => {
-  console.log(`Starward frontend listening on http://${HOST}:${PORT}`)
+  console.log(
+    `Starward frontend v${APP_VERSION} listening on http://${HOST}:${PORT}`,
+  )
 })
