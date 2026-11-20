@@ -116,31 +116,36 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             let member_id = Uuid::new_v4().to_string();
             let mut tx = state.db.begin().await?;
 
-            sqlx::query(
+            let inserted_vault: Option<(String,)> = sqlx::query_as(
                 r#"
                 INSERT INTO vaults (id, name, description, icon, color, owner_id, is_personal, created_at, updated_at)
                 VALUES ($1, 'Personale', 'Le tue credenziali private', 'lock', 'indigo', $2, TRUE, $3, $3)
+                ON CONFLICT (owner_id) WHERE is_personal = TRUE DO NOTHING
+                RETURNING id
                 "#,
             )
             .bind(&vault_id)
             .bind(&claims.sub)
             .bind(now)
-            .execute(&mut *tx)
+            .fetch_optional(&mut *tx)
             .await?;
 
-            sqlx::query(
-                r#"
-                INSERT INTO vault_members (id, vault_id, user_id, member_email, role, shared_by, created_at)
-                VALUES ($1, $2, $3, $4, 'owner', $3, $5)
-                "#,
-            )
-            .bind(&member_id)
-            .bind(&vault_id)
-            .bind(&claims.sub)
-            .bind(&email_normalized)
-            .bind(now)
-            .execute(&mut *tx)
-            .await?;
+            if let Some((created_vault_id,)) = inserted_vault {
+                sqlx::query(
+                    r#"
+                    INSERT INTO vault_members (id, vault_id, user_id, member_email, role, shared_by, created_at)
+                    VALUES ($1, $2, $3, $4, 'owner', $3, $5)
+                    ON CONFLICT (vault_id, LOWER(member_email)) DO NOTHING
+                    "#,
+                )
+                .bind(&member_id)
+                .bind(&created_vault_id)
+                .bind(&claims.sub)
+                .bind(&email_normalized)
+                .bind(now)
+                .execute(&mut *tx)
+                .await?;
+            }
 
             tx.commit().await?;
         }

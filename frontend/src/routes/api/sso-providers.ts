@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { getSsoProvidersStatus } from '@/lib/sso-config'
+import { getEnabledSsoProviders } from '@/lib/sso-config'
 
 export const Route = createFileRoute('/api/sso-providers')({
   server: {
     handlers: {
       GET: async () => {
-        const providers = getSsoProvidersStatus()
+        const providers = getEnabledSsoProviders()
         return Response.json({ providers })
       },
     },

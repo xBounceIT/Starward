@@ -8,6 +8,12 @@ export interface SsoProviderDescriptor {
   envHint: string
 }
 
+export interface PublicSsoProvider {
+  id: string
+  name: string
+  kind: 'oidc' | 'social'
+}
+
 export function getSsoProvidersStatus(): SsoProviderDescriptor[] {
   const oidcEnabled = Boolean(
     process.env.SSO_OIDC_CLIENT_ID &&
@@ -54,4 +60,10 @@ export function getSsoProvidersStatus(): SsoProviderDescriptor[] {
       envHint: 'MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET',
     },
   ]
+}
+
+export function getEnabledSsoProviders(): PublicSsoProvider[] {
+  return getSsoProvidersStatus()
+    .filter((provider) => provider.enabled)
+    .map(({ id, name, kind }) => ({ id, name, kind }))
 }

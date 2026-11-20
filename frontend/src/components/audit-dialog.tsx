@@ -8,8 +8,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Skeleton } from '@/components/ui/skeleton'
 import { vaultApi, type AuditLog, type Vault } from '@/lib/api'
-import { formatRelativeDate } from '@/lib/utils'
+import { formatRelativeDate } from '@/lib/vault-utils'
 
 interface AuditDialogProps {
   open: boolean
@@ -55,9 +56,17 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
 
         <ScrollArea className="max-h-80 pr-3">
           {loading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Caricamento attività...
-            </p>
+            <div className="space-y-2.5 py-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
+              ))}
+            </div>
           ) : logs.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Nessuna attività registrata finora.

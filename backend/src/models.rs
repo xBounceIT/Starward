@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -98,6 +100,7 @@ pub struct CredentialDto {
     pub url: String,
     pub category: String,
     pub notes: String,
+    pub fields: BTreeMap<String, String>,
     pub favorite: bool,
     pub created_by: String,
     pub created_by_name: String,
@@ -113,6 +116,7 @@ pub struct CreateCredentialRequest {
     pub title: String,
     #[serde(default)]
     pub username: String,
+    #[serde(default)]
     pub password: String,
     #[serde(default)]
     pub url: String,
@@ -120,6 +124,8 @@ pub struct CreateCredentialRequest {
     pub category: String,
     #[serde(default)]
     pub notes: String,
+    #[serde(default)]
+    pub fields: BTreeMap<String, String>,
     #[serde(default)]
     pub favorite: bool,
 }
@@ -133,6 +139,7 @@ pub struct UpdateCredentialRequest {
     pub url: Option<String>,
     pub category: Option<String>,
     pub notes: Option<String>,
+    pub fields: Option<BTreeMap<String, String>>,
     pub favorite: Option<bool>,
 }
 

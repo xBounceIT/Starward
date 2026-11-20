@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, Menu, X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppSidebar, type VaultSelection } from '@/components/app-sidebar'
 import { AuditDialog } from '@/components/audit-dialog'
@@ -8,11 +8,28 @@ import { CredentialDetail } from '@/components/credential-detail'
 import { CredentialDialog } from '@/components/credential-dialog'
 import { CredentialList } from '@/components/credential-list'
 import { ShareVaultDialog } from '@/components/share-vault-dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
 import { VaultDialog } from '@/components/vault-dialog'
 import { vaultApi, type Credential, type Vault } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
 import { getServerSessionFn } from '@/lib/auth-server'
+import { getSearchableMetadata } from '@/lib/credential-types'
 
 export const Route = createFileRoute('/vault')({
   beforeLoad: async () => {
@@ -40,7 +57,7 @@ function VaultWorkspace() {
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
 
-  // Modals state
+  // Modals & confirmation dialogs state
   const [credDialogOpen, setCredDialogOpen] = useState(false)
   const [editingCredential, setEditingCredential] =
     useState<Credential | null>(null)
@@ -48,30 +65,13 @@ function VaultWorkspace() {
   const [editingVault, setEditingVault] = useState<Vault | null>(null)
   const [shareVaultTarget, setShareVaultTarget] = useState<Vault | null>(null)
   const [auditVaultTarget, setAuditVaultTarget] = useState<Vault | null>(null)
+  const [pendingDeleteCred, setPendingDeleteCred] =
+    useState<Credential | null>(null)
+  const [pendingDeleteVault, setPendingDeleteVault] = useState<Vault | null>(
+    null,
+  )
 
-  // Responsive mobile drawer & theme
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
-  const [darkMode, setDarkMode] = useState(false)
-
-  useEffect(() => {
-    const saved = localStorage.getItem('starward-theme')
-    const prefersDark = window.matchMedia(
-      '(prefers-color-scheme: dark)',
-    ).matches
-    const isDark = saved ? saved === 'dark' : prefersDark
-    setDarkMode(isDark)
-    document.documentElement.classList.toggle('dark', isDark)
-  }, [])
-
-  const toggleDarkMode = () => {
-    setDarkMode((prev) => {
-      const next = !prev
-      document.documentElement.classList.toggle('dark', next)
-      localStorage.setItem('starward-theme', next ? 'dark' : 'light')
-      return next
-    })
-  }
 
   const refreshData = useCallback(async () => {
     try {
@@ -110,7 +110,7 @@ function VaultWorkspace() {
       if (categoryFilter && cred.category !== categoryFilter) return false
       if (q) {
         const hay =
-          `${cred.title} ${cred.username} ${cred.url} ${cred.vault_name}`.toLowerCase()
+          `${cred.title} ${cred.username} ${cred.url} ${cred.vault_name} ${getSearchableMetadata(cred)}`.toLowerCase()
         if (!hay.includes(q)) return false
       }
       return true
@@ -132,7 +132,6 @@ function VaultWorkspace() {
 
   const handleSelectNavigation = (next: VaultSelection) => {
     setSelection(next)
-    setMobileMenuOpen(false)
     setMobileDetailOpen(false)
   }
 
@@ -141,8 +140,10 @@ function VaultWorkspace() {
     await navigate({ to: '/login' })
   }
 
-  const handleDeleteCredential = async (cred: Credential) => {
-    if (!window.confirm(`Eliminare la credenziale "${cred.title}"?`)) return
+  const confirmDeleteCredential = async () => {
+    if (!pendingDeleteCred) return
+    const cred = pendingDeleteCred
+    setPendingDeleteCred(null)
     try {
       await vaultApi.deleteCredential(cred.id)
       toast.success(`Credenziale "${cred.title}" eliminata`)
@@ -173,14 +174,10 @@ function VaultWorkspace() {
     }
   }
 
-  const handleDeleteVault = async (vault: Vault) => {
-    if (
-      !window.confirm(
-        `Eliminare la cartella "${vault.name}" e tutte le credenziali al suo interno?`,
-      )
-    ) {
-      return
-    }
+  const confirmDeleteVault = async () => {
+    if (!pendingDeleteVault) return
+    const vault = pendingDeleteVault
+    setPendingDeleteVault(null)
     try {
       await vaultApi.deleteVault(vault.id)
       toast.success(`Cartella "${vault.name}" eliminata`)
@@ -203,160 +200,120 @@ function VaultWorkspace() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
-      {/* Mobile Header */}
-      <header className="flex items-center justify-between border-b px-3 py-2.5 lg:hidden">
-        <div className="flex items-center gap-2">
-          {mobileDetailOpen ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileDetailOpen(false)}
-            >
-              <ArrowLeft className="size-4" />
-              Lista
-            </Button>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setMobileMenuOpen((v) => !v)}
-            >
-              {mobileMenuOpen ? (
-                <X className="size-5" />
-              ) : (
-                <Menu className="size-5" />
-              )}
-            </Button>
-          )}
-          <span className="font-semibold text-sm">Starward Vault</span>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setEditingCredential(null)
-            setCredDialogOpen(true)
-          }}
-        >
-          Nuova
-        </Button>
-      </header>
+    <SidebarProvider className="h-svh overflow-hidden">
+      <AppSidebar
+        user={user}
+        vaults={vaults}
+        totalCredentialsCount={allCredentials.length}
+        favoritesCount={favoritesCount}
+        selection={selection}
+        onSelect={handleSelectNavigation}
+        onNewCredential={() => {
+          setEditingCredential(null)
+          setCredDialogOpen(true)
+        }}
+        onNewVault={() => {
+          setEditingVault(null)
+          setVaultDialogOpen(true)
+        }}
+        onSignOut={handleSignOut}
+      />
 
-      <div className="relative flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:flex h-full">
-          <AppSidebar
-            user={user}
-            vaults={vaults}
-            totalCredentialsCount={allCredentials.length}
-            favoritesCount={favoritesCount}
-            selection={selection}
-            onSelect={handleSelectNavigation}
-            onNewCredential={() => {
-              setEditingCredential(null)
-              setCredDialogOpen(true)
-            }}
-            onNewVault={() => {
-              setEditingVault(null)
-              setVaultDialogOpen(true)
-            }}
-            onSignOut={handleSignOut}
-            darkMode={darkMode}
-            onToggleDarkMode={toggleDarkMode}
-          />
-        </div>
-
-        {/* Mobile Drawer Sidebar */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-40 flex lg:hidden">
-            <div
-              className="fixed inset-0 bg-black/50"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            <div className="relative z-50 flex h-full bg-background shadow-xl">
-              <AppSidebar
-                user={user}
-                vaults={vaults}
-                totalCredentialsCount={allCredentials.length}
-                favoritesCount={favoritesCount}
-                selection={selection}
-                onSelect={handleSelectNavigation}
-                onNewCredential={() => {
-                  setMobileMenuOpen(false)
-                  setEditingCredential(null)
-                  setCredDialogOpen(true)
-                }}
-                onNewVault={() => {
-                  setMobileMenuOpen(false)
-                  setEditingVault(null)
-                  setVaultDialogOpen(true)
-                }}
-                onSignOut={handleSignOut}
-                darkMode={darkMode}
-                onToggleDarkMode={toggleDarkMode}
-              />
-            </div>
+      <SidebarInset className="flex h-svh min-h-0 flex-col overflow-hidden">
+        {/* Mobile & Tablet Header */}
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-3 lg:hidden">
+          <div className="flex items-center gap-2">
+            {mobileDetailOpen ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileDetailOpen(false)}
+              >
+                <ArrowLeft className="size-4" />
+                Lista
+              </Button>
+            ) : (
+              <>
+                <SidebarTrigger className="md:hidden" />
+                <Separator
+                  orientation="vertical"
+                  className="mr-1 h-4 md:hidden"
+                />
+              </>
+            )}
+            <span className="text-sm font-semibold">Starward Vault</span>
           </div>
-        )}
-
-        {/* Center Credential List */}
-        <div
-          className={
-            mobileDetailOpen
-              ? 'hidden lg:flex h-full'
-              : 'flex flex-1 lg:flex-none h-full min-w-0'
-          }
-        >
-          <CredentialList
-            selection={selection}
-            activeVault={activeVault}
-            credentials={filteredCredentials}
-            selectedCredentialId={selectedCredential?.id ?? null}
-            searchQuery={searchQuery}
-            categoryFilter={categoryFilter}
-            loading={loading}
-            onSearchChange={setSearchQuery}
-            onCategoryFilterChange={setCategoryFilter}
-            onSelectCredential={(cred) => {
-              setSelectedCredentialId(cred.id)
-              setMobileDetailOpen(true)
-            }}
-            onNewCredential={() => {
+          <Button
+            size="sm"
+            onClick={() => {
               setEditingCredential(null)
               setCredDialogOpen(true)
             }}
-            onShareVault={(vault) => setShareVaultTarget(vault)}
-            onEditVault={(vault) => {
-              setEditingVault(vault)
-              setVaultDialogOpen(true)
-            }}
-            onDeleteVault={handleDeleteVault}
-            onOpenAudit={(vault) => setAuditVaultTarget(vault)}
-          />
-        </div>
+          >
+            Nuova
+          </Button>
+        </header>
 
-        {/* Right Detail Panel */}
-        <div
-          className={
-            mobileDetailOpen
-              ? 'flex flex-1 h-full min-w-0'
-              : 'hidden lg:flex flex-1 h-full min-w-0'
-          }
-        >
-          <CredentialDetail
-            credential={selectedCredential}
-            onEdit={(cred) => {
-              setEditingCredential(cred)
-              setCredDialogOpen(true)
-            }}
-            onDelete={handleDeleteCredential}
-            onToggleFavorite={handleToggleFavorite}
-            onSelectVault={(vaultId) =>
-              handleSelectNavigation({ type: 'vault', vaultId })
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {/* Center Credential List */}
+          <div
+            className={
+              mobileDetailOpen
+                ? 'hidden h-full lg:flex'
+                : 'flex h-full min-w-0 flex-1 lg:flex-none'
             }
-          />
+          >
+            <CredentialList
+              selection={selection}
+              activeVault={activeVault}
+              credentials={filteredCredentials}
+              selectedCredentialId={selectedCredential?.id ?? null}
+              searchQuery={searchQuery}
+              categoryFilter={categoryFilter}
+              loading={loading}
+              onSearchChange={setSearchQuery}
+              onCategoryFilterChange={setCategoryFilter}
+              onSelectCredential={(cred) => {
+                setSelectedCredentialId(cred.id)
+                setMobileDetailOpen(true)
+              }}
+              onNewCredential={() => {
+                setEditingCredential(null)
+                setCredDialogOpen(true)
+              }}
+              onShareVault={(vault) => setShareVaultTarget(vault)}
+              onEditVault={(vault) => {
+                setEditingVault(vault)
+                setVaultDialogOpen(true)
+              }}
+              onDeleteVault={(vault) => setPendingDeleteVault(vault)}
+              onOpenAudit={(vault) => setAuditVaultTarget(vault)}
+            />
+          </div>
+
+          {/* Right Detail Panel */}
+          <div
+            className={
+              mobileDetailOpen
+                ? 'flex h-full min-w-0 flex-1'
+                : 'hidden h-full min-w-0 flex-1 lg:flex'
+            }
+          >
+            <CredentialDetail
+              credential={selectedCredential}
+              onEdit={(cred) => {
+                setEditingCredential(cred)
+                setCredDialogOpen(true)
+              }}
+              onDelete={(cred) => setPendingDeleteCred(cred)}
+              onToggleFavorite={handleToggleFavorite}
+              onSelectVault={(vaultId) =>
+                handleSelectNavigation({ type: 'vault', vaultId })
+              }
+            />
+          </div>
         </div>
-      </div>
+      </SidebarInset>
 
       {/* Dialogs */}
       <CredentialDialog
@@ -409,6 +366,68 @@ function VaultWorkspace() {
         }}
         vault={auditVaultTarget}
       />
-    </div>
+
+      {/* Delete Credential Confirmation */}
+      <AlertDialog
+        open={Boolean(pendingDeleteCred)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteCred(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminare questa credenziale?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La credenziale{' '}
+              <strong className="text-foreground">
+                "{pendingDeleteCred?.title}"
+              </strong>{' '}
+              verrà eliminata definitivamente dal vault. Questa azione non può
+              essere annullata.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmDeleteCredential}
+            >
+              Elimina
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Vault Confirmation */}
+      <AlertDialog
+        open={Boolean(pendingDeleteVault)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteVault(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminare questa cartella?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La cartella{' '}
+              <strong className="text-foreground">
+                "{pendingDeleteVault?.name}"
+              </strong>{' '}
+              e tutte le credenziali al suo interno verranno eliminate
+              definitivamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmDeleteVault}
+            >
+              Elimina cartella
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </SidebarProvider>
   )
 }

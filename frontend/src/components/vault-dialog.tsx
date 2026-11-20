@@ -14,7 +14,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { VAULT_ICON_OPTIONS, VaultIcon } from '@/components/vault-icon'
 import { vaultApi, type Vault } from '@/lib/api'
-import { cn, VAULT_COLORS } from '@/lib/utils'
+import { cn } from '@/lib/utils'
+import { VAULT_COLORS } from '@/lib/vault-utils'
 
 interface VaultDialogProps {
   open: boolean
@@ -129,10 +130,10 @@ export function VaultDialog({
                   type="button"
                   onClick={() => setIcon(opt.value)}
                   className={cn(
-                    'flex flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-all cursor-pointer',
+                    'flex cursor-pointer flex-col items-center gap-1 rounded-lg border p-2 text-xs transition-colors',
                     icon === opt.value
-                      ? 'border-primary bg-primary/10 text-primary font-medium'
-                      : 'hover:bg-muted text-muted-foreground',
+                      ? 'border-primary bg-accent text-accent-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-muted',
                   )}
                 >
                   <VaultIcon icon={opt.value} className="size-4" />
@@ -151,9 +152,9 @@ export function VaultDialog({
                   type="button"
                   onClick={() => setColor(key)}
                   className={cn(
-                    'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all cursor-pointer',
+                    'flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
                     color === key
-                      ? 'border-primary bg-primary/8 font-medium'
+                      ? 'border-primary bg-accent text-accent-foreground font-medium'
                       : 'hover:bg-muted',
                   )}
                 >

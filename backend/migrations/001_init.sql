@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS vaults (
 );
 
 CREATE INDEX IF NOT EXISTS idx_vaults_owner_id ON vaults (owner_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vaults_owner_personal_unique
+    ON vaults (owner_id)
+    WHERE is_personal = TRUE;
 
 CREATE TABLE IF NOT EXISTS vault_members (
     id TEXT PRIMARY KEY NOT NULL,
@@ -50,6 +53,8 @@ CREATE TABLE IF NOT EXISTS credentials (
     password_nonce TEXT NOT NULL,
     notes_ciphertext TEXT NOT NULL,
     notes_nonce TEXT NOT NULL,
+    extra_fields_ciphertext TEXT NOT NULL DEFAULT '',
+    extra_fields_nonce TEXT NOT NULL DEFAULT '',
     favorite BOOLEAN NOT NULL DEFAULT FALSE,
     created_by TEXT NOT NULL REFERENCES users(id),
     updated_by TEXT NOT NULL REFERENCES users(id),

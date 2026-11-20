@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use axum::{
     extract::{Path, Query, State},
     http::StatusCode,
@@ -10,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{
     auth::AuthenticatedUser,
+    crypto::VaultCrypto,
     error::{AppError, AppResult},
     models::{CreateCredentialRequest, CredentialDto, UpdateCredentialRequest},
     routes::{record_audit, require_vault_role},
@@ -39,6 +42,8 @@ struct CredentialRow {
     password_nonce: String,
     notes_ciphertext: String,
     notes_nonce: String,
+    extra_fields_ciphertext: String,
+    extra_fields_nonce: String,
     favorite: bool,
     created_by: String,
     created_by_name: String,
@@ -55,6 +60,15 @@ fn decrypt_credential_row(state: &AppState, row: CredentialRow) -> AppResult<Cre
     let notes = state
         .crypto
         .decrypt(&row.notes_ciphertext, &row.notes_nonce)?;
+    let fields: BTreeMap<String, String> =
+        if row.extra_fields_ciphertext.is_empty() || row.extra_fields_nonce.is_empty() {
+            BTreeMap::new()
+        } else {
+            let json_str = state
+                .crypto
+                .decrypt(&row.extra_fields_ciphertext, &row.extra_fields_nonce)?;
+            serde_json::from_str(&json_str).unwrap_or_default()
+        };
 
     Ok(CredentialDto {
         id: row.id,
@@ -68,6 +82,7 @@ fn decrypt_credential_row(state: &AppState, row: CredentialRow) -> AppResult<Cre
         url: row.url,
         category: row.category,
         notes,
+        fields,
         favorite: row.favorite,
         created_by: row.created_by,
         created_by_name: row.created_by_name,
@@ -99,6 +114,8 @@ async fn fetch_credential_dto(
             c.password_nonce,
             c.notes_ciphertext,
             c.notes_nonce,
+            c.extra_fields_ciphertext,
+            c.extra_fields_nonce,
             c.favorite,
             c.created_by,
             cb.name AS created_by_name,
@@ -156,6 +173,8 @@ pub async fn list_credentials(
             c.password_nonce,
             c.notes_ciphertext,
             c.notes_nonce,
+            c.extra_fields_ciphertext,
+            c.extra_fields_nonce,
             c.favorite,
             c.created_by,
             cb.name AS created_by_name,
@@ -222,18 +241,17 @@ pub async fn create_credential(
         ));
     }
 
-    if payload.password.is_empty() {
-        return Err(AppError::BadRequest(
-            "La password non può essere vuota".to_string(),
-        ));
-    }
+    let category = normalize_category(&payload.category);
+    let fields = clean_extra_fields(&payload.fields);
+    validate_credential_fields(&category, &payload.password, &payload.notes, &fields)?;
 
     let enc_password = state.crypto.encrypt(&payload.password)?;
     let enc_notes = state.crypto.encrypt(payload.notes.trim())?;
+    let (extra_fields_ciphertext, extra_fields_nonce) =
+        encrypt_extra_fields(&state.crypto, &fields)?;
 
     let id = Uuid::new_v4().to_string();
     let now = Utc::now();
-    let category = normalize_category(&payload.category);
 
     sqlx::query(
         r#"
@@ -241,9 +259,10 @@ pub async fn create_credential(
             id, vault_id, title, username, url, category,
             password_ciphertext, password_nonce,
             notes_ciphertext, notes_nonce,
+            extra_fields_ciphertext, extra_fields_nonce,
             favorite, created_by, updated_by, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12, $13, $13)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $15)
         "#,
     )
     .bind(&id)
@@ -251,11 +270,13 @@ pub async fn create_credential(
     .bind(title)
     .bind(payload.username.trim())
     .bind(payload.url.trim())
-    .bind(category)
+    .bind(&category)
     .bind(&enc_password.ciphertext)
     .bind(&enc_password.nonce)
     .bind(&enc_notes.ciphertext)
     .bind(&enc_notes.nonce)
+    .bind(&extra_fields_ciphertext)
+    .bind(&extra_fields_nonce)
     .bind(payload.favorite)
     .bind(&user.id)
     .bind(now)
@@ -319,11 +340,6 @@ pub async fn update_credential(
         .map(str::trim)
         .unwrap_or(&existing.url);
     let password = payload.password.as_deref().unwrap_or(&existing.password);
-    if password.is_empty() {
-        return Err(AppError::BadRequest(
-            "La password non può essere vuota".to_string(),
-        ));
-    }
     let notes = payload
         .notes
         .as_deref()
@@ -334,10 +350,19 @@ pub async fn update_credential(
         .as_deref()
         .map(normalize_category)
         .unwrap_or_else(|| existing.category.clone());
+    let fields = payload
+        .fields
+        .as_ref()
+        .map(clean_extra_fields)
+        .unwrap_or_else(|| existing.fields.clone());
     let favorite = payload.favorite.unwrap_or(existing.favorite);
+
+    validate_credential_fields(&category, password, notes, &fields)?;
 
     let enc_password = state.crypto.encrypt(password)?;
     let enc_notes = state.crypto.encrypt(notes)?;
+    let (extra_fields_ciphertext, extra_fields_nonce) =
+        encrypt_extra_fields(&state.crypto, &fields)?;
     let now = Utc::now();
 
     sqlx::query(
@@ -352,10 +377,12 @@ pub async fn update_credential(
             password_nonce = $7,
             notes_ciphertext = $8,
             notes_nonce = $9,
-            favorite = $10,
-            updated_by = $11,
-            updated_at = $12
-        WHERE id = $13
+            extra_fields_ciphertext = $10,
+            extra_fields_nonce = $11,
+            favorite = $12,
+            updated_by = $13,
+            updated_at = $14
+        WHERE id = $15
         "#,
     )
     .bind(target_vault_id)
@@ -367,6 +394,8 @@ pub async fn update_credential(
     .bind(&enc_password.nonce)
     .bind(&enc_notes.ciphertext)
     .bind(&enc_notes.nonce)
+    .bind(&extra_fields_ciphertext)
+    .bind(&extra_fields_nonce)
     .bind(favorite)
     .bind(&user.id)
     .bind(now)
@@ -414,11 +443,181 @@ pub async fn delete_credential(
     Ok(StatusCode::NO_CONTENT)
 }
 
+fn clean_extra_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    fields
+        .iter()
+        .filter_map(|(k, v)| {
+            let clean_key = k.trim();
+            let clean_val = v.trim();
+            if clean_key.is_empty() || clean_val.is_empty() {
+                None
+            } else {
+                Some((clean_key.to_string(), clean_val.to_string()))
+            }
+        })
+        .collect()
+}
+
+fn encrypt_extra_fields(
+    crypto: &VaultCrypto,
+    fields: &BTreeMap<String, String>,
+) -> AppResult<(String, String)> {
+    if fields.is_empty() {
+        return Ok((String::new(), String::new()));
+    }
+    let json = serde_json::to_string(fields)
+        .map_err(|e| AppError::Internal(format!("Errore serializzazione campi extra: {e}")))?;
+    let encrypted = crypto.encrypt(&json)?;
+    Ok((encrypted.ciphertext, encrypted.nonce))
+}
+
+fn validate_credential_fields(
+    category: &str,
+    password: &str,
+    notes: &str,
+    fields: &BTreeMap<String, String>,
+) -> AppResult<()> {
+    match category {
+        "note" => {
+            if notes.trim().is_empty() && password.is_empty() {
+                return Err(AppError::BadRequest(
+                    "Inserisci il contenuto della nota sicura".to_string(),
+                ));
+            }
+        }
+        "ssh" => {
+            let has_private_key = fields
+                .get("private_key")
+                .map(|v| !v.trim().is_empty())
+                .unwrap_or(false);
+            if password.is_empty() && !has_private_key {
+                return Err(AppError::BadRequest(
+                    "Inserisci una password o una chiave privata SSH".to_string(),
+                ));
+            }
+        }
+        "api_key" => {
+            if password.is_empty() {
+                return Err(AppError::BadRequest(
+                    "La chiave API / token non può essere vuota".to_string(),
+                ));
+            }
+        }
+        "card" => {
+            if password.is_empty() {
+                return Err(AppError::BadRequest(
+                    "Il numero della carta non può essere vuoto".to_string(),
+                ));
+            }
+        }
+        "license" => {
+            if password.is_empty() {
+                return Err(AppError::BadRequest(
+                    "La chiave di licenza non può essere vuota".to_string(),
+                ));
+            }
+        }
+        _ => {
+            if password.is_empty() {
+                return Err(AppError::BadRequest(
+                    "La password non può essere vuota".to_string(),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn normalize_category(input: &str) -> String {
     match input.trim().to_lowercase().as_str() {
-        "login" | "api_key" | "database" | "ssh" | "card" | "note" => {
+        "login" | "api_key" | "database" | "ssh" | "card" | "license" | "note" => {
             input.trim().to_lowercase()
         }
         _ => "login".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalize_category_supports_all_known_and_defaults_unknown() {
+        assert_eq!(normalize_category("LOGIN"), "login");
+        assert_eq!(normalize_category(" api_key "), "api_key");
+        assert_eq!(normalize_category("database"), "database");
+        assert_eq!(normalize_category("ssh"), "ssh");
+        assert_eq!(normalize_category("card"), "card");
+        assert_eq!(normalize_category("license"), "license");
+        assert_eq!(normalize_category("note"), "note");
+        assert_eq!(normalize_category("unknown"), "login");
+    }
+
+    #[test]
+    fn clean_extra_fields_drops_empty_and_preserves_multiline() {
+        let mut raw = BTreeMap::new();
+        raw.insert(" port ".to_string(), " 5432 ".to_string());
+        raw.insert("empty_val".to_string(), "   ".to_string());
+        raw.insert("  ".to_string(), "ignored".to_string());
+        raw.insert(
+            "private_key".to_string(),
+            "  -----BEGIN KEY-----\nline1\nline2\n-----END KEY-----  ".to_string(),
+        );
+
+        let cleaned = clean_extra_fields(&raw);
+        assert_eq!(cleaned.len(), 2);
+        assert_eq!(cleaned.get("port").map(String::as_str), Some("5432"));
+        assert_eq!(
+            cleaned.get("private_key").map(String::as_str),
+            Some("-----BEGIN KEY-----\nline1\nline2\n-----END KEY-----")
+        );
+    }
+
+    #[test]
+    fn validate_credential_fields_enforces_category_rules() {
+        let empty_fields = BTreeMap::new();
+
+        // login & database require password
+        assert!(validate_credential_fields("login", "", "n", &empty_fields).is_err());
+        assert!(validate_credential_fields("login", "pw", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("database", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("database", "dbpw", "", &empty_fields).is_ok());
+
+        // api_key, card, license require secret
+        assert!(validate_credential_fields("api_key", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("api_key", "sk_live_123", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("card", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("card", "4242", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("license", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("license", "XXXX-YYYY", "", &empty_fields).is_ok());
+
+        // note allows empty password when notes is non-empty
+        assert!(validate_credential_fields("note", "", "   ", &empty_fields).is_err());
+        assert!(validate_credential_fields("note", "", "Codice Wi-Fi: 1234", &empty_fields).is_ok());
+        assert!(validate_credential_fields("note", "legacy-pw", "", &empty_fields).is_ok());
+
+        // ssh allows empty password if private_key is provided
+        assert!(validate_credential_fields("ssh", "", "", &empty_fields).is_err());
+        let mut ssh_fields = BTreeMap::new();
+        ssh_fields.insert("private_key".to_string(), "-----BEGIN OPENSSH PRIVATE KEY-----".to_string());
+        assert!(validate_credential_fields("ssh", "", "", &ssh_fields).is_ok());
+        assert!(validate_credential_fields("ssh", "passphrase", "", &empty_fields).is_ok());
+    }
+
+    #[test]
+    fn encrypt_extra_fields_roundtrips_json() {
+        let crypto = VaultCrypto::from_master_key("test-master-key-for-extra-fields");
+        let empty = BTreeMap::new();
+        assert_eq!(encrypt_extra_fields(&crypto, &empty).unwrap(), (String::new(), String::new()));
+
+        let mut fields = BTreeMap::new();
+        fields.insert("db_type".to_string(), "postgresql".to_string());
+        fields.insert("port".to_string(), "5432".to_string());
+
+        let (cipher, nonce) = encrypt_extra_fields(&crypto, &fields).unwrap();
+        assert!(!cipher.contains("postgresql"));
+        let decrypted = crypto.decrypt(&cipher, &nonce).unwrap();
+        let parsed: BTreeMap<String, String> = serde_json::from_str(&decrypted).unwrap();
+        assert_eq!(parsed, fields);
     }
 }

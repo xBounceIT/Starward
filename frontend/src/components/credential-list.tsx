@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import {
   Copy,
   History,
@@ -28,14 +28,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SidebarTrigger } from '@/components/ui/sidebar'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CategoryIcon, VaultIcon } from '@/components/vault-icon'
 import type { Credential, Vault } from '@/lib/api'
 import {
-  cn,
   CREDENTIAL_CATEGORIES,
-  getInitials,
-  getVaultColor,
-} from '@/lib/utils'
+  getCredentialQuickCopy,
+  getCredentialSubtitle,
+} from '@/lib/credential-types'
+import { cn } from '@/lib/utils'
+import { getInitials, getVaultColor } from '@/lib/vault-utils'
 
 interface CredentialListProps {
   selection: VaultSelection
@@ -93,7 +96,7 @@ export function CredentialList({
     e.stopPropagation()
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`${label} copiata negli appunti`)
+      toast.success(`${label} copiato negli appunti`)
     } catch {
       toast.error('Impossibile copiare negli appunti')
     }
@@ -124,10 +127,11 @@ export function CredentialList({
   return (
     <section className="flex h-full w-full flex-col border-r bg-background lg:w-96 lg:shrink-0">
       {/* Header */}
-      <div className="border-b px-4 py-3.5 space-y-3">
+      <div className="space-y-3 border-b px-4 py-3.5">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
+              <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex" />
               {activeVault && (
                 <span
                   className={cn(
@@ -154,7 +158,7 @@ export function CredentialList({
           </div>
 
           {activeVault && (
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex shrink-0 items-center gap-1">
               <Button
                 variant={activeVault.is_shared ? 'secondary' : 'outline'}
                 size="sm"
@@ -162,7 +166,7 @@ export function CredentialList({
                 onClick={() => onShareVault(activeVault)}
               >
                 {activeVault.is_shared ? (
-                  <Users className="size-3.5 text-primary" />
+                  <Users className="size-3.5" />
                 ) : (
                   <Share2 className="size-3.5" />
                 )}
@@ -173,7 +177,7 @@ export function CredentialList({
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" className="size-8">
+                  <Button variant="ghost" size="icon-sm">
                     <MoreVertical className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -212,10 +216,12 @@ export function CredentialList({
 
         {/* Shared folder members preview bar */}
         {activeVault && activeVault.is_shared && (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => onShareVault(activeVault)}
-            className="flex w-full items-center justify-between rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs hover:bg-muted/70 transition-colors cursor-pointer"
+            className="h-auto w-full justify-between px-2.5 py-1.5 text-xs font-normal"
           >
             <div className="flex items-center gap-2">
               <div className="flex -space-x-1.5">
@@ -231,69 +237,66 @@ export function CredentialList({
                 ))}
               </div>
               <span className="text-muted-foreground">
-                Cartella condivisa con{' '}
+                Condivisa con{' '}
                 <strong className="text-foreground">
                   {activeVault.member_count} persone
                 </strong>
               </span>
             </div>
-            <span className="text-primary font-medium">Gestisci</span>
-          </button>
+            <span className="font-medium text-foreground">Gestisci</span>
+          </Button>
         )}
 
         {/* Search input */}
         <div className="relative">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchInputRef}
             placeholder="Cerca titolo, username, URL... (Ctrl+K)"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 pr-8 h-9 text-sm"
+            className="h-9 pr-8 pl-8 text-sm"
           />
           {searchQuery && (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon-xs"
               onClick={() => onSearchChange('')}
-              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2 cursor-pointer"
+              className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
+              aria-label="Cancella ricerca"
             >
               <X className="size-3.5" />
-            </button>
+            </Button>
           )}
         </div>
 
-        {/* Category pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-          <button
+        {/* Category filter buttons */}
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+          <Button
             type="button"
+            size="xs"
+            variant={categoryFilter === '' ? 'default' : 'secondary'}
+            className="shrink-0 rounded-full"
             onClick={() => onCategoryFilterChange('')}
-            className={cn(
-              'shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer',
-              categoryFilter === ''
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground hover:text-foreground',
-            )}
           >
             Tutte
-          </button>
+          </Button>
           {CREDENTIAL_CATEGORIES.map((cat) => (
-            <button
+            <Button
               key={cat.value}
               type="button"
+              size="xs"
+              variant={categoryFilter === cat.value ? 'default' : 'secondary'}
+              className="shrink-0 rounded-full"
               onClick={() =>
                 onCategoryFilterChange(
                   categoryFilter === cat.value ? '' : cat.value,
                 )
               }
-              className={cn(
-                'shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors cursor-pointer',
-                categoryFilter === cat.value
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted text-muted-foreground hover:text-foreground',
-              )}
             >
               {cat.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -305,8 +308,14 @@ export function CredentialList({
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="h-16 animate-pulse rounded-xl bg-muted/60"
-              />
+                className="flex items-center gap-3 rounded-lg border p-3"
+              >
+                <Skeleton className="size-9 shrink-0 rounded-md" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
             ))}
           </div>
         ) : credentials.length === 0 ? (
@@ -317,7 +326,7 @@ export function CredentialList({
             <p className="mt-3 text-sm font-medium">
               Nessuna credenziale trovata
             </p>
-            <p className="mt-1 text-xs text-muted-foreground max-w-60">
+            <p className="mt-1 max-w-60 text-xs text-muted-foreground">
               {searchQuery || categoryFilter
                 ? 'Prova a modificare i filtri di ricerca.'
                 : 'Aggiungi la prima credenziale in questa cartella per iniziare.'}
@@ -334,6 +343,9 @@ export function CredentialList({
             {credentials.map((cred) => {
               const isSelected = cred.id === selectedCredentialId
               const vaultPalette = getVaultColor(cred.vault_color)
+              const subtitle = getCredentialSubtitle(cred)
+              const quickCopy = getCredentialQuickCopy(cred)
+
               return (
                 <div
                   key={cred.id}
@@ -347,15 +359,15 @@ export function CredentialList({
                     }
                   }}
                   className={cn(
-                    'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all cursor-pointer border',
+                    'group relative flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
                     isSelected
-                      ? 'bg-accent/70 border-primary/30 shadow-xs'
+                      ? 'border-border bg-accent text-accent-foreground'
                       : 'border-transparent hover:bg-muted/60',
                   )}
                 >
                   <div
                     className={cn(
-                      'flex size-9 shrink-0 items-center justify-center rounded-lg',
+                      'flex size-9 shrink-0 items-center justify-center rounded-md',
                       vaultPalette.bg,
                       vaultPalette.text,
                     )}
@@ -373,12 +385,15 @@ export function CredentialList({
                       )}
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
-                      {cred.username || cred.url || 'Nessun username'}
+                      {subtitle}
                     </p>
                     {selection.type !== 'vault' && (
                       <div className="mt-1 flex items-center gap-1">
                         <span
-                          className={cn('size-1.5 rounded-full', vaultPalette.dot)}
+                          className={cn(
+                            'size-1.5 rounded-full',
+                            vaultPalette.dot,
+                          )}
                         />
                         <span className="truncate text-[10px] text-muted-foreground">
                           {cred.vault_name}
@@ -388,32 +403,44 @@ export function CredentialList({
                   </div>
 
                   {/* Hover quick-copy buttons */}
-                  <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
-                    {cred.username && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        className="size-7"
-                        title="Copia username"
-                        onClick={(e) =>
-                          copyQuick(e, cred.username, 'Username')
-                        }
-                      >
-                        <User className="size-3.5" />
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="size-7"
-                      title="Copia password"
-                      onClick={(e) => copyQuick(e, cred.password, 'Password')}
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
-                  </div>
+                  {(quickCopy.primary || quickCopy.secondary) && (
+                    <div className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                      {quickCopy.primary && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          title={`Copia ${quickCopy.primary.label}`}
+                          onClick={(e) =>
+                            copyQuick(
+                              e,
+                              quickCopy.primary!.value,
+                              quickCopy.primary!.label,
+                            )
+                          }
+                        >
+                          <User className="size-3.5" />
+                        </Button>
+                      )}
+                      {quickCopy.secondary && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-xs"
+                          title={`Copia ${quickCopy.secondary.label}`}
+                          onClick={(e) =>
+                            copyQuick(
+                              e,
+                              quickCopy.secondary!.value,
+                              quickCopy.secondary!.label,
+                            )
+                          }
+                        >
+                          <Copy className="size-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

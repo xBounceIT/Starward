@@ -6,6 +6,7 @@ import {
   Folder,
   Globe,
   KeyRound,
+  KeySquare,
   Lock,
   Server,
   Shield,
@@ -67,6 +68,8 @@ export function CategoryIcon({
       return <Terminal className={className} />
     case 'card':
       return <CreditCard className={className} />
+    case 'license':
+      return <KeySquare className={className} />
     case 'note':
       return <FileText className={className} />
     default:

@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Check, RefreshCw, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import {
   evaluatePasswordStrength,
   generateSecurePassword,
   type PasswordOptions,
-} from '@/lib/utils'
+} from '@/lib/vault-utils'
 
 interface PasswordGeneratorProps {
   onSelect: (password: string) => void
@@ -56,66 +58,58 @@ export function PasswordGenerator({ onSelect }: PasswordGeneratorProps) {
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-muted/50 px-3 py-2.5 font-mono text-xs break-all select-all">
+      <div className="rounded-md border bg-muted/50 px-3 py-2.5 font-mono text-xs break-all select-all">
         {generated}
       </div>
 
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Robustezza</span>
           <span className="font-medium">{strength.label}</span>
         </div>
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className={`h-full transition-all duration-300 ${strength.colorClass}`}
-            style={{ width: `${strength.percent}%` }}
-          />
-        </div>
+        <Progress value={strength.percent} className="h-1.5" />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         <div className="flex items-center justify-between text-xs">
           <Label htmlFor="gen-length" className="text-xs">
             Lunghezza
           </Label>
           <span className="font-mono font-semibold">{options.length}</span>
         </div>
-        <input
+        <Slider
           id="gen-length"
-          type="range"
           min={10}
           max={40}
-          value={options.length}
-          onChange={(e) =>
-            regenerate({ ...options, length: Number(e.target.value) })
-          }
-          className="w-full accent-primary cursor-pointer"
+          step={1}
+          value={[options.length]}
+          onValueChange={([length]) => regenerate({ ...options, length })}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 text-xs">
-        <label className="flex items-center justify-between rounded-md border px-2.5 py-1.5 cursor-pointer">
+        <label className="flex cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5">
           <span>A-Z</span>
           <Switch
             checked={options.uppercase}
             onCheckedChange={(v) => regenerate({ ...options, uppercase: v })}
           />
         </label>
-        <label className="flex items-center justify-between rounded-md border px-2.5 py-1.5 cursor-pointer">
+        <label className="flex cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5">
           <span>a-z</span>
           <Switch
             checked={options.lowercase}
             onCheckedChange={(v) => regenerate({ ...options, lowercase: v })}
           />
         </label>
-        <label className="flex items-center justify-between rounded-md border px-2.5 py-1.5 cursor-pointer">
+        <label className="flex cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5">
           <span>0-9</span>
           <Switch
             checked={options.numbers}
             onCheckedChange={(v) => regenerate({ ...options, numbers: v })}
           />
         </label>
-        <label className="flex items-center justify-between rounded-md border px-2.5 py-1.5 cursor-pointer">
+        <label className="flex cursor-pointer items-center justify-between rounded-md border px-2.5 py-1.5">
           <span>!@#$</span>
           <Switch
             checked={options.symbols}

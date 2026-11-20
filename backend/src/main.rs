@@ -397,10 +397,136 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::FORBIDDEN);
 
+        // 7. Concurrent first requests for a brand-new user create exactly one Personal vault
+        let charlie_id = format!("test-charlie-{suffix}");
+        let charlie_email = format!("charlie-{suffix}@starward.io");
+        let charlie_token = make_token(&config.auth_secret, &charlie_id, &charlie_email, "Charlie");
+
+        let (res_vaults, res_creds) = tokio::join!(
+            app.clone().oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            ),
+            app.clone().oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+        );
+        let res_vaults = res_vaults.unwrap();
+        let res_creds = res_creds.unwrap();
+        assert_eq!(res_vaults.status(), StatusCode::OK);
+        assert_eq!(res_creds.status(), StatusCode::OK);
+
+        let charlie_vaults = read_json(res_vaults).await;
+        let personal_vaults: Vec<&Value> = charlie_vaults
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|v| v["is_personal"] == true)
+            .collect();
+        assert_eq!(personal_vaults.len(), 1);
+        let charlie_personal_id = personal_vaults[0]["id"].as_str().unwrap().to_string();
+
+        // 8. Database credential encrypts extra fields at rest and returns decrypted fields
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": charlie_personal_id,
+                            "title": "Postgres Prod",
+                            "username": "pgadmin",
+                            "password": "DbSecret!Password",
+                            "url": "db.internal",
+                            "category": "database",
+                            "fields": {
+                                "db_type": "postgresql",
+                                "port": "5432",
+                                "database_name": "starward_prod"
+                            }
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let db_cred = read_json(res).await;
+        let db_cred_id = db_cred["id"].as_str().unwrap().to_string();
+        assert_eq!(db_cred["fields"]["port"], "5432");
+        assert_eq!(db_cred["fields"]["db_type"], "postgresql");
+
+        let raw_extra: (String,) =
+            sqlx::query_as("SELECT extra_fields_ciphertext FROM credentials WHERE id = $1")
+                .bind(&db_cred_id)
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert!(!raw_extra.0.is_empty());
+        assert!(!raw_extra.0.contains("starward_prod"));
+
+        // 9. Secure note allows empty password and supports PATCH favorite toggle
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": charlie_personal_id,
+                            "title": "Codici backup",
+                            "category": "note",
+                            "notes": "RECOVERY-1234-5678"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let note_cred = read_json(res).await;
+        let note_cred_id = note_cred["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{note_cred_id}"))
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "favorite": true }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let patched_note = read_json(res).await;
+        assert_eq!(patched_note["favorite"], true);
+
         // Clean up test users (cascades vaults, members, credentials, audit logs)
-        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
+        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2, $3)")
             .bind(&alice_id)
             .bind(&bob_id)
+            .bind(&charlie_id)
             .execute(&db)
             .await;
     }

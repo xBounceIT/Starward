@@ -49,6 +49,7 @@ export interface Credential {
   url: string
   category: string
   notes: string
+  fields: Record<string, string>
   favorite: boolean
   created_by: string
   created_by_name: string
@@ -195,11 +196,12 @@ export const vaultApi = {
   createCredential: (payload: {
     vault_id: string
     title: string
-    username: string
-    password: string
+    username?: string
+    password?: string
     url?: string
     category?: string
     notes?: string
+    fields?: Record<string, string>
     favorite?: boolean
   }) =>
     request<Credential>('/credentials', {
@@ -217,6 +219,7 @@ export const vaultApi = {
       url?: string
       category?: string
       notes?: string
+      fields?: Record<string, string>
       favorite?: boolean
     },
   ) =>

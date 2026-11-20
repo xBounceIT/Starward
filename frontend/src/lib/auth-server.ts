@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeaders } from '@tanstack/react-start/server'
 import { auth, ensureAuthMigrated } from '@/lib/auth'
-import { getSsoProvidersStatus } from '@/lib/sso-config'
+import { getEnabledSsoProviders } from '@/lib/sso-config'
 
 export const getServerSessionFn = createServerFn({ method: 'GET' }).handler(
   async () => {
@@ -22,6 +22,6 @@ export const getServerSessionFn = createServerFn({ method: 'GET' }).handler(
 
 export const getSsoProvidersFn = createServerFn({ method: 'GET' }).handler(
   async () => {
-    return getSsoProvidersStatus()
+    return getEnabledSsoProviders()
   },
 )

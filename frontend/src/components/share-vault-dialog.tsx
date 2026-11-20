@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { vaultApi, type UserSummary, type Vault } from '@/lib/api'
-import { getInitials } from '@/lib/utils'
+import { getInitials } from '@/lib/vault-utils'
 
 interface ShareVaultDialogProps {
   open: boolean
@@ -208,18 +208,20 @@ export function ShareVaultDialog({
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {suggestions.slice(0, 6).map((user) => (
-                    <button
+                    <Button
                       key={user.id}
                       type="button"
+                      variant="outline"
+                      size="xs"
+                      className="rounded-full"
                       onClick={() => setEmail(user.email)}
-                      className="inline-flex items-center gap-1.5 rounded-full border bg-background px-2.5 py-1 text-xs hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
                     >
-                      <UserCheck className="size-3 text-primary" />
+                      <UserCheck className="size-3" />
                       <span className="font-medium">{user.name}</span>
                       <span className="text-muted-foreground">
                         ({user.email})
                       </span>
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
@@ -261,7 +263,7 @@ export function ShareVaultDialog({
                           )}
                         </p>
                         {member.is_pending && (
-                          <Badge variant="warning" className="text-[10px] py-0">
+                          <Badge variant="outline" className="py-0 text-[10px]">
                             In attesa di accesso
                           </Badge>
                         )}

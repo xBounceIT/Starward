@@ -4,8 +4,9 @@ import {
   Scripts,
   createRootRoute,
 } from '@tanstack/react-router'
-import { Toaster } from 'sonner'
+import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeProvider } from '@/lib/theme'
 import appCss from '@/styles/app.css?url'
 
 export const Route = createRootRoute({
@@ -31,11 +32,13 @@ function RootDocument() {
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen bg-background text-foreground">
-        <TooltipProvider>
-          <Outlet />
-        </TooltipProvider>
-        <Toaster richColors position="bottom-right" />
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <ThemeProvider>
+          <TooltipProvider>
+            <Outlet />
+          </TooltipProvider>
+          <Toaster richColors position="bottom-right" />
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
