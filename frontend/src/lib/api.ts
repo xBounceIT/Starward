@@ -273,6 +273,23 @@ export interface CreatedApiKey {
   secret_key: string
 }
 
+export interface McpKeyItem {
+  id: string
+  name: string
+  key_prefix: string
+  permission: ApiKeyPermission
+  vault_ids: string[]
+  expires_at: string | null
+  last_used_at: string | null
+  is_expired: boolean
+  created_at: string
+}
+
+export interface CreatedMcpKey {
+  mcp_key: McpKeyItem
+  secret_key: string
+}
+
 export interface ServiceAccountKey {
   id: string
   name: string
@@ -423,6 +440,24 @@ export const vaultApi = {
 
   deleteApiKey: (keyId: string) =>
     request<void>(`/api-keys/${keyId}`, {
+      method: 'DELETE',
+    }),
+
+  listMcpKeys: () => request<McpKeyItem[]>('/mcp-keys'),
+
+  createMcpKey: (payload: {
+    name: string
+    permission: ApiKeyPermission
+    vault_ids?: string[]
+    expires_in_days?: number | null
+  }) =>
+    request<CreatedMcpKey>('/mcp-keys', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  deleteMcpKey: (keyId: string) =>
+    request<void>(`/mcp-keys/${keyId}`, {
       method: 'DELETE',
     }),
 

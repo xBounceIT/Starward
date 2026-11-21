@@ -4,6 +4,8 @@ pub mod credentials;
 pub mod groups;
 pub mod health;
 pub mod import;
+pub mod mcp;
+pub mod mcp_keys;
 pub mod service_accounts;
 pub mod users;
 pub mod vaults;

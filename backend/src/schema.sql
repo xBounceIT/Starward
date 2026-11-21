@@ -203,3 +203,19 @@ CREATE TABLE IF NOT EXISTS service_account_keys (
 
 CREATE INDEX IF NOT EXISTS idx_service_account_keys_sa_id ON service_account_keys (service_account_id);
 CREATE INDEX IF NOT EXISTS idx_service_account_keys_key_hash ON service_account_keys (key_hash);
+
+CREATE TABLE IF NOT EXISTS mcp_keys (
+    id TEXT PRIMARY KEY NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    key_prefix TEXT NOT NULL,
+    key_hash TEXT NOT NULL UNIQUE,
+    permission TEXT NOT NULL DEFAULT 'read' CHECK (permission IN ('read', 'read_write')),
+    vault_ids TEXT[] NOT NULL DEFAULT '{}',
+    expires_at TIMESTAMPTZ,
+    last_used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_keys_user_id ON mcp_keys (user_id);
+CREATE INDEX IF NOT EXISTS idx_mcp_keys_key_hash ON mcp_keys (key_hash);

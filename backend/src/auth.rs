@@ -1,6 +1,11 @@
 use axum::{
     extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts},
+    http::{
+        header::{AUTHORIZATION, WWW_AUTHENTICATE},
+        request::Parts,
+        HeaderValue, StatusCode,
+    },
+    response::{IntoResponse, Response},
 };
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
@@ -33,6 +38,15 @@ pub struct ServiceAccountAuthContext {
 }
 
 #[derive(Debug, Clone)]
+pub struct McpKeyAuthContext {
+    pub id: String,
+    pub name: String,
+    pub key_prefix: String,
+    pub permission: String,
+    pub vault_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AuthenticatedUser {
     pub id: String,
     pub email: String,
@@ -42,11 +56,12 @@ pub struct AuthenticatedUser {
     pub is_service_account: bool,
     pub api_key: Option<ApiKeyAuthContext>,
     pub service_account: Option<ServiceAccountAuthContext>,
+    pub mcp_key: Option<McpKeyAuthContext>,
 }
 
 impl AuthenticatedUser {
     pub fn is_admin(&self) -> bool {
-        !self.is_service_account && self.role == "admin"
+        !self.is_service_account && self.mcp_key.is_none() && self.role == "admin"
     }
 
     pub fn require_admin(&self) -> Result<(), AppError> {
@@ -60,9 +75,13 @@ impl AuthenticatedUser {
     }
 
     pub fn require_session_auth(&self) -> Result<(), AppError> {
-        if self.api_key.is_some() || self.service_account.is_some() || self.is_service_account {
+        if self.api_key.is_some()
+            || self.service_account.is_some()
+            || self.mcp_key.is_some()
+            || self.is_service_account
+        {
             return Err(AppError::Forbidden(
-                "Questa operazione richiede una sessione utente interattiva e non può essere eseguita tramite API Key o Service Account"
+                "Questa operazione richiede una sessione utente interattiva e non può essere eseguita tramite API Key, chiave MCP o Service Account"
                     .to_string(),
             ));
         }
@@ -87,6 +106,14 @@ impl AuthenticatedUser {
             }
             return Ok(());
         }
+        if let Some(ref mcp) = self.mcp_key {
+            if mcp.permission != "read_write" {
+                return Err(AppError::Forbidden(
+                    "Questa chiave MCP ha permessi di sola lettura".to_string(),
+                ));
+            }
+            return Ok(());
+        }
         if let Some(ref key) = self.api_key {
             if key.permission != "read_write" {
                 return Err(AppError::Forbidden(
@@ -101,6 +128,10 @@ impl AuthenticatedUser {
         if let Some(ref sa) = self.service_account {
             return sa.vault_ids.iter().any(|allowed| allowed == vault_id);
         }
+        if let Some(ref mcp) = self.mcp_key {
+            return mcp.vault_ids.is_empty()
+                || mcp.vault_ids.iter().any(|allowed| allowed == vault_id);
+        }
         match &self.api_key {
             Some(key) if !key.vault_ids.is_empty() => {
                 key.vault_ids.iter().any(|allowed| allowed == vault_id)
@@ -113,6 +144,8 @@ impl AuthenticatedUser {
         if !self.can_access_vault(vault_id) {
             let msg = if self.service_account.is_some() {
                 "Questo Service Account non è autorizzato ad accedere a questa cartella"
+            } else if self.mcp_key.is_some() {
+                "Questa chiave MCP non è autorizzata ad accedere a questa cartella"
             } else {
                 "Questa API Key non è autorizzata ad accedere a questa cartella"
             };
@@ -140,6 +173,8 @@ impl AuthenticatedUser {
         if !self.can_access_credential(credential_id, vault_id) {
             let msg = if self.service_account.is_some() {
                 "Questo Service Account non è autorizzato ad accedere a questa credenziale"
+            } else if self.mcp_key.is_some() {
+                "Questa chiave MCP non è autorizzata ad accedere a questa credenziale"
             } else {
                 "Questa API Key non è autorizzata ad accedere a questa credenziale"
             };
@@ -161,6 +196,9 @@ impl AuthenticatedUser {
     pub fn is_vault_restricted_api_key(&self) -> bool {
         if self.service_account.is_some() {
             return true;
+        }
+        if let Some(ref mcp) = self.mcp_key {
+            return !mcp.vault_ids.is_empty();
         }
         self.api_key
             .as_ref()
@@ -286,6 +324,7 @@ async fn authenticate_service_account_key(
             vault_ids: row.vault_ids,
             credential_ids: row.credential_ids,
         }),
+        mcp_key: None,
     };
 
     if is_first_use {
@@ -310,6 +349,12 @@ async fn authenticate_api_key(
     raw_key: &str,
     state: &AppState,
 ) -> Result<AuthenticatedUser, AppError> {
+    if raw_key.starts_with("sw_mcp_") {
+        return Err(AppError::Unauthorized(
+            "Le chiavi MCP (sw_mcp_...) sono valide esclusivamente sull'endpoint del server MCP (/api/mcp)"
+                .to_string(),
+        ));
+    }
     if raw_key.starts_with("sw_sa_") {
         return authenticate_service_account_key(raw_key, state).await;
     }
@@ -377,6 +422,7 @@ async fn authenticate_api_key(
             vault_ids: row.vault_ids,
         }),
         service_account: None,
+        mcp_key: None,
     };
 
     if is_first_use {
@@ -590,6 +636,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             is_service_account: false,
             api_key: None,
             service_account: None,
+            mcp_key: None,
         };
 
         if is_first_login {
@@ -611,6 +658,209 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
     }
 }
 
+#[derive(Debug, FromRow)]
+struct McpKeyAuthRow {
+    mcp_key_id: String,
+    mcp_key_name: String,
+    key_prefix: String,
+    permission: String,
+    vault_ids: Vec<String>,
+    expires_at: Option<DateTime<Utc>>,
+    last_used_at: Option<DateTime<Utc>>,
+    user_id: String,
+    email: String,
+    name: String,
+    image: Option<String>,
+    role: String,
+}
+
+pub struct McpAuthRejection(pub AppError);
+
+impl IntoResponse for McpAuthRejection {
+    fn into_response(self) -> Response {
+        let is_unauthorized = matches!(self.0, AppError::Unauthorized(_));
+        let mut response = self.0.into_response();
+        if is_unauthorized && response.status() == StatusCode::UNAUTHORIZED {
+            response.headers_mut().insert(
+                WWW_AUTHENTICATE,
+                HeaderValue::from_static("Bearer realm=\"starward-mcp\""),
+            );
+        }
+        response
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthenticatedMcpUser {
+    pub user: AuthenticatedUser,
+    pub key: McpKeyAuthContext,
+}
+
+impl AuthenticatedMcpUser {
+    pub fn audit_tag(&self) -> String {
+        format!("via MCP: '{}' ({}...)", self.key.name, self.key.key_prefix)
+    }
+}
+
+fn extract_mcp_raw_key(parts: &Parts) -> Result<String, AppError> {
+    if let Some(raw_api_key) = parts
+        .headers
+        .get("x-api-key")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        return Ok(raw_api_key.to_string());
+    }
+
+    if let Some(auth_header) = parts
+        .headers
+        .get(AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if let Some((scheme, rest)) = auth_header.split_once(char::is_whitespace) {
+            if scheme.eq_ignore_ascii_case("bearer") {
+                let token = rest.trim();
+                if !token.is_empty() {
+                    return Ok(token.to_string());
+                }
+            }
+        }
+    }
+
+    Err(AppError::Unauthorized(
+        "Chiave MCP mancante o non valida. Usa una chiave MCP personale (sw_mcp_...) tramite Authorization: Bearer o X-API-Key."
+            .to_string(),
+    ))
+}
+
+async fn authenticate_mcp_key(
+    raw_key: &str,
+    state: &AppState,
+) -> Result<AuthenticatedMcpUser, AppError> {
+    let key_hash = hash_api_key(raw_key);
+    let row: Option<McpKeyAuthRow> = sqlx::query_as(
+        r#"
+        SELECT
+            mk.id AS mcp_key_id,
+            mk.name AS mcp_key_name,
+            mk.key_prefix,
+            mk.permission,
+            mk.vault_ids,
+            mk.expires_at,
+            mk.last_used_at,
+            u.id AS user_id,
+            u.email,
+            u.name,
+            u.image,
+            u.role
+        FROM mcp_keys mk
+        INNER JOIN users u ON u.id = mk.user_id
+        WHERE mk.key_hash = $1
+          AND u.is_service_account = FALSE
+        LIMIT 1
+        "#,
+    )
+    .bind(&key_hash)
+    .fetch_optional(&state.db)
+    .await?;
+
+    let row =
+        row.ok_or_else(|| AppError::Unauthorized("Chiave MCP non valida o revocata".to_string()))?;
+    let now = Utc::now();
+
+    if let Some(expires_at) = row.expires_at {
+        if expires_at <= now {
+            return Err(AppError::Unauthorized("Chiave MCP scaduta".to_string()));
+        }
+    }
+
+    let is_first_use = row.last_used_at.is_none();
+
+    sqlx::query("UPDATE mcp_keys SET last_used_at = $1 WHERE id = $2")
+        .bind(now)
+        .bind(&row.mcp_key_id)
+        .execute(&state.db)
+        .await?;
+
+    sqlx::query("UPDATE users SET last_seen_at = $1 WHERE id = $2")
+        .bind(now)
+        .bind(&row.user_id)
+        .execute(&state.db)
+        .await?;
+
+    let mcp_ctx = McpKeyAuthContext {
+        id: row.mcp_key_id.clone(),
+        name: row.mcp_key_name.clone(),
+        key_prefix: row.key_prefix.clone(),
+        permission: row.permission,
+        vault_ids: row.vault_ids,
+    };
+
+    let auth_user = AuthenticatedUser {
+        id: row.user_id,
+        email: row.email,
+        name: row.name,
+        image: row.image,
+        role: row.role,
+        is_service_account: false,
+        api_key: None,
+        service_account: None,
+        mcp_key: Some(mcp_ctx.clone()),
+    };
+
+    if is_first_use {
+        let _ = crate::routes::record_system_audit(
+            &state.db,
+            &auth_user,
+            "auth.mcp_key_used",
+            "mcp_key",
+            Some(&row.mcp_key_id),
+            &format!(
+                "Primo accesso al server MCP effettuato tramite chiave '{}' ({}...)",
+                row.mcp_key_name, row.key_prefix
+            ),
+        )
+        .await;
+    }
+
+    Ok(AuthenticatedMcpUser {
+        user: auth_user,
+        key: mcp_ctx,
+    })
+}
+
+impl FromRequestParts<AppState> for AuthenticatedMcpUser {
+    type Rejection = McpAuthRejection;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let raw_key = extract_mcp_raw_key(parts).map_err(McpAuthRejection)?;
+
+        if raw_key.starts_with("sw_live_") || raw_key.starts_with("sw_sa_") {
+            return Err(McpAuthRejection(AppError::Unauthorized(
+                "Le API Key REST e i Service Account non possono accedere al server MCP. Genera una chiave MCP dedicata (sw_mcp_...) nelle Impostazioni Utente."
+                    .to_string(),
+            )));
+        }
+
+        if !raw_key.starts_with("sw_mcp_") {
+            return Err(McpAuthRejection(AppError::Unauthorized(
+                "Chiave MCP mancante o non valida. Usa una chiave MCP personale (sw_mcp_...) tramite Authorization: Bearer o X-API-Key."
+                    .to_string(),
+            )));
+        }
+
+        authenticate_mcp_key(&raw_key, state)
+            .await
+            .map_err(McpAuthRejection)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -625,6 +875,31 @@ mod tests {
             is_service_account: false,
             api_key,
             service_account: None,
+            mcp_key: None,
+        }
+    }
+
+    fn sample_mcp_user(
+        role: &str,
+        permission: &str,
+        vault_ids: Vec<&str>,
+    ) -> AuthenticatedUser {
+        AuthenticatedUser {
+            id: "user-1".to_string(),
+            email: "alice@starward.io".to_string(),
+            name: "Alice".to_string(),
+            image: None,
+            role: role.to_string(),
+            is_service_account: false,
+            api_key: None,
+            service_account: None,
+            mcp_key: Some(McpKeyAuthContext {
+                id: "mcp-key-1".to_string(),
+                name: "Claude Code".to_string(),
+                key_prefix: "sw_mcp_123456789".to_string(),
+                permission: permission.to_string(),
+                vault_ids: vault_ids.into_iter().map(String::from).collect(),
+            }),
         }
     }
 
@@ -646,6 +921,7 @@ mod tests {
                 vault_ids: vault_ids.into_iter().map(String::from).collect(),
                 credential_ids: credential_ids.into_iter().map(String::from).collect(),
             }),
+            mcp_key: None,
         }
     }
 
@@ -716,5 +992,43 @@ mod tests {
         assert_eq!(sa.service_account_vault_role(), Some("editor"));
         assert!(!sa.can_access_vault("any-vault"));
         assert!(!sa.can_access_credential("any-cred", "any-vault"));
+    }
+
+    #[test]
+    fn read_only_mcp_key_forbids_session_admin_and_write_actions() {
+        let user = sample_mcp_user("admin", "read", vec![]);
+        assert!(!user.is_admin());
+        assert!(user.require_admin().is_err());
+        assert!(user.require_session_auth().is_err());
+        assert!(user.require_write_permission().is_err());
+        assert!(user.can_access_vault("any-vault"));
+        assert!(!user.is_vault_restricted_api_key());
+    }
+
+    #[test]
+    fn scoped_read_write_mcp_key_enforces_allowed_vault_ids() {
+        let user = sample_mcp_user("user", "read_write", vec!["vault-prod", "vault-shared"]);
+        assert!(!user.is_admin());
+        assert!(user.require_session_auth().is_err());
+        assert!(user.require_write_permission().is_ok());
+        assert!(user.is_vault_restricted_api_key());
+        assert!(user.can_access_vault("vault-prod"));
+        assert!(user.ensure_vault_allowed("vault-shared").is_ok());
+        assert!(!user.can_access_vault("vault-personal"));
+        assert!(user.ensure_vault_allowed("vault-personal").is_err());
+        assert!(!user.can_access_credential("cred-1", "vault-personal"));
+        assert!(user.ensure_credential_allowed("cred-1", "vault-personal").is_err());
+    }
+
+    #[test]
+    fn unscoped_read_write_mcp_key_allows_all_user_vaults_without_admin() {
+        let user = sample_mcp_user("admin", "read_write", vec![]);
+        assert!(!user.is_admin());
+        assert!(user.require_admin().is_err());
+        assert!(user.require_session_auth().is_err());
+        assert!(user.require_write_permission().is_ok());
+        assert!(!user.is_vault_restricted_api_key());
+        assert!(user.can_access_vault("vault-personal"));
+        assert!(user.ensure_vault_allowed("vault-personal").is_ok());
     }
 }

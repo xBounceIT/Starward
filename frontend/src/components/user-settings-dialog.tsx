@@ -10,6 +10,7 @@ import {
   Laptop,
   Lock,
   Moon,
+  Plug,
   Plus,
   RefreshCw,
   Settings2,
@@ -61,6 +62,8 @@ import {
   type ApiKeyItem,
   type ApiKeyPermission,
   type CreatedApiKey,
+  type CreatedMcpKey,
+  type McpKeyItem,
   type UserSettings,
   type UserSummary,
   type Vault,
@@ -77,7 +80,14 @@ import {
   getVaultColor,
 } from '@/lib/vault-utils'
 
-export type SettingsTab = 'profile' | 'security' | 'preferences' | 'api-keys'
+export type SettingsTab =
+  | 'profile'
+  | 'security'
+  | 'preferences'
+  | 'api-keys'
+  | 'mcp'
+
+type McpSnippetClient = 'json' | 'claude-code' | 'vscode'
 
 interface UserSettingsDialogProps {
   open: boolean
@@ -119,6 +129,200 @@ function formatUserAgent(ua?: string | null): string {
   else if (lower.includes('linux')) os = 'Linux'
 
   return os ? `${browser} su ${os}` : browser
+}
+
+function getMcpSnippet(
+  client: McpSnippetClient,
+  endpoint: string,
+  token: string,
+): string {
+  switch (client) {
+    case 'claude-code':
+      return `claude mcp add --transport http starward "${endpoint}" --header "Authorization: Bearer ${token}"`
+    case 'vscode':
+      return JSON.stringify(
+        {
+          servers: {
+            starward: {
+              type: 'http',
+              url: endpoint,
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )
+    case 'json':
+    default:
+      return JSON.stringify(
+        {
+          mcpServers: {
+            starward: {
+              type: 'http',
+              url: endpoint,
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )
+  }
+}
+
+function VaultScopeSelector({
+  scopeMode,
+  onScopeModeChange,
+  selectedVaultIds,
+  onToggleVault,
+  vaults,
+}: {
+  scopeMode: 'all' | 'selected'
+  onScopeModeChange: (mode: 'all' | 'selected') => void
+  selectedVaultIds: string[]
+  onToggleVault: (vaultId: string) => void
+  vaults: Vault[]
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">Ambito cartelle (Scope)</Label>
+        <div className="flex items-center gap-1 rounded-lg border bg-background p-0.5 text-xs">
+          <button
+            type="button"
+            onClick={() => onScopeModeChange('all')}
+            className={cn(
+              'cursor-pointer rounded-md px-2.5 py-1 transition-colors',
+              scopeMode === 'all'
+                ? 'bg-primary text-primary-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Tutte le cartelle
+          </button>
+          <button
+            type="button"
+            onClick={() => onScopeModeChange('selected')}
+            className={cn(
+              'cursor-pointer rounded-md px-2.5 py-1 transition-colors',
+              scopeMode === 'selected'
+                ? 'bg-primary text-primary-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Cartelle specifiche
+          </button>
+        </div>
+      </div>
+
+      {scopeMode === 'selected' && (
+        <div className="flex flex-wrap gap-1.5 rounded-lg border bg-background p-2.5">
+          {vaults.map((v) => {
+            const selected = selectedVaultIds.includes(v.id)
+            const palette = getVaultColor(v.color)
+            return (
+              <button
+                key={v.id}
+                type="button"
+                onClick={() => onToggleVault(v.id)}
+                className={cn(
+                  'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                  selected
+                    ? 'border-primary bg-primary/10 font-medium text-foreground'
+                    : 'text-muted-foreground hover:bg-muted',
+                )}
+              >
+                <VaultIcon
+                  icon={getVaultDisplayIcon(v)}
+                  className={cn('size-3.5', palette.text)}
+                />
+                <span>{v.name}</span>
+                {selected && <Check className="size-3 text-primary" />}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ScopedKeyCard({
+  item,
+  vaultMap,
+  onRevoke,
+}: {
+  item: ApiKeyItem | McpKeyItem
+  vaultMap: Map<string, Vault>
+  onRevoke: () => void
+}) {
+  const scopedNames = item.vault_ids
+    .map((id) => vaultMap.get(id)?.name ?? id.slice(0, 8))
+    .filter(Boolean)
+
+  return (
+    <div className="flex flex-col justify-between gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center">
+      <div className="min-w-0 space-y-1.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-semibold">{item.name}</span>
+          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+            {item.key_prefix}••••••••
+          </code>
+          <Badge
+            variant={item.permission === 'read_write' ? 'default' : 'secondary'}
+            className="text-[10px]"
+          >
+            {item.permission === 'read_write'
+              ? 'Lettura & Scrittura'
+              : 'Sola lettura'}
+          </Badge>
+          {item.is_expired && (
+            <Badge variant="destructive" className="text-[10px]">
+              Scaduta
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <FolderLock className="size-3" />
+            {scopedNames.length === 0
+              ? 'Tutte le cartelle'
+              : `Cartelle: ${scopedNames.join(', ')}`}
+          </span>
+          <span>Creata il {formatShortDate(item.created_at)}</span>
+          <span>
+            {item.expires_at
+              ? `Scadenza: ${formatShortDate(item.expires_at)}`
+              : 'Nessuna scadenza'}
+          </span>
+          <span>
+            {item.last_used_at
+              ? `Ultimo uso: ${formatRelativeDate(item.last_used_at)}`
+              : 'Mai utilizzata'}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-end gap-1.5">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={onRevoke}
+        >
+          <Trash2 className="size-3.5" />
+          Revoca
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 export function UserSettingsDialog({
@@ -200,6 +404,28 @@ export function UserSettingsDialog({
     null,
   )
 
+  // MCP Keys tab state
+  const [mcpKeys, setMcpKeys] = useState<McpKeyItem[]>([])
+  const [loadingMcpKeys, setLoadingMcpKeys] = useState(false)
+  const [newMcpKeyName, setNewMcpKeyName] = useState('')
+  const [newMcpKeyPermission, setNewMcpKeyPermission] =
+    useState<ApiKeyPermission>('read')
+  const [newMcpKeyExpiry, setNewMcpKeyExpiry] = useState<string>('90')
+  const [newMcpKeyScopeMode, setNewMcpKeyScopeMode] = useState<
+    'all' | 'selected'
+  >('all')
+  const [newMcpKeyVaultIds, setNewMcpKeyVaultIds] = useState<string[]>([])
+  const [creatingMcpKey, setCreatingMcpKey] = useState(false)
+  const [newlyCreatedMcpKey, setNewlyCreatedMcpKey] =
+    useState<CreatedMcpKey | null>(null)
+  const [copiedMcpSecretKey, setCopiedMcpSecretKey] = useState(false)
+  const [copiedMcpEndpoint, setCopiedMcpEndpoint] = useState(false)
+  const [copiedMcpConfig, setCopiedMcpConfig] = useState(false)
+  const [mcpSnippetClient, setMcpSnippetClient] =
+    useState<McpSnippetClient>('json')
+  const [pendingRevokeMcpKey, setPendingRevokeMcpKey] =
+    useState<McpKeyItem | null>(null)
+
   const writableVaults = useMemo(
     () => vaults.filter((v) => v.role === 'owner' || v.role === 'editor'),
     [vaults],
@@ -231,6 +457,7 @@ export function UserSettingsDialog({
     } else if (justClosed) {
       settingsHydratedRef.current = false
       setNewlyCreatedKey(null)
+      setNewlyCreatedMcpKey(null)
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
@@ -284,14 +511,32 @@ export function UserSettingsDialog({
     }
   }, [])
 
+  const loadMcpKeys = useCallback(async () => {
+    setLoadingMcpKeys(true)
+    try {
+      const list = await vaultApi.listMcpKeys()
+      setMcpKeys(list)
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Errore nel caricamento delle chiavi MCP',
+      )
+    } finally {
+      setLoadingMcpKeys(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!open) return
     if (activeTab === 'security') {
       loadSessions()
     } else if (activeTab === 'api-keys') {
       loadApiKeys()
+    } else if (activeTab === 'mcp') {
+      loadMcpKeys()
     }
-  }, [open, activeTab, loadSessions, loadApiKeys])
+  }, [open, activeTab, loadSessions, loadApiKeys, loadMcpKeys])
 
   const previewPassword = useMemo(() => {
     void previewSeed
@@ -436,6 +681,14 @@ export function UserSettingsDialog({
     )
   }
 
+  const toggleSelectedMcpVault = (vaultId: string) => {
+    setNewMcpKeyVaultIds((prev) =>
+      prev.includes(vaultId)
+        ? prev.filter((id) => id !== vaultId)
+        : [...prev, vaultId],
+    )
+  }
+
   const handleCreateApiKey = async (e: React.FormEvent) => {
     e.preventDefault()
     const cleanName = newKeyName.trim()
@@ -497,6 +750,69 @@ export function UserSettingsDialog({
     }
   }
 
+  const handleCreateMcpKey = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanName = newMcpKeyName.trim()
+    if (!cleanName) {
+      toast.error('Inserisci un nome identificativo per la chiave MCP')
+      return
+    }
+    if (newMcpKeyScopeMode === 'selected' && newMcpKeyVaultIds.length === 0) {
+      toast.error(
+        'Seleziona almeno una cartella o scegli "Tutte le cartelle"',
+      )
+      return
+    }
+
+    setCreatingMcpKey(true)
+    try {
+      const expiresInDays =
+        newMcpKeyExpiry === 'never'
+          ? null
+          : Number.parseInt(newMcpKeyExpiry, 10)
+      const created = await vaultApi.createMcpKey({
+        name: cleanName,
+        permission: newMcpKeyPermission,
+        vault_ids: newMcpKeyScopeMode === 'selected' ? newMcpKeyVaultIds : [],
+        expires_in_days: expiresInDays,
+      })
+      setNewlyCreatedMcpKey(created)
+      setMcpKeys((prev) => [created.mcp_key, ...prev])
+      setNewMcpKeyName('')
+      setNewMcpKeyVaultIds([])
+      setNewMcpKeyScopeMode('all')
+      toast.success(`Chiave MCP "${created.mcp_key.name}" generata`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Errore nella generazione della chiave MCP',
+      )
+    } finally {
+      setCreatingMcpKey(false)
+    }
+  }
+
+  const confirmRevokeMcpKey = async () => {
+    if (!pendingRevokeMcpKey) return
+    const target = pendingRevokeMcpKey
+    setPendingRevokeMcpKey(null)
+    try {
+      await vaultApi.deleteMcpKey(target.id)
+      setMcpKeys((prev) => prev.filter((k) => k.id !== target.id))
+      if (newlyCreatedMcpKey?.mcp_key.id === target.id) {
+        setNewlyCreatedMcpKey(null)
+      }
+      toast.success(`Chiave MCP "${target.name}" revocata`)
+    } catch (err) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Errore durante la revoca della chiave MCP',
+      )
+    }
+  }
+
   const copyText = async (
     text: string,
     label: string,
@@ -517,6 +833,14 @@ export function UserSettingsDialog({
       : 'http://localhost:3000'
   const sampleKey = newlyCreatedKey?.secret_key ?? 'sw_live_la_tua_api_key'
   const curlExample = `curl -s -H "Authorization: Bearer ${sampleKey}" "${apiOrigin}/api/v1/credentials"`
+  const mcpEndpoint = `${apiOrigin}/api/mcp`
+  const sampleMcpKey =
+    newlyCreatedMcpKey?.secret_key ?? 'sw_mcp_la_tua_chiave_mcp'
+  const mcpConfigSnippet = getMcpSnippet(
+    mcpSnippetClient,
+    mcpEndpoint,
+    sampleMcpKey,
+  )
 
   return (
     <>
@@ -525,11 +849,11 @@ export function UserSettingsDialog({
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="size-5 text-primary" />
-              Impostazioni Utente & API Key
+              Impostazioni Utente, API Key & Server MCP
             </DialogTitle>
             <DialogDescription>
               Gestisci il tuo profilo, la sicurezza dell'account, le preferenze
-              del vault e le API Key personali per l'accesso programmatico.
+              del vault, le API Key personali e le chiavi del Server MCP.
             </DialogDescription>
           </DialogHeader>
 
@@ -543,25 +867,41 @@ export function UserSettingsDialog({
             }}
             className="flex min-h-0 min-w-0 flex-1 flex-col"
           >
-            <TabsList className="grid w-full shrink-0 grid-cols-4">
-              <TabsTrigger value="profile" className="gap-1.5 text-xs sm:text-sm">
+            <TabsList className="grid w-full shrink-0 grid-cols-5">
+              <TabsTrigger
+                value="profile"
+                className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
+              >
                 <UserIcon className="size-3.5" />
                 <span>Profilo</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="gap-1.5 text-xs sm:text-sm">
+              <TabsTrigger
+                value="security"
+                className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
+              >
                 <Shield className="size-3.5" />
                 <span>Sicurezza</span>
               </TabsTrigger>
               <TabsTrigger
                 value="preferences"
-                className="gap-1.5 text-xs sm:text-sm"
+                className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
               >
                 <Sparkles className="size-3.5" />
                 <span>Preferenze</span>
               </TabsTrigger>
-              <TabsTrigger value="api-keys" className="gap-1.5 text-xs sm:text-sm">
+              <TabsTrigger
+                value="api-keys"
+                className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
+              >
                 <KeyRound className="size-3.5" />
                 <span>API Key</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="mcp"
+                className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
+              >
+                <Plug className="size-3.5" />
+                <span>MCP</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1181,70 +1521,13 @@ export function UserSettingsDialog({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs">
-                        Ambito cartelle (Scope)
-                      </Label>
-                      <div className="flex items-center gap-1 rounded-lg border bg-background p-0.5 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setNewKeyScopeMode('all')}
-                          className={cn(
-                            'cursor-pointer rounded-md px-2.5 py-1 transition-colors',
-                            newKeyScopeMode === 'all'
-                              ? 'bg-primary text-primary-foreground font-medium'
-                              : 'text-muted-foreground hover:text-foreground',
-                          )}
-                        >
-                          Tutte le cartelle
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setNewKeyScopeMode('selected')}
-                          className={cn(
-                            'cursor-pointer rounded-md px-2.5 py-1 transition-colors',
-                            newKeyScopeMode === 'selected'
-                              ? 'bg-primary text-primary-foreground font-medium'
-                              : 'text-muted-foreground hover:text-foreground',
-                          )}
-                        >
-                          Cartelle specifiche
-                        </button>
-                      </div>
-                    </div>
-
-                    {newKeyScopeMode === 'selected' && (
-                      <div className="flex flex-wrap gap-1.5 rounded-lg border bg-background p-2.5">
-                        {vaults.map((v) => {
-                          const selected = newKeyVaultIds.includes(v.id)
-                          const palette = getVaultColor(v.color)
-                          return (
-                            <button
-                              key={v.id}
-                              type="button"
-                              onClick={() => toggleSelectedVault(v.id)}
-                              className={cn(
-                                'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-                                selected
-                                  ? 'border-primary bg-primary/10 font-medium text-foreground'
-                                  : 'text-muted-foreground hover:bg-muted',
-                              )}
-                            >
-                              <VaultIcon
-                                icon={getVaultDisplayIcon(v)}
-                                className={cn('size-3.5', palette.text)}
-                              />
-                              <span>{v.name}</span>
-                              {selected && (
-                                <Check className="size-3 text-primary" />
-                              )}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
+                  <VaultScopeSelector
+                    scopeMode={newKeyScopeMode}
+                    onScopeModeChange={setNewKeyScopeMode}
+                    selectedVaultIds={newKeyVaultIds}
+                    onToggleVault={toggleSelectedVault}
+                    vaults={vaults}
+                  />
 
                   <div className="flex justify-end">
                     <Button type="submit" size="sm" disabled={creatingKey}>
@@ -1279,84 +1562,14 @@ export function UserSettingsDialog({
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {apiKeys.map((key) => {
-                        const scopedNames = key.vault_ids
-                          .map((id) => vaultMap.get(id)?.name ?? id.slice(0, 8))
-                          .filter(Boolean)
-
-                        return (
-                          <div
-                            key={key.id}
-                            className="flex flex-col justify-between gap-3 rounded-xl border bg-card p-3 sm:flex-row sm:items-center"
-                          >
-                            <div className="min-w-0 space-y-1.5">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="truncate text-sm font-semibold">
-                                  {key.name}
-                                </span>
-                                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                                  {key.key_prefix}••••••••
-                                </code>
-                                <Badge
-                                  variant={
-                                    key.permission === 'read_write'
-                                      ? 'default'
-                                      : 'secondary'
-                                  }
-                                  className="text-[10px]"
-                                >
-                                  {key.permission === 'read_write'
-                                    ? 'Lettura & Scrittura'
-                                    : 'Sola lettura'}
-                                </Badge>
-                                {key.is_expired && (
-                                  <Badge
-                                    variant="destructive"
-                                    className="text-[10px]"
-                                  >
-                                    Scaduta
-                                  </Badge>
-                                )}
-                              </div>
-
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <FolderLock className="size-3" />
-                                  {scopedNames.length === 0
-                                    ? 'Tutte le cartelle'
-                                    : `Cartelle: ${scopedNames.join(', ')}`}
-                                </span>
-                                <span>
-                                  Creata il {formatShortDate(key.created_at)}
-                                </span>
-                                <span>
-                                  {key.expires_at
-                                    ? `Scadenza: ${formatShortDate(key.expires_at)}`
-                                    : 'Nessuna scadenza'}
-                                </span>
-                                <span>
-                                  {key.last_used_at
-                                    ? `Ultimo uso: ${formatRelativeDate(key.last_used_at)}`
-                                    : 'Mai utilizzata'}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="flex shrink-0 items-center justify-end gap-1.5">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="xs"
-                                className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => setPendingRevokeKey(key)}
-                              >
-                                <Trash2 className="size-3.5" />
-                                Revoca
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
+                      {apiKeys.map((key) => (
+                        <ScopedKeyCard
+                          key={key.id}
+                          item={key}
+                          vaultMap={vaultMap}
+                          onRevoke={() => setPendingRevokeKey(key)}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1404,6 +1617,291 @@ export function UserSettingsDialog({
                   </pre>
                 </div>
               </TabsContent>
+
+              {/* TAB 5: MCP SERVER */}
+              <TabsContent value="mcp" className="mt-0 min-w-0 space-y-5">
+                {newlyCreatedMcpKey && (
+                  <div className="space-y-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                        <AlertTriangle className="size-4 shrink-0" />
+                        <span>
+                          Copia subito la tua nuova chiave MCP "{newlyCreatedMcpKey.mcp_key.name}"
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        onClick={() => setNewlyCreatedMcpKey(null)}
+                      >
+                        Chiudi
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Per motivi di sicurezza il token completo viene mostrato{' '}
+                      <strong className="text-foreground">
+                        una sola volta
+                      </strong>{' '}
+                      ed è salvato sul server esclusivamente come hash SHA-256.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 rounded-lg border bg-background px-3 py-2 font-mono text-xs break-all select-all">
+                        {newlyCreatedMcpKey.secret_key}
+                      </code>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() =>
+                          copyText(
+                            newlyCreatedMcpKey.secret_key,
+                            'Chiave MCP',
+                            setCopiedMcpSecretKey,
+                          )
+                        }
+                      >
+                        {copiedMcpSecretKey ? (
+                          <>
+                            <Check className="size-3.5" />
+                            Copiata
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-3.5" />
+                            Copia
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={handleCreateMcpKey}
+                  className="space-y-3.5 rounded-xl border bg-muted/20 p-3.5"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <Plus className="size-4 text-primary" />
+                    Genera nuova chiave MCP
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="space-y-1.5 sm:col-span-1">
+                      <Label htmlFor="mcp-key-name" className="text-xs">
+                        Nome client / chiave
+                      </Label>
+                      <Input
+                        id="mcp-key-name"
+                        placeholder="es. Claude Code, Cursor, Antigravity..."
+                        value={newMcpKeyName}
+                        onChange={(e) => setNewMcpKeyName(e.target.value)}
+                        maxLength={80}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-1">
+                      <Label htmlFor="mcp-key-perm" className="text-xs">
+                        Permessi
+                      </Label>
+                      <Select
+                        value={newMcpKeyPermission}
+                        onValueChange={(v) =>
+                          setNewMcpKeyPermission(v as ApiKeyPermission)
+                        }
+                      >
+                        <SelectTrigger id="mcp-key-perm" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="read">
+                            Sola lettura (Read)
+                          </SelectItem>
+                          <SelectItem value="read_write">
+                            Lettura e scrittura
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5 sm:col-span-1">
+                      <Label htmlFor="mcp-key-exp" className="text-xs">
+                        Scadenza
+                      </Label>
+                      <Select
+                        value={newMcpKeyExpiry}
+                        onValueChange={setNewMcpKeyExpiry}
+                      >
+                        <SelectTrigger id="mcp-key-exp" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30">30 giorni</SelectItem>
+                          <SelectItem value="90">90 giorni</SelectItem>
+                          <SelectItem value="365">1 anno</SelectItem>
+                          <SelectItem value="never">
+                            Nessuna scadenza
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <VaultScopeSelector
+                    scopeMode={newMcpKeyScopeMode}
+                    onScopeModeChange={setNewMcpKeyScopeMode}
+                    selectedVaultIds={newMcpKeyVaultIds}
+                    onToggleVault={toggleSelectedMcpVault}
+                    vaults={vaults}
+                  />
+
+                  <div className="flex justify-end">
+                    <Button type="submit" size="sm" disabled={creatingMcpKey}>
+                      <Plug className="size-3.5" />
+                      {creatingMcpKey ? 'Generazione...' : 'Genera chiave MCP'}
+                    </Button>
+                  </div>
+                </form>
+
+                {/* MCP KEYS LIST */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Le tue chiavi MCP ({mcpKeys.length})
+                    </h4>
+                  </div>
+
+                  {loadingMcpKeys ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">
+                      Caricamento chiavi MCP...
+                    </p>
+                  ) : mcpKeys.length === 0 ? (
+                    <div className="rounded-xl border border-dashed py-8 text-center">
+                      <Plug className="mx-auto size-7 text-muted-foreground/60" />
+                      <p className="mt-2 text-sm font-medium">
+                        Nessuna chiave MCP attiva
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Genera una chiave MCP dedicata (sw_mcp_...) per
+                        collegare assistenti AI e IDE compatibili con Model
+                        Context Protocol.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {mcpKeys.map((key) => (
+                        <ScopedKeyCard
+                          key={key.id}
+                          item={key}
+                          vaultMap={vaultMap}
+                          onRevoke={() => setPendingRevokeMcpKey(key)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* MCP CLIENT CONNECTION SNIPPET */}
+                <div className="space-y-3 rounded-xl border bg-muted/30 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Terminal className="size-3.5 text-primary" />
+                      Configurazione Client MCP (Streamable HTTP)
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() =>
+                        copyText(
+                          mcpConfigSnippet,
+                          'Configurazione MCP',
+                          setCopiedMcpConfig,
+                        )
+                      }
+                    >
+                      {copiedMcpConfig ? (
+                        <>
+                          <Check className="size-3 text-emerald-500" />
+                          Copiata
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3" />
+                          Copia config
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                      Endpoint:
+                    </span>
+                    <code className="min-w-0 flex-1 truncate rounded border bg-background px-2 py-1 font-mono text-[11px]">
+                      {mcpEndpoint}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      onClick={() =>
+                        copyText(
+                          mcpEndpoint,
+                          'Endpoint MCP',
+                          setCopiedMcpEndpoint,
+                        )
+                      }
+                    >
+                      {copiedMcpEndpoint ? (
+                        <Check className="size-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                      Copia URL
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-background p-0.5 text-xs">
+                    {(
+                      [
+                        { id: 'json', label: 'JSON (mcpServers)' },
+                        { id: 'claude-code', label: 'Claude Code' },
+                        { id: 'vscode', label: 'VS Code' },
+                      ] as const
+                    ).map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setMcpSnippetClient(opt.id)}
+                        className={cn(
+                          'flex-1 cursor-pointer rounded-md px-2.5 py-1 text-[11px] transition-colors',
+                          mcpSnippetClient === opt.id
+                            ? 'bg-primary text-primary-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <pre className="overflow-x-auto rounded-lg border bg-background p-2.5 font-mono text-[11px] leading-relaxed">
+                    {mcpConfigSnippet}
+                  </pre>
+
+                  <p className="text-[11px] leading-relaxed text-muted-foreground">
+                    <strong className="text-foreground">Isolamento & Sicurezza:</strong>{' '}
+                    le chiavi MCP (<code className="font-mono">sw_mcp_...</code>)
+                    funzionano solo su <code className="font-mono">/api/mcp</code>{' '}
+                    (le chiavi REST <code className="font-mono">sw_live_...</code>{' '}
+                    vengono rifiutate). Liste e risorse espongono solo metadati;
+                    la decifratura avviene on-demand su{' '}
+                    <code className="font-mono">get_credential</code> con
+                    registrazione nell'Audit Log.
+                  </p>
+                </div>
+              </TabsContent>
             </div>
           </Tabs>
         </DialogContent>
@@ -1434,6 +1932,42 @@ export function UserSettingsDialog({
             <AlertDialogAction
               variant="destructive"
               onClick={confirmRevokeApiKey}
+            >
+              Revoca definitivamente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* REVOKE MCP KEY CONFIRMATION */}
+      <AlertDialog
+        open={Boolean(pendingRevokeMcpKey)}
+        onOpenChange={(openState) => {
+          if (!openState) setPendingRevokeMcpKey(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revocare questa chiave MCP?</AlertDialogTitle>
+            <AlertDialogDescription>
+              La chiave MCP{' '}
+              <strong className="text-foreground">
+                "{pendingRevokeMcpKey?.name}"
+              </strong>{' '}
+              (
+              <code className="font-mono">
+                {pendingRevokeMcpKey?.key_prefix}
+              </code>
+              ) verrà disattivata immediatamente. Il client AI o IDE collegato
+              non potrà più autenticarsi su{' '}
+              <code className="font-mono">/api/mcp</code>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmRevokeMcpKey}
             >
               Revoca definitivamente
             </AlertDialogAction>

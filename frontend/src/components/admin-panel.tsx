@@ -31,6 +31,7 @@ import {
   ListFilter,
   Lock,
   Pencil,
+  Plug,
   Plus,
   RefreshCw,
   Search,
@@ -283,6 +284,21 @@ const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
     tone: 'violet',
     icon: Bot,
   },
+  'mcp_key.created': {
+    label: 'Chiave MCP generata',
+    tone: 'emerald',
+    icon: Plug,
+  },
+  'mcp_key.revoked': {
+    label: 'Chiave MCP revocata',
+    tone: 'rose',
+    icon: Trash2,
+  },
+  'auth.mcp_key_used': {
+    label: 'Accesso Server MCP',
+    tone: 'violet',
+    icon: Plug,
+  },
 }
 
 const TARGET_TYPE_LABELS: Record<string, string> = {
@@ -292,6 +308,7 @@ const TARGET_TYPE_LABELS: Record<string, string> = {
   vault: 'Cartella',
   credential: 'Credenziale',
   api_key: 'API Key',
+  mcp_key: 'Chiave MCP',
   service_account: 'Service Account',
 }
 
@@ -362,6 +379,7 @@ const AUDIT_TARGET_OPTIONS: { value: string; label: string }[] = [
   { value: 'vault', label: 'Cartelle' },
   { value: 'credential', label: 'Credenziali' },
   { value: 'api_key', label: 'API Key' },
+  { value: 'mcp_key', label: 'Chiave MCP' },
   { value: 'service_account', label: 'Service Account' },
 ]
 const AUDIT_PERIOD_OPTIONS: { value: AuditPeriodFilter; label: string }[] = [
@@ -1088,6 +1106,8 @@ export function AdminPanel({
           return act.startsWith('credential.')
         if (auditTargetTypeFilter === 'api_key')
           return act.startsWith('api_key.') || act === 'auth.api_key_used'
+        if (auditTargetTypeFilter === 'mcp_key')
+          return act.startsWith('mcp_key.') || act === 'auth.mcp_key_used'
         if (auditTargetTypeFilter === 'service_account')
           return (
             act.startsWith('service_account.') ||

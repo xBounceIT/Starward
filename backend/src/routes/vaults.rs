@@ -319,9 +319,17 @@ pub async fn list_vaults(
     State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> AppResult<Json<Vec<VaultDto>>> {
+    let vaults = list_vaults_for_user(&state, &user).await?;
+    Ok(Json(vaults))
+}
+
+pub(crate) async fn list_vaults_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+) -> AppResult<Vec<VaultDto>> {
     if let Some(ref sa) = user.service_account {
         if sa.vault_ids.is_empty() {
-            return Ok(Json(Vec::new()));
+            return Ok(Vec::new());
         }
 
         let sa_role = user.service_account_vault_role().unwrap_or("viewer");
@@ -384,7 +392,7 @@ pub async fn list_vaults(
             })
             .collect();
 
-        return Ok(Json(vaults));
+        return Ok(vaults);
     }
 
     let rows: Vec<VaultRow> = sqlx::query_as(
@@ -473,7 +481,7 @@ pub async fn list_vaults(
         vaults.push(build_vault_dto(&state.db, row, &user.id).await?);
     }
 
-    Ok(Json(vaults))
+    Ok(vaults)
 }
 
 pub async fn create_vault(
@@ -481,13 +489,25 @@ pub async fn create_vault(
     user: AuthenticatedUser,
     Json(payload): Json<CreateVaultRequest>,
 ) -> AppResult<(StatusCode, Json<VaultDto>)> {
+    let dto = create_vault_for_user(&state, &user, payload, None).await?;
+    Ok((StatusCode::CREATED, Json(dto)))
+}
+
+pub(crate) async fn create_vault_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    payload: CreateVaultRequest,
+    audit_suffix: Option<&str>,
+) -> AppResult<VaultDto> {
     user.require_non_service_account()?;
     user.require_write_permission()?;
     if user.is_vault_restricted_api_key() {
-        return Err(AppError::Forbidden(
+        let msg = if user.mcp_key.is_some() {
+            "Questa chiave MCP è limitata a cartelle specifiche e non può creare nuove cartelle"
+        } else {
             "Questa API Key è limitata a cartelle specifiche e non può creare nuove cartelle"
-                .to_string(),
-        ));
+        };
+        return Err(AppError::Forbidden(msg.to_string()));
     }
 
     let name = payload.name.trim();
@@ -527,7 +547,7 @@ pub async fn create_vault(
         let (gname,) =
             group_row.ok_or_else(|| AppError::NotFound("Gruppo non trovato".to_string()))?;
 
-        let membership = get_user_group_role(&state.db, gid, &user).await?;
+        let membership = get_user_group_role(&state.db, gid, user).await?;
         if membership.is_none() {
             return Err(AppError::Forbidden(
                 "Devi essere membro del gruppo per creare una cartella a nome del gruppo"
@@ -597,7 +617,7 @@ pub async fn create_vault(
 
     tx.commit().await?;
 
-    let audit_details = if let Some(ref gname) = owner_group_name {
+    let mut audit_details = if let Some(ref gname) = owner_group_name {
         format!(
             "Cartella '{}' creata a nome del gruppo '{}' (permessi membri: {})",
             name, gname, group_role
@@ -605,19 +625,21 @@ pub async fn create_vault(
     } else {
         format!("Cartella '{}' creata", name)
     };
+    if let Some(tag) = audit_suffix {
+        audit_details.push_str(&format!(" [{tag}]"));
+    }
 
     record_audit(
         &state.db,
         &vault_id,
         None,
-        &user,
+        user,
         "vault.created",
         &audit_details,
     )
     .await?;
 
-    let dto = fetch_single_vault(&state.db, &vault_id, &user).await?;
-    Ok((StatusCode::CREATED, Json(dto)))
+    fetch_single_vault(&state.db, &vault_id, user).await
 }
 
 pub async fn update_vault(

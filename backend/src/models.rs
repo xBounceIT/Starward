@@ -118,6 +118,36 @@ pub struct CreateApiKeyRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpKeyDto {
+    pub id: String,
+    pub name: String,
+    pub key_prefix: String,
+    pub permission: String,
+    pub vault_ids: Vec<String>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub is_expired: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreatedMcpKeyDto {
+    pub mcp_key: McpKeyDto,
+    pub secret_key: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CreateMcpKeyRequest {
+    pub name: String,
+    #[serde(default = "default_api_key_permission")]
+    pub permission: String,
+    #[serde(default)]
+    pub vault_ids: Vec<String>,
+    pub expires_in_days: Option<i64>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroupMemberDto {
     pub id: String,
     pub group_id: String,
@@ -412,6 +442,26 @@ pub struct CredentialDto {
     pub category: String,
     pub notes: String,
     pub fields: BTreeMap<String, String>,
+    pub favorite: bool,
+    pub created_by: String,
+    pub created_by_name: String,
+    pub updated_by: String,
+    pub updated_by_name: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct CredentialMetadataDto {
+    pub id: String,
+    pub vault_id: String,
+    pub vault_name: String,
+    pub vault_color: String,
+    pub vault_role: String,
+    pub title: String,
+    pub username: String,
+    pub url: String,
+    pub category: String,
     pub favorite: bool,
     pub created_by: String,
     pub created_by_name: String,

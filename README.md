@@ -26,10 +26,30 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
    - Password e note cifrate a riposo in Rust con **AES-256-GCM**, nonce casuali a 96-bit per ogni salvataggio e derivazione chiave **HKDF-SHA256**.
    - Interfaccia master-detail ispirata ai moderni password manager: ricerca istantanea (`Ctrl+K`), filtri per categoria, copia rapida in un clic, generatore di password con indicatore di robustezza, tema chiaro/scuro e layout responsive.
 
-4. **Impostazioni Utente & API Key Personali (`sw_live_...`)**
+5. **Impostazioni Utente & API Key Personali (`sw_live_...`)**
    - Pannello impostazioni completo (Profilo, Sicurezza & Sessioni Attive, Preferenze Vault e Generatore Password, Gestione API Key).
    - Generazione di **API Key personali** salvate esclusivamente come hash **SHA-256**, con scelta dei permessi (`read` o `read_write`), restrizione opzionale a specifiche cartelle e scadenza configurabile.
    - Autenticazione programmatica diretta tramite header `Authorization: Bearer sw_live_...` o `X-API-Key: sw_live_...` su `/api/v1/*` e `/api/*`.
+
+6. **Server MCP Integrato legato all'utenza (`sw_mcp_...`)**
+   - Endpoint **Streamable HTTP** nativo su `/api/mcp` (compatibile con Claude Code, Cursor, VS Code, Antigravity e altri client MCP, senza container o porte aggiuntive).
+   - **Chiavi MCP dedicate (`sw_mcp_...`)** gestibili dalla scheda **MCP** nelle Impostazioni Utente: salvate solo come hash **SHA-256**, con permessi (`read` o `read_write`), restrizione opzionale a cartelle specifiche e scadenza configurabile.
+   - **Isolamento rigoroso**: le chiavi `sw_mcp_...` possono autenticarsi esclusivamente su `/api/mcp` (vengono rifiutate dalle API REST), mentre le chiavi REST (`sw_live_...`), i Service Account (`sw_sa_...`) e i token JWT non possono accedere al server MCP.
+   - **Segreti on-demand con Audit Log**: `list_vaults`, `list_credentials` e le risorse (`starward://vaults`, `starward://vaults/{vault_id}/credentials`) espongono solo metadati senza decifrare segreti; la decifratura avviene on-demand tramite `get_credential` con tracciamento automatico nel registro attività (`[via MCP: ...]`). Le chiavi `read_write` espongono anche `create_credential`, `update_credential`, `delete_credential` (e `create_vault` se non limitate a cartelle specifiche).
+   - Esempio di configurazione client MCP (`mcpServers`):
+     ```json
+     {
+       "mcpServers": {
+         "starward": {
+           "type": "http",
+           "url": "http://localhost:3000/api/mcp",
+           "headers": {
+             "Authorization": "Bearer sw_mcp_..."
+           }
+         }
+       }
+     }
+     ```
 
 ## Struttura del progetto
 
@@ -42,11 +62,11 @@ Starward/
 │       ├── main.rs          # Router Axum, CORS, applicazione schema PostgreSQL e test
 │       ├── auth.rs          # Validazione JWT HS256, sync utenti e collegamento inviti pendenti
 │       ├── crypto.rs        # Cifratura AES-256-GCM + HKDF-SHA256
-│       └── routes/          # API REST /api/vaults, /api/credentials, /api/users, /api/health
+│       └── routes/          # API REST /api/vaults, /api/credentials, /api/users, /api/mcp-keys, Server MCP (/api/mcp)
 └── frontend/                # Frontend TanStack Start + Better Auth (pg) + Tailwind v4 + shadcn/ui
     └── src/
         ├── lib/auth.ts      # Configurazione Better Auth su PostgreSQL (Locale + SSO OIDC/Social)
-        ├── routes/api/      # Handler /api/auth/$ e proxy autenticato /api/v1/$
+        ├── routes/api/      # Handler /api/auth/$, proxy /api/v1/$ e proxy MCP /api/mcp
         ├── routes/login.tsx # Pagina accesso locale + SSO
         ├── routes/vault.tsx # Workspace principale del password manager
         └── components/      # Componenti shadcn/ui e moduli vault/condivisione

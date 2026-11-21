@@ -102,6 +102,12 @@ pub fn build_app(state: AppState) -> Router {
             header::CONTENT_TYPE,
             header::ACCEPT,
             HeaderName::from_static("x-api-key"),
+            HeaderName::from_static("mcp-protocol-version"),
+            HeaderName::from_static("mcp-session-id"),
+        ])
+        .expose_headers([
+            HeaderName::from_static("mcp-session-id"),
+            HeaderName::from_static("mcp-protocol-version"),
         ]);
 
     Router::new()
@@ -121,6 +127,21 @@ pub fn build_app(state: AppState) -> Router {
         .route(
             "/api/api-keys/{key_id}",
             delete(routes::api_keys::delete_api_key),
+        )
+        .route(
+            "/api/mcp-keys",
+            get(routes::mcp_keys::list_mcp_keys).post(routes::mcp_keys::create_mcp_key),
+        )
+        .route(
+            "/api/mcp-keys/{key_id}",
+            delete(routes::mcp_keys::delete_mcp_key),
+        )
+        .route(
+            "/api/mcp",
+            post(routes::mcp::handle_mcp_post)
+                .get(routes::mcp::handle_mcp_get)
+                .delete(routes::mcp::handle_mcp_delete)
+                .layer(DefaultBodyLimit::max(1024 * 1024)),
         )
         .route("/api/users", get(routes::users::list_users))
         .route("/api/admin/users", get(routes::admin::list_admin_users))
@@ -2244,6 +2265,851 @@ mod tests {
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
             .bind(&owner_id)
             .bind(&viewer_id)
+            .execute(&db)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn mcp_server_and_keys_workflow_postgres() {
+        let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
+            eprintln!("Skipping PostgreSQL integration test: TEST_DATABASE_URL not set");
+            return;
+        };
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let alice_id = format!("test-mcp-alice-{suffix}");
+        let bob_id = format!("test-mcp-bob-{suffix}");
+        let alice_email = format!("mcp-alice-{suffix}@starward.io");
+        let bob_email = format!("mcp-bob-{suffix}@starward.io");
+
+        let config = Config {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            database_url,
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            cors_origin: "http://localhost:3000".to_string(),
+            admin_emails: vec![alice_email.clone()],
+        };
+
+        let db = init_db(&config.database_url).await.unwrap();
+        let crypto = VaultCrypto::from_master_key(&config.master_key);
+        let app = build_app(AppState {
+            db: db.clone(),
+            config: config.clone(),
+            crypto,
+        });
+
+        let alice_token = make_token(&config.auth_secret, &alice_id, &alice_email, "Alice");
+        let bob_token = make_token(&config.auth_secret, &bob_id, &bob_email, "Bob");
+
+        // 1. Seed vaults & credentials (Alice personal + shared "Infra Prod", Bob viewer on "Infra Prod")
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let alice_vaults = read_json(res).await;
+        let alice_personal_id = alice_vaults
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["is_personal"] == true)
+            .unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "name": "Infra Prod", "description": "Server produzione" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let infra_vault_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{infra_vault_id}/members"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "email": bob_email, "role": "viewer" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        // Initialize Bob user & personal vault
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Create one credential in Alice Personal and one in Infra Prod
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": alice_personal_id,
+                            "title": "Alice Private Login",
+                            "username": "alice",
+                            "password": "AliceOnlySecret!99",
+                            "notes": "Private personal note"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let alice_priv_cred_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": infra_vault_id,
+                            "title": "Prod DB",
+                            "username": "pgadmin",
+                            "password": "DbMcpSecret!2026",
+                            "url": "db.prod.internal",
+                            "category": "database",
+                            "notes": "Secret prod note"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let prod_cred_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        // 2. Create MCP keys (read unscoped, read_write scoped, read_write unscoped for Bob) and REST API key
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp-keys")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "Alice Read MCP",
+                            "permission": "read",
+                            "expires_in_days": 30
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let created_ro = read_json(res).await;
+        let ro_key_id = created_ro["mcp_key"]["id"].as_str().unwrap().to_string();
+        let ro_secret = created_ro["secret_key"].as_str().unwrap().to_string();
+        assert!(ro_secret.starts_with("sw_mcp_"));
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp-keys")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "Alice Scoped RW MCP",
+                            "permission": "read_write",
+                            "vault_ids": [infra_vault_id],
+                            "expires_in_days": 90
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let created_scoped_rw = read_json(res).await;
+        let scoped_rw_secret = created_scoped_rw["secret_key"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp-keys")
+                    .header("Authorization", format!("Bearer {bob_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "Bob Full RW MCP",
+                            "permission": "read_write"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let bob_rw_secret = read_json(res).await["secret_key"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/api-keys")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "name": "Alice REST Key",
+                            "permission": "read_write"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let rest_secret = read_json(res).await["secret_key"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(rest_secret.starts_with("sw_live_"));
+
+        // List MCP keys hides secret and requires session auth
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/mcp-keys")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let listed_keys = read_json(res).await;
+        assert_eq!(listed_keys.as_array().unwrap().len(), 2);
+
+        // 3. Strict bidirectional isolation
+        for uri in ["/api/vaults", "/api/credentials", "/api/mcp-keys"] {
+            let res = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("GET")
+                        .uri(uri)
+                        .header("Authorization", format!("Bearer {ro_secret}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        }
+
+        for bad_auth in [
+            format!("Bearer {rest_secret}"),
+            format!("Bearer {alice_token}"),
+        ] {
+            let res = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/mcp")
+                        .header("Authorization", bad_auth)
+                        .header("Content-Type", "application/json")
+                        .body(Body::from(
+                            json!({"jsonrpc": "2.0", "id": 1, "method": "ping"}).to_string(),
+                        ))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+            assert!(res.headers().contains_key("www-authenticate"));
+        }
+
+        // Expired MCP key is rejected with 401
+        let (expired_secret, expired_prefix, expired_hash) = crate::crypto::generate_mcp_key();
+        sqlx::query(
+            "INSERT INTO mcp_keys (id, user_id, name, key_prefix, key_hash, permission, vault_ids, expires_at, created_at) VALUES ($1, $2, 'Expired', $3, $4, 'read', '{}', NOW() - INTERVAL '1 hour', NOW())",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(&alice_id)
+        .bind(&expired_prefix)
+        .bind(&expired_hash)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp")
+                    .header("X-API-Key", &expired_secret)
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({"jsonrpc": "2.0", "id": 1, "method": "ping"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        // 4. Streamable HTTP handshake & methods
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/mcp")
+                    .header("Authorization", format!("Bearer {ro_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::METHOD_NOT_ALLOWED);
+        assert!(res.headers().contains_key("allow"));
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/api/mcp")
+                    .header("Authorization", format!("Bearer {ro_secret}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp")
+                    .header("Authorization", format!("Bearer {ro_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "jsonrpc": "2.0",
+                            "id": 1,
+                            "method": "initialize",
+                            "params": {
+                                "protocolVersion": "2025-06-18",
+                                "capabilities": {},
+                                "clientInfo": { "name": "test-client", "version": "1.0" }
+                            }
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        assert_eq!(
+            res.headers()
+                .get("mcp-protocol-version")
+                .and_then(|v| v.to_str().ok()),
+            Some("2025-06-18")
+        );
+        let init_json = read_json(res).await;
+        assert_eq!(init_json["result"]["serverInfo"]["name"], "starward-mcp");
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp")
+                    .header("Authorization", format!("Bearer {ro_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "jsonrpc": "2.0",
+                            "method": "notifications/initialized"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::ACCEPTED);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp")
+                    .header("Authorization", format!("Bearer {ro_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from("{not-json"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(read_json(res).await["error"]["code"], -32700);
+
+        // 5. Dynamic tools/list per permission & scope
+        let mcp_call = |secret: String, body: Value| {
+            let app = app.clone();
+            async move {
+                let res = app
+                    .oneshot(
+                        Request::builder()
+                            .method("POST")
+                            .uri("/api/mcp")
+                            .header("X-API-Key", secret)
+                            .header("Content-Type", "application/json")
+                            .body(Body::from(body.to_string()))
+                            .unwrap(),
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.status(), StatusCode::OK);
+                read_json(res).await
+            }
+        };
+
+        let ro_tools = mcp_call(
+            ro_secret.clone(),
+            json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
+        )
+        .await;
+        assert_eq!(ro_tools["result"]["tools"].as_array().unwrap().len(), 4);
+
+        let scoped_tools = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/list" }),
+        )
+        .await;
+        assert_eq!(scoped_tools["result"]["tools"].as_array().unwrap().len(), 7);
+
+        let bob_tools = mcp_call(
+            bob_rw_secret.clone(),
+            json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/list" }),
+        )
+        .await;
+        assert_eq!(bob_tools["result"]["tools"].as_array().unwrap().len(), 8);
+
+        // 6. whoami, list_vaults, metadata-only list_credentials, on-demand get_credential
+        let whoami_res = mcp_call(
+            ro_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 5,
+                "method": "tools/call",
+                "params": { "name": "whoami", "arguments": {} }
+            }),
+        )
+        .await;
+        assert_eq!(whoami_res["result"]["isError"], false);
+        let whoami_payload: Value =
+            serde_json::from_str(whoami_res["result"]["content"][0]["text"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(whoami_payload["user"]["id"], alice_id);
+        assert_eq!(whoami_payload["mcp_key"]["permission"], "read");
+
+        let scoped_vaults_res = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "tools/call",
+                "params": { "name": "list_vaults", "arguments": {} }
+            }),
+        )
+        .await;
+        let scoped_vaults_payload: Value = serde_json::from_str(
+            scoped_vaults_res["result"]["content"][0]["text"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(scoped_vaults_payload["count"], 1);
+        assert_eq!(scoped_vaults_payload["vaults"][0]["id"], infra_vault_id);
+
+        let list_creds_res = mcp_call(
+            ro_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": { "name": "list_credentials", "arguments": { "vault_id": infra_vault_id } }
+            }),
+        )
+        .await;
+        let list_creds_text = list_creds_res["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap();
+        assert!(!list_creds_text.contains("DbMcpSecret!2026"));
+        assert!(!list_creds_text.contains("Secret prod note"));
+
+        let get_cred_res = mcp_call(
+            ro_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 8,
+                "method": "tools/call",
+                "params": { "name": "get_credential", "arguments": { "credential_id": prod_cred_id } }
+            }),
+        )
+        .await;
+        assert_eq!(get_cred_res["result"]["isError"], false);
+        let cred_payload: Value =
+            serde_json::from_str(get_cred_res["result"]["content"][0]["text"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(cred_payload["password"], "DbMcpSecret!2026");
+        assert_eq!(cred_payload["notes"], "Secret prod note");
+
+        // Out-of-scope get_credential rejected
+        let oos_get = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": { "name": "get_credential", "arguments": { "credential_id": alice_priv_cred_id } }
+            }),
+        )
+        .await;
+        assert_eq!(oos_get["result"]["isError"], true);
+
+        // 7. Write tools & permission enforcement
+        let ro_create = mcp_call(
+            ro_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 10,
+                "method": "tools/call",
+                "params": {
+                    "name": "create_credential",
+                    "arguments": { "vault_id": infra_vault_id, "title": "Nope", "password": "secret" }
+                }
+            }),
+        )
+        .await;
+        assert_eq!(ro_create["result"]["isError"], true);
+
+        // Bob (viewer on infra_vault_id) cannot create in infra_vault_id even with read_write MCP key
+        let bob_viewer_create = mcp_call(
+            bob_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 11,
+                "method": "tools/call",
+                "params": {
+                    "name": "create_credential",
+                    "arguments": { "vault_id": infra_vault_id, "title": "Forbidden", "password": "secret" }
+                }
+            }),
+        )
+        .await;
+        assert_eq!(bob_viewer_create["result"]["isError"], true);
+
+        // Scoped key cannot create_vault
+        let scoped_create_vault = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 12,
+                "method": "tools/call",
+                "params": { "name": "create_vault", "arguments": { "name": "Blocked" } }
+            }),
+        )
+        .await;
+        assert_eq!(scoped_create_vault["result"]["isError"], true);
+
+        // Scoped RW key creates, updates, and deletes a credential in infra_vault_id
+        let rw_create = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 13,
+                "method": "tools/call",
+                "params": {
+                    "name": "create_credential",
+                    "arguments": {
+                        "vault_id": infra_vault_id,
+                        "title": "MCP Created API Token",
+                        "username": "deploy-bot",
+                        "password": "CreatedViaMcp!123",
+                        "category": "api_key"
+                    }
+                }
+            }),
+        )
+        .await;
+        assert_eq!(rw_create["result"]["isError"], false);
+        let rw_create_text = rw_create["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(!rw_create_text.contains("CreatedViaMcp!123"));
+        let rw_created_json: Value = serde_json::from_str(rw_create_text).unwrap();
+        let mcp_cred_id = rw_created_json["id"].as_str().unwrap().to_string();
+
+        let raw_cipher: (String,) =
+            sqlx::query_as("SELECT password_ciphertext FROM credentials WHERE id = $1")
+                .bind(&mcp_cred_id)
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert!(!raw_cipher.0.contains("CreatedViaMcp!123"));
+
+        let rw_update = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 14,
+                "method": "tools/call",
+                "params": {
+                    "name": "update_credential",
+                    "arguments": {
+                        "credential_id": mcp_cred_id,
+                        "password": "RotatedViaMcp!456"
+                    }
+                }
+            }),
+        )
+        .await;
+        assert_eq!(rw_update["result"]["isError"], false);
+
+        let verify_updated = mcp_call(
+            ro_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 15,
+                "method": "tools/call",
+                "params": { "name": "get_credential", "arguments": { "credential_id": mcp_cred_id } }
+            }),
+        )
+        .await;
+        let verify_updated_json: Value =
+            serde_json::from_str(verify_updated["result"]["content"][0]["text"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(verify_updated_json["password"], "RotatedViaMcp!456");
+
+        let rw_delete = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 16,
+                "method": "tools/call",
+                "params": { "name": "delete_credential", "arguments": { "credential_id": mcp_cred_id } }
+            }),
+        )
+        .await;
+        assert_eq!(rw_delete["result"]["isError"], false);
+
+        // Bob unscoped RW key creates a vault
+        let bob_create_vault = mcp_call(
+            bob_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 17,
+                "method": "tools/call",
+                "params": { "name": "create_vault", "arguments": { "name": "Bob MCP Vault" } }
+            }),
+        )
+        .await;
+        assert_eq!(bob_create_vault["result"]["isError"], false);
+
+        // 8. Resources
+        let res_read_vaults = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 18,
+                "method": "resources/read",
+                "params": { "uri": "starward://vaults" }
+            }),
+        )
+        .await;
+        let vaults_res_json: Value = serde_json::from_str(
+            res_read_vaults["result"]["contents"][0]["text"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(vaults_res_json.as_array().unwrap().len(), 1);
+
+        let res_read_creds = mcp_call(
+            ro_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 19,
+                "method": "resources/read",
+                "params": { "uri": format!("starward://vaults/{infra_vault_id}/credentials") }
+            }),
+        )
+        .await;
+        let creds_res_text = res_read_creds["result"]["contents"][0]["text"]
+            .as_str()
+            .unwrap();
+        assert!(!creds_res_text.contains("DbMcpSecret!2026"));
+
+        let res_read_oos = mcp_call(
+            scoped_rw_secret.clone(),
+            json!({
+                "jsonrpc": "2.0",
+                "id": 20,
+                "method": "resources/read",
+                "params": { "uri": format!("starward://vaults/{alice_personal_id}/credentials") }
+            }),
+        )
+        .await;
+        assert_eq!(res_read_oos["error"]["code"], -32002);
+
+        // 9. Audit logs, last_used_at, and revocation
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/vaults/{infra_vault_id}/audit"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let vault_audit = read_json(res).await;
+        assert!(vault_audit.as_array().unwrap().iter().any(|a| {
+            a["action"] == "credential.accessed"
+                && a["details"].as_str().unwrap_or("").contains("[via MCP:")
+        }));
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri(format!("/api/mcp-keys/{ro_key_id}"))
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/mcp")
+                    .header("Authorization", format!("Bearer {ro_secret}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({"jsonrpc": "2.0", "id": 21, "method": "ping"}).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/audit?target_type=mcp_key")
+                    .header("Authorization", format!("Bearer {alice_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let sys_audit = read_json(res).await;
+        let actions: Vec<&str> = sys_audit
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|e| e["action"].as_str())
+            .collect();
+        assert!(actions.contains(&"mcp_key.created"));
+        assert!(actions.contains(&"auth.mcp_key_used"));
+        assert!(actions.contains(&"mcp_key.revoked"));
+
+        // Clean up test users
+        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
+            .bind(&alice_id)
+            .bind(&bob_id)
             .execute(&db)
             .await;
     }

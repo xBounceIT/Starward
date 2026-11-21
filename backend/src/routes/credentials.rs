@@ -14,10 +14,19 @@ use crate::{
     auth::AuthenticatedUser,
     crypto::VaultCrypto,
     error::{AppError, AppResult},
-    models::{CreateCredentialRequest, CredentialDto, UpdateCredentialRequest},
+    models::{
+        CreateCredentialRequest, CredentialDto, CredentialMetadataDto, UpdateCredentialRequest,
+    },
     routes::{record_audit, require_vault_role},
     AppState,
 };
+
+fn append_audit_suffix(mut details: String, audit_suffix: Option<&str>) -> String {
+    if let Some(tag) = audit_suffix {
+        details.push_str(&format!(" [{tag}]"));
+    }
+    details
+}
 
 #[derive(Debug, Deserialize)]
 pub struct ListCredentialsQuery {
@@ -447,35 +456,165 @@ pub async fn list_credentials(
     Ok(Json(credentials))
 }
 
-pub async fn get_credential(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Path(credential_id): Path<String>,
-) -> AppResult<Json<CredentialDto>> {
-    let dto = fetch_credential_dto(&state, &credential_id, &user).await?;
+pub(crate) async fn list_credential_metadata_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    query: ListCredentialsQuery,
+) -> AppResult<Vec<CredentialMetadataDto>> {
+    user.require_non_service_account()?;
+
+    let search = query.q.unwrap_or_default().trim().to_lowercase();
+    let search_pattern = format!("%{}%", search);
+    let fav_only = query.favorite.unwrap_or(false);
+    let category = query.category.unwrap_or_default().trim().to_lowercase();
+
+    if let Some(ref vault_id) = query.vault_id {
+        require_vault_role(&state.db, vault_id, user, &["owner", "editor", "viewer"]).await?;
+    }
+
+    let rows: Vec<CredentialMetadataDto> = sqlx::query_as(
+        r#"
+        WITH user_vault_roles AS (
+            SELECT
+                vault_id,
+                CASE MAX(role_rank)
+                    WHEN 3 THEN 'owner'
+                    WHEN 2 THEN 'editor'
+                    ELSE 'viewer'
+                END AS role
+            FROM (
+                SELECT
+                    vm.vault_id,
+                    CASE vm.role WHEN 'owner' THEN 3 WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_members vm
+                WHERE vm.user_id = $1 OR LOWER(vm.member_email) = LOWER($2)
+
+                UNION ALL
+
+                SELECT
+                    vg.vault_id,
+                    CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END AS role_rank
+                FROM vault_groups vg
+                INNER JOIN group_members gm ON gm.group_id = vg.group_id
+                WHERE gm.user_id = $1 OR LOWER(gm.member_email) = LOWER($2)
+
+                UNION ALL
+
+                SELECT
+                    v.id AS vault_id,
+                    CASE
+                        WHEN gm.role = 'owner' OR v.owner_id = $1 THEN 3
+                        ELSE COALESCE(
+                            (
+                                SELECT CASE vg.role WHEN 'editor' THEN 2 ELSE 1 END
+                                FROM vault_groups vg
+                                WHERE vg.vault_id = v.id AND vg.group_id = v.owner_group_id
+                                LIMIT 1
+                            ),
+                            2
+                        )
+                    END AS role_rank
+                FROM vaults v
+                INNER JOIN group_members gm ON gm.group_id = v.owner_group_id
+                WHERE v.owner_group_id IS NOT NULL
+                  AND (gm.user_id = $1 OR LOWER(gm.member_email) = LOWER($2))
+            ) AS raw_roles
+            GROUP BY vault_id
+        )
+        SELECT
+            c.id,
+            c.vault_id,
+            v.name AS vault_name,
+            v.color AS vault_color,
+            uvr.role AS vault_role,
+            c.title,
+            c.username,
+            c.url,
+            c.category,
+            c.favorite,
+            c.created_by,
+            cb.name AS created_by_name,
+            c.updated_by,
+            ub.name AS updated_by_name,
+            c.created_at,
+            c.updated_at
+        FROM credentials c
+        INNER JOIN vaults v ON v.id = c.vault_id
+        INNER JOIN user_vault_roles uvr ON uvr.vault_id = v.id
+        INNER JOIN users cb ON cb.id = c.created_by
+        INNER JOIN users ub ON ub.id = c.updated_by
+        WHERE ($3::TEXT IS NULL OR c.vault_id = $3)
+          AND (NOT $4 OR c.favorite = TRUE)
+          AND ($5 = '' OR LOWER(c.category) = $5)
+          AND (
+            $6 = '%%'
+            OR c.title ILIKE $6
+            OR c.username ILIKE $6
+            OR c.url ILIKE $6
+            OR v.name ILIKE $6
+          )
+        ORDER BY c.favorite DESC, c.updated_at DESC
+        "#,
+    )
+    .bind(&user.id)
+    .bind(&user.email)
+    .bind(&query.vault_id)
+    .bind(fav_only)
+    .bind(&category)
+    .bind(&search_pattern)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter(|row| user.can_access_vault(&row.vault_id))
+        .collect())
+}
+
+pub(crate) async fn get_credential_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    credential_id: &str,
+    audit_suffix: Option<&str>,
+) -> AppResult<CredentialDto> {
+    let dto = fetch_credential_dto(state, credential_id, user).await?;
+    let details = append_audit_suffix(
+        format!(
+            "Credenziale '{}' consultata nella cartella '{}'",
+            dto.title, dto.vault_name
+        ),
+        audit_suffix,
+    );
 
     record_audit(
         &state.db,
         &dto.vault_id,
         Some(&dto.id),
-        &user,
+        user,
         "credential.accessed",
-        &format!(
-            "Credenziale '{}' consultata nella cartella '{}'",
-            dto.title, dto.vault_name
-        ),
+        &details,
     )
     .await?;
 
+    Ok(dto)
+}
+
+pub async fn get_credential(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(credential_id): Path<String>,
+) -> AppResult<Json<CredentialDto>> {
+    let dto = get_credential_for_user(&state, &user, &credential_id, None).await?;
     Ok(Json(dto))
 }
 
-pub async fn create_credential(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Json(payload): Json<CreateCredentialRequest>,
-) -> AppResult<(StatusCode, Json<CredentialDto>)> {
-    require_vault_role(&state.db, &payload.vault_id, &user, &["owner", "editor"]).await?;
+pub(crate) async fn create_credential_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    payload: CreateCredentialRequest,
+    audit_suffix: Option<&str>,
+) -> AppResult<CredentialDto> {
+    require_vault_role(&state.db, &payload.vault_id, user, &["owner", "editor"]).await?;
 
     let title = payload.title.trim();
     if title.is_empty() || title.len() > 140 {
@@ -526,31 +665,45 @@ pub async fn create_credential(
     .execute(&state.db)
     .await?;
 
+    let details = append_audit_suffix(
+        format!("Credenziale '{}' creata", title),
+        audit_suffix,
+    );
+
     record_audit(
         &state.db,
         &payload.vault_id,
         Some(&id),
-        &user,
+        user,
         "credential.created",
-        &format!("Credenziale '{}' creata", title),
+        &details,
     )
     .await?;
 
-    let dto = fetch_credential_dto(&state, &id, &user).await?;
+    fetch_credential_dto(state, &id, user).await
+}
+
+pub async fn create_credential(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Json(payload): Json<CreateCredentialRequest>,
+) -> AppResult<(StatusCode, Json<CredentialDto>)> {
+    let dto = create_credential_for_user(&state, &user, payload, None).await?;
     Ok((StatusCode::CREATED, Json(dto)))
 }
 
-pub async fn update_credential(
-    State(state): State<AppState>,
-    user: AuthenticatedUser,
-    Path(credential_id): Path<String>,
-    Json(payload): Json<UpdateCredentialRequest>,
-) -> AppResult<Json<CredentialDto>> {
-    let existing = fetch_credential_dto(&state, &credential_id, &user).await?;
+pub(crate) async fn update_credential_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    credential_id: &str,
+    payload: UpdateCredentialRequest,
+    audit_suffix: Option<&str>,
+) -> AppResult<CredentialDto> {
+    let existing = fetch_credential_dto(state, credential_id, user).await?;
     if user.service_account.is_some() {
         user.require_write_permission()?;
     } else {
-        require_vault_role(&state.db, &existing.vault_id, &user, &["owner", "editor"]).await?;
+        require_vault_role(&state.db, &existing.vault_id, user, &["owner", "editor"]).await?;
     }
 
     let target_vault_id = payload
@@ -561,7 +714,7 @@ pub async fn update_credential(
         .unwrap_or(&existing.vault_id);
 
     if target_vault_id != existing.vault_id {
-        require_vault_role(&state.db, target_vault_id, &user, &["owner", "editor"]).await?;
+        require_vault_role(&state.db, target_vault_id, user, &["owner", "editor"]).await?;
     }
 
     let title = payload
@@ -646,34 +799,49 @@ pub async fn update_credential(
     .bind(favorite)
     .bind(&user.id)
     .bind(now)
-    .bind(&credential_id)
+    .bind(credential_id)
     .execute(&state.db)
     .await?;
+
+    let details = append_audit_suffix(
+        format!("Credenziale '{}' aggiornata", title),
+        audit_suffix,
+    );
 
     record_audit(
         &state.db,
         target_vault_id,
-        Some(&credential_id),
-        &user,
+        Some(credential_id),
+        user,
         "credential.updated",
-        &format!("Credenziale '{}' aggiornata", title),
+        &details,
     )
     .await?;
 
-    let dto = fetch_credential_dto(&state, &credential_id, &user).await?;
-    Ok(Json(dto))
+    fetch_credential_dto(state, credential_id, user).await
 }
 
-pub async fn delete_credential(
+pub async fn update_credential(
     State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(credential_id): Path<String>,
-) -> AppResult<StatusCode> {
-    let existing = fetch_credential_dto(&state, &credential_id, &user).await?;
+    Json(payload): Json<UpdateCredentialRequest>,
+) -> AppResult<Json<CredentialDto>> {
+    let dto = update_credential_for_user(&state, &user, &credential_id, payload, None).await?;
+    Ok(Json(dto))
+}
+
+pub(crate) async fn delete_credential_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    credential_id: &str,
+    audit_suffix: Option<&str>,
+) -> AppResult<()> {
+    let existing = fetch_credential_dto(state, credential_id, user).await?;
     if user.service_account.is_some() {
         user.require_write_permission()?;
     } else {
-        require_vault_role(&state.db, &existing.vault_id, &user, &["owner", "editor"]).await?;
+        require_vault_role(&state.db, &existing.vault_id, user, &["owner", "editor"]).await?;
     }
 
     let mut tx = state.db.begin().await?;
@@ -685,27 +853,41 @@ pub async fn delete_credential(
         WHERE $1 = ANY(credential_ids)
         "#,
     )
-    .bind(&credential_id)
+    .bind(credential_id)
     .execute(&mut *tx)
     .await?;
 
     sqlx::query("DELETE FROM credentials WHERE id = $1")
-        .bind(&credential_id)
+        .bind(credential_id)
         .execute(&mut *tx)
         .await?;
 
     tx.commit().await?;
 
+    let details = append_audit_suffix(
+        format!("Credenziale '{}' eliminata", existing.title),
+        audit_suffix,
+    );
+
     record_audit(
         &state.db,
         &existing.vault_id,
-        Some(&credential_id),
-        &user,
+        Some(credential_id),
+        user,
         "credential.deleted",
-        &format!("Credenziale '{}' eliminata", existing.title),
+        &details,
     )
     .await?;
 
+    Ok(())
+}
+
+pub async fn delete_credential(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(credential_id): Path<String>,
+) -> AppResult<StatusCode> {
+    delete_credential_for_user(&state, &user, &credential_id, None).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
