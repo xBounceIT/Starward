@@ -4,7 +4,16 @@
 @custom-variant dark (&:is(.dark *, .sync-security *));
 @custom-variant sync-security (&:is(.sync-security *));
 
+@theme static {
+  --font-anthropic-sans: 'Anthropic Sans', 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-anthropic-serif: 'Anthropic Serif', 'Source Serif 4', Georgia, Charter, ui-serif, Cambria, 'Times New Roman', Times, serif;
+  --font-anthropic-mono: 'Anthropic Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 @theme inline {
+  --font-sans: var(--font-anthropic-sans);
+  --font-serif: var(--font-anthropic-serif);
+  --font-mono: var(--font-anthropic-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -45,7 +54,9 @@
 
 :root {
   --radius: 0.5rem;
-  --font-sans: 'Bai Jamjuree', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-anthropic-sans);
+  --font-serif: var(--font-anthropic-serif);
+  --font-mono: var(--font-anthropic-mono);
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
   --card: oklch(1 0 0);
@@ -161,9 +172,10 @@
     @apply bg-background text-foreground;
   }
 
-  /* Site-aligned typography shared by every theme */
+  /* Anthropic-inspired typography shared by every theme */
   body {
-    font-family: 'Bai Jamjuree', ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-anthropic-sans);
+    letter-spacing: -0.005em;
   }
 
   h1,
@@ -173,9 +185,9 @@
   [data-slot="alert-dialog-title"],
   [data-slot="card-title"],
   [data-slot="sheet-title"] {
-    font-family: 'Michroma', 'Bai Jamjuree', sans-serif;
+    font-family: var(--font-anthropic-serif);
     font-weight: 400;
-    letter-spacing: 0.01em;
+    letter-spacing: normal;
   }
 
   .sync-security ::selection {
@@ -207,7 +219,7 @@
 }
 
 [data-slot="sidebar-group-label"] {
-  font-family: 'Bai Jamjuree', sans-serif;
+  font-family: var(--font-anthropic-sans);
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.14em;

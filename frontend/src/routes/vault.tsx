@@ -483,7 +483,7 @@ function VaultWorkspace() {
                 />
               </>
             )}
-            <span className="font-['Michroma',sans-serif] text-xs font-normal">
+            <span className="font-serif text-sm font-semibold">
               {selection.type === 'admin'
                 ? 'Pannello Admin'
                 : selection.type === 'group' && activeGroup

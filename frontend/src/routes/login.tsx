@@ -118,7 +118,7 @@ function LoginPage() {
           <div className="flex items-center justify-center bg-primary text-primary-foreground size-8 rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
             <ShieldCheck className="size-4.5" />
           </div>
-          <span className="font-['Michroma',sans-serif] text-base font-normal tracking-wide">
+          <span className="font-serif text-lg font-semibold tracking-normal">
             Starward
           </span>
         </div>
