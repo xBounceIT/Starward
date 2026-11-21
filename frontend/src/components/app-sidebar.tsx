@@ -67,6 +67,14 @@ const menuTrailingBadgeClass =
 // del gruppo (py-1 + h-8/2 = 4+16=20px)
 const groupActionClass = 'top-2 right-3 h-6 w-6'
 
+// Larghezza fissa del contenuto interno su desktop (256px - 1px border-r)
+// così testo e pulsanti non vanno a capo né si comprimono durante il collapse
+const sidebarInnerWidthClass = 'w-full md:w-[calc(var(--sidebar-width)-1px)]'
+// Fade asimmetrico sincronizzato con l'animazione width (250ms):
+// in chiusura svanisce rapidamente (150ms), in apertura riappare con un lieve ritardo (75ms)
+const collapsibleFadeClass =
+  'transition-opacity duration-200 delay-75 ease-out group-data-[collapsible=strip]:pointer-events-none group-data-[collapsible=strip]:opacity-0 group-data-[collapsible=strip]:duration-150 group-data-[collapsible=strip]:delay-0'
+
 // Stato di collasso dei gruppi nella sidebar, persistito in localStorage
 const COLLAPSED_GROUPS_STORAGE_KEY = 'starward-collapsed-groups'
 
@@ -502,44 +510,60 @@ export function AppSidebar({
   const toggleLabel = sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'
 
   return (
-    // collapsible="icon": quando la sidebar collassa resta una striscia
+    // collapsible="strip": quando la sidebar collassa resta una striscia
     // dedicata di 3rem che contiene il toggle, così il contenuto della
     // pagina non va mai sotto il pulsante.
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="gap-3.5 border-b p-3.5 group-data-[collapsible=icon]:border-b-0 sync-security:border-white/20">
-        {/* mt-1 allinea il centro del toggle (p-3.5 + mt-1 + size-8/2 = 34px)
-            al centro dell'icona del titolo pagina (pt-5 + 28/2 = 34px);
-            stessa posizione in modalità espansa e collassata, così il
-            pulsante non si sposta durante l'animazione */}
-        <div className="mt-1 flex items-center justify-start">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="-ml-1.5 text-muted-foreground hover:text-foreground"
-            onClick={toggleSidebar}
-            title={toggleLabel}
-            aria-label={toggleLabel}
-            aria-expanded={!sidebarCollapsed}
-          >
-            {toggleIcon}
-          </Button>
-        </div>
-
-        <Button
-          type="button"
-          className="h-9 w-full justify-center gap-2 font-medium shadow-xs group-data-[collapsible=icon]:hidden"
-          onClick={() => {
-            setOpenMobile(false)
-            onNewCredential()
-          }}
+    <Sidebar collapsible="strip">
+      <div className="flex h-full w-full flex-col overflow-hidden">
+        <SidebarHeader
+          className={cn(
+            sidebarInnerWidthClass,
+            'shrink-0 gap-3.5 border-b border-sidebar-border p-3.5 transition-colors duration-200 group-data-[collapsible=strip]:border-transparent sync-security:border-white/20 sync-security:group-data-[collapsible=strip]:border-transparent',
+          )}
         >
-          <Plus className="size-4" />
-          Nuova credenziale
-        </Button>
-      </SidebarHeader>
+          {/* mt-1 allinea il centro del toggle (p-3.5 + mt-1 + size-8/2 = 34px)
+              al centro dell'icona del titolo pagina (pt-5 + 28/2 = 34px);
+              stessa posizione in modalità espansa e collassata, così il
+              pulsante non si sposta durante l'animazione */}
+          <div className="mt-1 flex items-center justify-start">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="-ml-1.5 text-muted-foreground hover:text-foreground"
+              onClick={toggleSidebar}
+              title={toggleLabel}
+              aria-label={toggleLabel}
+              aria-expanded={!sidebarCollapsed}
+            >
+              {toggleIcon}
+            </Button>
+          </div>
 
-      <SidebarContent className="transition-opacity duration-200 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
+          <div
+            inert={sidebarCollapsed}
+            aria-hidden={sidebarCollapsed || undefined}
+            className={collapsibleFadeClass}
+          >
+            <Button
+              type="button"
+              className="h-9 w-full justify-center gap-2 font-medium shadow-xs"
+              onClick={() => {
+                setOpenMobile(false)
+                onNewCredential()
+              }}
+            >
+              <Plus className="size-4" />
+              Nuova credenziale
+            </Button>
+          </div>
+        </SidebarHeader>
+
+        <SidebarContent
+          inert={sidebarCollapsed}
+          aria-hidden={sidebarCollapsed || undefined}
+          className={cn(sidebarInnerWidthClass, collapsibleFadeClass)}
+        >
         <SidebarGroup className="py-1">
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
@@ -934,13 +958,28 @@ export function AppSidebar({
             </SidebarGroup>
           </>
         )}
-      </SidebarContent>
+        </SidebarContent>
 
-      <div className="shrink-0 px-3 py-2 text-left text-[11px] text-muted-foreground transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0 sync-security:text-[#ff9c00]/90">
-        Starward v{APP_VERSION}
-      </div>
+        <div
+          aria-hidden={sidebarCollapsed || undefined}
+          className={cn(
+            sidebarInnerWidthClass,
+            collapsibleFadeClass,
+            'shrink-0 whitespace-nowrap px-3 py-2 text-left text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90',
+          )}
+        >
+          Starward v{APP_VERSION}
+        </div>
 
-      <SidebarFooter className="border-t border-sidebar-border p-2.5 transition-opacity duration-200 group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0">
+        <SidebarFooter
+          inert={sidebarCollapsed}
+          aria-hidden={sidebarCollapsed || undefined}
+          className={cn(
+            sidebarInnerWidthClass,
+            collapsibleFadeClass,
+            'shrink-0 border-t border-sidebar-border p-2.5',
+          )}
+        >
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -1031,7 +1070,8 @@ export function AppSidebar({
             </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarFooter>
+        </SidebarFooter>
+      </div>
       <SidebarRail />
     </Sidebar>
   )
