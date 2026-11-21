@@ -38,6 +38,7 @@ import {
   Share2,
   ShieldCheck,
   Trash2,
+  Upload,
   User,
   UserCheck,
   Users,
@@ -166,6 +167,11 @@ const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
     label: 'Cartella eliminata',
     tone: 'rose',
     icon: Trash2,
+  },
+  'vault.imported': {
+    label: 'Credenziali importate',
+    tone: 'emerald',
+    icon: Upload,
   },
   'vault.shared': {
     label: 'Cartella condivisa',

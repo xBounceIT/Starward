@@ -2,12 +2,14 @@ mod auth;
 mod config;
 mod crypto;
 mod error;
+mod importers;
 mod models;
 mod routes;
 
 use std::net::SocketAddr;
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::{header, HeaderName, HeaderValue, Method},
     routing::{delete, get, patch, post},
     Router,
@@ -201,6 +203,20 @@ pub fn build_app(state: AppState) -> Router {
         .route(
             "/api/vaults/{vault_id}/audit",
             get(routes::vaults::get_vault_audit),
+        )
+        .route(
+            "/api/import/providers",
+            get(routes::import::list_import_providers),
+        )
+        .route(
+            "/api/vaults/{vault_id}/import/preview",
+            post(routes::import::preview_vault_import)
+                .layer(DefaultBodyLimit::max(routes::import::MAX_IMPORT_BYTES)),
+        )
+        .route(
+            "/api/vaults/{vault_id}/import",
+            post(routes::import::import_vault)
+                .layer(DefaultBodyLimit::max(routes::import::MAX_IMPORT_BYTES)),
         )
         .route(
             "/api/credentials",
@@ -1921,6 +1937,313 @@ mod tests {
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
             .bind(&admin_id)
             .bind(&user_id)
+            .execute(&db)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn vault_import_workflow_and_permissions_postgres() {
+        let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
+            eprintln!("Skipping PostgreSQL integration test: TEST_DATABASE_URL not set");
+            return;
+        };
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let owner_id = format!("test-imp-owner-{suffix}");
+        let viewer_id = format!("test-imp-viewer-{suffix}");
+        let owner_email = format!("imp-owner-{suffix}@starward.io");
+        let viewer_email = format!("imp-viewer-{suffix}@starward.io");
+
+        let config = Config {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            database_url,
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            cors_origin: "http://localhost:3000".to_string(),
+            admin_emails: vec![owner_email.clone()],
+        };
+
+        let db = init_db(&config.database_url).await.unwrap();
+        let crypto = VaultCrypto::from_master_key(&config.master_key);
+        let app = build_app(AppState {
+            db: db.clone(),
+            config: config.clone(),
+            crypto,
+        });
+
+        let owner_token = make_token(&config.auth_secret, &owner_id, &owner_email, "Owner");
+        let viewer_token = make_token(&config.auth_secret, &viewer_id, &viewer_email, "Viewer");
+
+        // 1. Provider listing works
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/import/providers")
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let providers = read_json(res).await;
+        assert_eq!(providers[0]["id"], "bitwarden");
+        assert_eq!(providers[0]["featured"], true);
+
+        // 2. Owner creates a vault and shares with viewer (read-only)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/vaults")
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(json!({ "name": "Import Test" }).to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let vault_id = read_json(res).await["id"].as_str().unwrap().to_string();
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{vault_id}/members"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "email": viewer_email, "role": "viewer" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+
+        let bw_json = json!({
+            "encrypted": false,
+            "folders": [{ "id": "f1", "name": "Cloud" }],
+            "items": [
+                {
+                    "type": 1,
+                    "folderId": "f1",
+                    "name": "AWS Console",
+                    "favorite": true,
+                    "login": {
+                        "username": "admin@acme.io",
+                        "password": "TopSecretImportPassword!",
+                        "uris": [{ "uri": "https://console.aws.amazon.com" }],
+                        "totp": "otpauth://totp/AWS"
+                    }
+                },
+                {
+                    "type": 2,
+                    "name": "Recovery Keys",
+                    "notes": "SECRET-NOTE-LINE-123"
+                },
+                {
+                    "type": 3,
+                    "name": "Corp Visa",
+                    "card": {
+                        "cardholderName": "Owner",
+                        "brand": "Visa",
+                        "number": "4111000099998888",
+                        "expMonth": "12",
+                        "expYear": "2029",
+                        "code": "777"
+                    }
+                },
+                {
+                    "type": 4,
+                    "name": "Company Identity",
+                    "identity": {
+                        "firstName": "Mario",
+                        "lastName": "Rossi",
+                        "email": "mario@acme.io"
+                    }
+                },
+                {
+                    "type": 5,
+                    "name": "Bastion SSH",
+                    "sshKey": {
+                        "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\nkeydata\n-----END OPENSSH PRIVATE KEY-----",
+                        "publicKey": "ssh-ed25519 AAAAC3"
+                    }
+                }
+            ]
+        })
+        .to_string();
+
+        // 3. Viewer is forbidden from preview & import
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{vault_id}/import/preview"))
+                    .header("Authorization", format!("Bearer {viewer_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "provider": "bitwarden", "content": bw_json }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{vault_id}/import"))
+                    .header("Authorization", format!("Bearer {viewer_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "provider": "bitwarden", "content": bw_json }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // 4. Preview succeeds and NEVER leaks plaintext secrets
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{vault_id}/import/preview"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "provider": "bitwarden", "content": bw_json, "filename": "bitwarden.json" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let preview_bytes = res.into_body().collect().await.unwrap().to_bytes();
+        let preview_text = String::from_utf8(preview_bytes.to_vec()).unwrap();
+        assert!(!preview_text.contains("TopSecretImportPassword!"));
+        assert!(!preview_text.contains("SECRET-NOTE-LINE-123"));
+        assert!(!preview_text.contains("4111000099998888"));
+        assert!(!preview_text.contains("BEGIN OPENSSH PRIVATE KEY"));
+        let preview_json: Value = serde_json::from_str(&preview_text).unwrap();
+        assert_eq!(preview_json["total_parsed"], 5);
+        assert_eq!(preview_json["ready_count"], 4);
+        assert_eq!(preview_json["warning_count"], 1);
+
+        // 5. Commit import succeeds and encrypts at rest
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{vault_id}/import"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "provider": "bitwarden", "content": bw_json, "filename": "bitwarden.json" }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let import_res = read_json(res).await;
+        assert_eq!(import_res["imported_count"], 5);
+
+        // Verify encrypted at rest and decrypted via GET /api/credentials
+        let raw_ciphers: Vec<(String,)> =
+            sqlx::query_as("SELECT password_ciphertext FROM credentials WHERE vault_id = $1")
+                .bind(&vault_id)
+                .fetch_all(&db)
+                .await
+                .unwrap();
+        assert_eq!(raw_ciphers.len(), 5);
+        for (cipher,) in &raw_ciphers {
+            assert!(!cipher.contains("TopSecretImportPassword!"));
+            assert!(!cipher.contains("4111000099998888"));
+        }
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials?vault_id={vault_id}"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let creds = read_json(res).await;
+        assert_eq!(creds.as_array().unwrap().len(), 5);
+
+        // 6. Re-import with duplicate_strategy = "skip" skips all 5
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri(format!("/api/vaults/{vault_id}/import"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "provider": "bitwarden",
+                            "content": bw_json,
+                            "duplicate_strategy": "skip"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let reimport_res = read_json(res).await;
+        assert_eq!(reimport_res["imported_count"], 0);
+        assert_eq!(reimport_res["duplicate_skipped_count"], 5);
+
+        // 7. Audit log contains vault.imported
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/vaults/{vault_id}/audit"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let audit = read_json(res).await;
+        assert!(audit
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["action"] == "vault.imported"));
+
+        // Clean up test users
+        let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
+            .bind(&owner_id)
+            .bind(&viewer_id)
             .execute(&db)
             .await;
     }

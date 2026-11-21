@@ -3,6 +3,7 @@ pub mod api_keys;
 pub mod credentials;
 pub mod groups;
 pub mod health;
+pub mod import;
 pub mod service_accounts;
 pub mod users;
 pub mod vaults;

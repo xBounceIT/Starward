@@ -467,6 +467,91 @@ pub struct AuditLogDto {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportProviderDto {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub formats: Vec<String>,
+    pub extensions: Vec<String>,
+    pub featured: bool,
+    pub supports_folders: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImportVaultRequest {
+    pub provider: String,
+    pub content: String,
+    #[serde(default)]
+    pub filename: Option<String>,
+    #[serde(default = "default_duplicate_strategy")]
+    pub duplicate_strategy: String,
+    #[serde(default = "default_true")]
+    pub folder_as_tag: bool,
+    #[serde(default)]
+    pub include_source_folders: Option<Vec<String>>,
+    #[serde(default)]
+    pub selected_indices: Option<Vec<usize>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportPreviewItemDto {
+    pub index: usize,
+    pub title: String,
+    pub username: String,
+    pub url: String,
+    pub category: String,
+    pub source_folder: Option<String>,
+    pub favorite: bool,
+    pub tags: Vec<String>,
+    pub has_password: bool,
+    pub has_notes: bool,
+    pub extra_field_count: usize,
+    pub status: String,
+    pub is_duplicate: bool,
+    pub warning: Option<String>,
+    pub skip_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportPreviewResponseDto {
+    pub provider: String,
+    pub provider_label: String,
+    pub detected_format: String,
+    pub total_parsed: usize,
+    pub ready_count: usize,
+    pub warning_count: usize,
+    pub duplicate_count: usize,
+    pub skipped_count: usize,
+    pub source_folders: Vec<String>,
+    pub has_items_without_folder: bool,
+    pub items: Vec<ImportPreviewItemDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportSkippedItemDto {
+    pub index: usize,
+    pub title: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportResultDto {
+    pub provider: String,
+    pub provider_label: String,
+    pub detected_format: String,
+    pub vault_id: String,
+    pub total_parsed: usize,
+    pub imported_count: usize,
+    pub duplicate_skipped_count: usize,
+    pub invalid_skipped_count: usize,
+    pub skipped_items: Vec<ImportSkippedItemDto>,
+}
+
+fn default_duplicate_strategy() -> String {
+    "skip".to_string()
+}
+
 fn default_icon() -> String {
     "folder".to_string()
 }

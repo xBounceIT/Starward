@@ -14,6 +14,7 @@ import {
 } from '@/components/credential-list'
 import { GroupDetailPanel } from '@/components/group-detail-panel'
 import { GroupDialog } from '@/components/group-dialog'
+import { ImportVaultDialog } from '@/components/import-vault-dialog'
 import { ShareVaultDialog } from '@/components/share-vault-dialog'
 import {
   AlertDialog,
@@ -114,6 +115,7 @@ function VaultWorkspace() {
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<Group | null>(null)
   const [shareVaultTarget, setShareVaultTarget] = useState<Vault | null>(null)
+  const [importVaultTarget, setImportVaultTarget] = useState<Vault | null>(null)
   const [auditVaultTarget, setAuditVaultTarget] = useState<Vault | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsTab, setSettingsTab] = useState<SettingsTab>('profile')
@@ -425,6 +427,7 @@ function VaultWorkspace() {
           setEditingCredential(null)
           setCredDialogOpen(true)
         }}
+        onImportVault={(vault) => setImportVaultTarget(vault)}
         onNewVault={() => {
           setEditingVault(null)
           setVaultDefaultOwnerGroupId(null)
@@ -578,6 +581,7 @@ function VaultWorkspace() {
                   setEditingCredential(null)
                   setCredDialogOpen(true)
                 }}
+                onImportVault={(vault) => setImportVaultTarget(vault)}
                 onShareVault={(vault) => setShareVaultTarget(vault)}
                 onEditVault={(vault) => {
                   setEditingVault(vault)
@@ -720,6 +724,19 @@ function VaultWorkspace() {
           if (!open) setAuditVaultTarget(null)
         }}
         vault={auditVaultTarget}
+      />
+
+      <ImportVaultDialog
+        open={Boolean(importVaultTarget)}
+        onOpenChange={(open) => {
+          if (!open) setImportVaultTarget(null)
+        }}
+        vault={importVaultTarget}
+        vaults={vaults}
+        onImported={async (vaultId) => {
+          await refreshData()
+          setSelection({ type: 'vault', vaultId })
+        }}
       />
 
       {/* Delete Credential Confirmation */}

@@ -19,6 +19,7 @@ import {
   Share2,
   Star,
   Trash2,
+  Upload,
   User,
   Users,
   X,
@@ -97,6 +98,7 @@ interface CredentialListProps {
   onEditCredential: (cred: Credential) => void
   onDeleteCredential: (cred: Credential) => void
   onNewCredential: () => void
+  onImportVault: (vault: Vault) => void
   onShareVault: (vault: Vault) => void
   onEditVault: (vault: Vault) => void
   onDeleteVault: (vault: Vault) => void
@@ -121,6 +123,7 @@ export function CredentialList({
   onEditCredential,
   onDeleteCredential,
   onNewCredential,
+  onImportVault,
   onShareVault,
   onEditVault,
   onDeleteVault,
@@ -359,6 +362,18 @@ export function CredentialList({
                   ))}
                 </div>
               )}
+              {canCreateInCurrent && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => onImportVault(activeVault)}
+                >
+                  <Upload className="size-3.5" />
+                  Importa
+                </Button>
+              )}
+
               <Button
                 variant={activeVault.is_shared ? 'secondary' : 'outline'}
                 size="sm"
@@ -383,10 +398,18 @@ export function CredentialList({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   {canCreateInCurrent && (
-                    <DropdownMenuItem onClick={onNewCredential}>
-                      <Plus className="size-4" />
-                      Nuova credenziale
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={onNewCredential}>
+                        <Plus className="size-4" />
+                        Nuova credenziale
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onImportVault(activeVault)}
+                      >
+                        <Upload className="size-4" />
+                        Importa credenziali
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {activeVault.role === 'owner' && (
                     <DropdownMenuItem onClick={() => onEditVault(activeVault)}>
@@ -665,14 +688,22 @@ export function CredentialList({
                 : 'Aggiungi la prima credenziale in questa cartella per iniziare.'}
             </p>
             {canCreateInCurrent && !searchQuery && !categoryFilter && (
-              <Button
-                size="sm"
-                className="mt-4"
-                onClick={onNewCredential}
-              >
-                <Plus className="size-4" />
-                Aggiungi credenziale
-              </Button>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <Button size="sm" onClick={onNewCredential}>
+                  <Plus className="size-4" />
+                  Aggiungi credenziale
+                </Button>
+                {activeVault && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onImportVault(activeVault)}
+                  >
+                    <Upload className="size-4" />
+                    Importa da file
+                  </Button>
+                )}
+              </div>
             )}
           </div>
         ) : viewMode === 'grid' ? (

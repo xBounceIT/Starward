@@ -171,6 +171,78 @@ export interface AuditLog {
   created_at: string
 }
 
+export interface ImportProviderInfo {
+  id: string
+  name: string
+  description: string
+  formats: string[]
+  extensions: string[]
+  featured: boolean
+  supports_folders: boolean
+}
+
+export type ImportDuplicateStrategy = 'skip' | 'import_all'
+
+export interface ImportPreviewItem {
+  index: number
+  title: string
+  username: string
+  url: string
+  category: string
+  source_folder: string | null
+  favorite: boolean
+  tags: string[]
+  has_password: boolean
+  has_notes: boolean
+  extra_field_count: number
+  status: 'ready' | 'warning' | 'duplicate' | 'skipped'
+  is_duplicate: boolean
+  warning: string | null
+  skip_reason: string | null
+}
+
+export interface ImportPreviewResponse {
+  provider: string
+  provider_label: string
+  detected_format: string
+  total_parsed: number
+  ready_count: number
+  warning_count: number
+  duplicate_count: number
+  skipped_count: number
+  source_folders: string[]
+  has_items_without_folder: boolean
+  items: ImportPreviewItem[]
+}
+
+export interface ImportVaultPayload {
+  provider: string
+  content: string
+  filename?: string
+  duplicate_strategy?: ImportDuplicateStrategy
+  folder_as_tag?: boolean
+  include_source_folders?: string[]
+  selected_indices?: number[]
+}
+
+export interface ImportSkippedItem {
+  index: number
+  title: string
+  reason: string
+}
+
+export interface ImportResult {
+  provider: string
+  provider_label: string
+  detected_format: string
+  vault_id: string
+  total_parsed: number
+  imported_count: number
+  duplicate_skipped_count: number
+  invalid_skipped_count: number
+  skipped_items: ImportSkippedItem[]
+}
+
 export interface UserSettings {
   theme: 'light' | 'dark' | 'sync-security'
   password_generator_length: number
@@ -604,6 +676,21 @@ export const vaultApi = {
 
   getVaultAudit: (vaultId: string) =>
     request<AuditLog[]>(`/vaults/${vaultId}/audit`),
+
+  listImportProviders: () =>
+    request<ImportProviderInfo[]>('/import/providers'),
+
+  previewVaultImport: (vaultId: string, payload: ImportVaultPayload) =>
+    request<ImportPreviewResponse>(`/vaults/${vaultId}/import/preview`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  importVault: (vaultId: string, payload: ImportVaultPayload) =>
+    request<ImportResult>(`/vaults/${vaultId}/import`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   listCredentials: (params?: {
     vault_id?: string

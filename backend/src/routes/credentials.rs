@@ -709,7 +709,7 @@ pub async fn delete_credential(
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn clean_extra_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+pub(crate) fn clean_extra_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, String> {
     fields
         .iter()
         .filter_map(|(k, v)| {
@@ -724,7 +724,7 @@ fn clean_extra_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, Str
         .collect()
 }
 
-fn encrypt_extra_fields(
+pub(crate) fn encrypt_extra_fields(
     crypto: &VaultCrypto,
     fields: &BTreeMap<String, String>,
 ) -> AppResult<(String, String)> {
@@ -737,7 +737,7 @@ fn encrypt_extra_fields(
     Ok((encrypted.ciphertext, encrypted.nonce))
 }
 
-fn validate_credential_fields(
+pub(crate) fn validate_credential_fields(
     category: &str,
     password: &str,
     notes: &str,
@@ -794,7 +794,7 @@ fn validate_credential_fields(
     Ok(())
 }
 
-fn normalize_category(input: &str) -> String {
+pub(crate) fn normalize_category(input: &str) -> String {
     match input.trim().to_lowercase().as_str() {
         "login" | "api_key" | "database" | "ssh" | "card" | "license" | "note" => {
             input.trim().to_lowercase()

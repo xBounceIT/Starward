@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Star,
   Trash2,
+  Upload,
   User,
   Users,
 } from 'lucide-react'
@@ -94,6 +95,7 @@ interface AppSidebarProps {
   selection: VaultSelection
   onSelect: (selection: VaultSelection) => void
   onNewCredential: (vaultId?: string) => void
+  onImportVault: (vault: Vault) => void
   onNewVault: () => void
   onEditVault: (vault: Vault) => void
   onShareVault: (vault: Vault) => void
@@ -114,6 +116,7 @@ interface VaultSidebarMenuItemProps {
   showGroupBadge?: boolean
   onSelect: () => void
   onNewCredential: () => void
+  onImportVault: () => void
   onEditVault: () => void
   onShareVault: () => void
   onOpenAudit: () => void
@@ -127,6 +130,7 @@ function VaultSidebarMenuItem({
   showGroupBadge = false,
   onSelect,
   onNewCredential,
+  onImportVault,
   onEditVault,
   onShareVault,
   onOpenAudit,
@@ -211,10 +215,16 @@ function VaultSidebarMenuItem({
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {canWrite && (
-            <DropdownMenuItem onClick={onNewCredential}>
-              <Plus className="size-4" />
-              Nuova credenziale
-            </DropdownMenuItem>
+            <>
+              <DropdownMenuItem onClick={onNewCredential}>
+                <Plus className="size-4" />
+                Nuova credenziale
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onImportVault}>
+                <Upload className="size-4" />
+                Importa credenziali
+              </DropdownMenuItem>
+            </>
           )}
           {isOwner && (
             <DropdownMenuItem onClick={onEditVault}>
@@ -428,6 +438,7 @@ export function AppSidebar({
   selection,
   onSelect,
   onNewCredential,
+  onImportVault,
   onNewVault,
   onEditVault,
   onShareVault,
@@ -643,6 +654,10 @@ export function AppSidebar({
                       setOpenMobile(false)
                       onNewCredential(vault.id)
                     }}
+                    onImportVault={() => {
+                      setOpenMobile(false)
+                      onImportVault(vault)
+                    }}
                     onEditVault={() => {
                       setOpenMobile(false)
                       onEditVault(vault)
@@ -756,6 +771,10 @@ export function AppSidebar({
                                 setOpenMobile(false)
                                 onNewCredential(vault.id)
                               }}
+                              onImportVault={() => {
+                                setOpenMobile(false)
+                                onImportVault(vault)
+                              }}
                               onEditVault={() => {
                                 setOpenMobile(false)
                                 onEditVault(vault)
@@ -824,6 +843,10 @@ export function AppSidebar({
                     onNewCredential={() => {
                       setOpenMobile(false)
                       onNewCredential(vault.id)
+                    }}
+                    onImportVault={() => {
+                      setOpenMobile(false)
+                      onImportVault(vault)
                     }}
                     onEditVault={() => {
                       setOpenMobile(false)
