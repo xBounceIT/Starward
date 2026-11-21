@@ -193,7 +193,7 @@ function VaultWorkspace() {
     if (userSettings?.theme) {
       setTheme(userSettings.theme)
     }
-  }, [userSettings?.theme])
+  }, [userSettings?.theme, setTheme])
 
   useEffect(() => {
     if (

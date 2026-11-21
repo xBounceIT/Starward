@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 
 export type Theme = 'light' | 'dark' | 'sync-security'
 
@@ -39,23 +46,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyThemeClasses(resolved)
   }, [])
 
-  const setTheme = (next: Theme) => {
+  const setTheme = useCallback((next: Theme) => {
     setThemeState(next)
     applyThemeClasses(next)
     localStorage.setItem(STORAGE_KEY, next)
-  }
+  }, [])
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     const order: Theme[] = ['dark', 'light', 'sync-security']
-    const nextIndex = (order.indexOf(theme) + 1) % order.length
-    setTheme(order[nextIndex])
-  }
+    setThemeState((current) => {
+      const nextIndex = (order.indexOf(current) + 1) % order.length
+      const next = order[nextIndex]
+      applyThemeClasses(next)
+      localStorage.setItem(STORAGE_KEY, next)
+      return next
+    })
+  }, [])
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>
-      {children}
-    </ThemeContext.Provider>
+  const value = useMemo(
+    () => ({ theme, setTheme, toggleTheme }),
+    [theme, setTheme, toggleTheme],
   )
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
 export function useTheme(): ThemeContextValue {

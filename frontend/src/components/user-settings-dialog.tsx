@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -66,7 +66,7 @@ import {
   type Vault,
 } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
-import { useTheme, type Theme } from '@/lib/theme'
+import { useTheme } from '@/lib/theme'
 import { cn, copyToClipboard } from '@/lib/utils'
 import {
   evaluatePasswordStrength,
@@ -133,6 +133,9 @@ export function UserSettingsDialog({
 }: UserSettingsDialogProps) {
   const { theme, setTheme } = useTheme()
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
+  const wasOpenRef = useRef(false)
+  const settingsHydratedRef = useRef(false)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
   // Profile tab state
   const [displayName, setDisplayName] = useState(user.name)
@@ -155,9 +158,6 @@ export function UserSettingsDialog({
   const [revokingToken, setRevokingToken] = useState<string | null>(null)
 
   // Preferences tab state
-  const [prefTheme, setPrefTheme] = useState<Theme>(
-    settings?.theme ?? theme,
-  )
   const [prefDefaultVaultId, setPrefDefaultVaultId] = useState<string>(
     settings?.default_vault_id || AUTO_DEFAULT_VAULT,
   )
@@ -214,23 +214,40 @@ export function UserSettingsDialog({
   }, [vaults])
 
   useEffect(() => {
-    if (open) {
+    const justOpened = open && !wasOpenRef.current
+    const justClosed = !open && wasOpenRef.current
+    wasOpenRef.current = open
+
+    if (justOpened) {
       setActiveTab(initialTab)
       setDisplayName(user.name)
-      setPrefTheme(settings?.theme ?? theme)
       setPrefDefaultVaultId(settings?.default_vault_id || AUTO_DEFAULT_VAULT)
       setPrefLength(settings?.password_generator_length ?? 20)
       setPrefUpper(settings?.password_generator_uppercase ?? true)
       setPrefLower(settings?.password_generator_lowercase ?? true)
       setPrefNumbers(settings?.password_generator_numbers ?? true)
       setPrefSymbols(settings?.password_generator_symbols ?? true)
-    } else {
+      settingsHydratedRef.current = settings !== null
+    } else if (justClosed) {
+      settingsHydratedRef.current = false
       setNewlyCreatedKey(null)
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     }
-  }, [open, initialTab, user.name, settings, theme])
+  }, [open, initialTab, user.name, settings])
+
+  useEffect(() => {
+    if (open && settings && !settingsHydratedRef.current) {
+      setPrefDefaultVaultId(settings.default_vault_id || AUTO_DEFAULT_VAULT)
+      setPrefLength(settings.password_generator_length)
+      setPrefUpper(settings.password_generator_uppercase)
+      setPrefLower(settings.password_generator_lowercase)
+      setPrefNumbers(settings.password_generator_numbers)
+      setPrefSymbols(settings.password_generator_symbols)
+      settingsHydratedRef.current = true
+    }
+  }, [open, settings])
 
   const loadSessions = useCallback(async () => {
     setLoadingSessions(true)
@@ -388,7 +405,7 @@ export function UserSettingsDialog({
     setSavingPrefs(true)
     try {
       const updated = await vaultApi.updateSettings({
-        theme: prefTheme,
+        theme,
         password_generator_length: prefLength,
         password_generator_uppercase: prefUpper,
         password_generator_lowercase: prefLower,
@@ -504,8 +521,8 @@ export function UserSettingsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="flex h-[740px] max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden sm:max-w-2xl">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="size-5 text-primary" />
               Impostazioni Utente & API Key
@@ -518,10 +535,15 @@ export function UserSettingsDialog({
 
           <Tabs
             value={activeTab}
-            onValueChange={(v) => setActiveTab(v as SettingsTab)}
-            className="flex min-h-0 flex-1 flex-col"
+            onValueChange={(v) => {
+              setActiveTab(v as SettingsTab)
+              if (scrollContainerRef.current) {
+                scrollContainerRef.current.scrollTop = 0
+              }
+            }}
+            className="flex min-h-0 min-w-0 flex-1 flex-col"
           >
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full shrink-0 grid-cols-4">
               <TabsTrigger value="profile" className="gap-1.5 text-xs sm:text-sm">
                 <UserIcon className="size-3.5" />
                 <span>Profilo</span>
@@ -543,9 +565,12 @@ export function UserSettingsDialog({
               </TabsTrigger>
             </TabsList>
 
-            <div className="mt-4 flex-1 overflow-y-auto pr-1">
+            <div
+              ref={scrollContainerRef}
+              className="mt-4 min-h-0 min-w-0 flex-1 overflow-y-auto pr-1 pb-1 [scrollbar-gutter:stable]"
+            >
               {/* TAB 1: PROFILE */}
-              <TabsContent value="profile" className="mt-0 space-y-5">
+              <TabsContent value="profile" className="mt-0 min-w-0 space-y-5">
                 <div className="flex flex-col gap-4 rounded-xl border bg-muted/25 p-4 sm:flex-row sm:items-center">
                   <Avatar className="size-14 border border-border/80">
                     <AvatarFallback className="bg-primary/10 text-base font-semibold text-primary">
@@ -629,7 +654,7 @@ export function UserSettingsDialog({
               </TabsContent>
 
               {/* TAB 2: SECURITY */}
-              <TabsContent value="security" className="mt-0 space-y-6">
+              <TabsContent value="security" className="mt-0 min-w-0 space-y-6">
                 <form onSubmit={handleChangePassword} className="space-y-4">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
@@ -834,20 +859,18 @@ export function UserSettingsDialog({
               </TabsContent>
 
               {/* TAB 3: PREFERENCES */}
-              <TabsContent value="preferences" className="mt-0">
+              <TabsContent value="preferences" className="mt-0 min-w-0">
                 <form onSubmit={handleSavePreferences} className="space-y-5">
                   <div className="space-y-2">
                     <Label>Tema Interfaccia</Label>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <button
                         type="button"
-                        onClick={() => {
-                          setPrefTheme('dark')
-                          setTheme('dark')
-                        }}
+                        aria-pressed={theme === 'dark'}
+                        onClick={() => setTheme('dark')}
                         className={cn(
                           'flex cursor-pointer items-center gap-2.5 rounded-md border p-3 text-left text-sm transition-colors',
-                          prefTheme === 'dark'
+                          theme === 'dark'
                             ? 'border-primary bg-primary/10 font-medium text-foreground'
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
@@ -863,13 +886,11 @@ export function UserSettingsDialog({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setPrefTheme('light')
-                          setTheme('light')
-                        }}
+                        aria-pressed={theme === 'light'}
+                        onClick={() => setTheme('light')}
                         className={cn(
                           'flex cursor-pointer items-center gap-2.5 rounded-md border p-3 text-left text-sm transition-colors',
-                          prefTheme === 'light'
+                          theme === 'light'
                             ? 'border-primary bg-primary/10 font-medium text-foreground'
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
@@ -885,13 +906,11 @@ export function UserSettingsDialog({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          setPrefTheme('sync-security')
-                          setTheme('sync-security')
-                        }}
+                        aria-pressed={theme === 'sync-security'}
+                        onClick={() => setTheme('sync-security')}
                         className={cn(
                           'flex cursor-pointer items-center gap-2.5 border p-3 text-left text-sm transition-colors rounded-md',
-                          prefTheme === 'sync-security'
+                          theme === 'sync-security'
                             ? 'border-primary bg-primary/10 font-medium text-foreground sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00]/15'
                             : 'hover:bg-muted/50 text-muted-foreground',
                         )}
@@ -1034,7 +1053,7 @@ export function UserSettingsDialog({
               </TabsContent>
 
               {/* TAB 4: API KEYS */}
-              <TabsContent value="api-keys" className="mt-0 space-y-5">
+              <TabsContent value="api-keys" className="mt-0 min-w-0 space-y-5">
                 {newlyCreatedKey && (
                   <div className="space-y-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3.5">
                     <div className="flex items-start justify-between gap-2">
