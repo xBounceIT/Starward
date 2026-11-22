@@ -348,3 +348,21 @@
   width: 100% !important;
   min-width: 0 !important;
 }
+
+/* Vault/group colors driven by the per-element `--vc` custom property, so both
+   the predefined palettes and custom hex colors render everywhere. */
+.vault-color-bg {
+  background-color: color-mix(in oklab, var(--vc) 12%, transparent);
+}
+
+.vault-color-text {
+  color: color-mix(in oklab, var(--vc) 68%, var(--foreground));
+}
+
+.vault-color-dot {
+  background-color: var(--vc);
+}
+
+.vault-color-ring {
+  --tw-ring-color: color-mix(in oklab, var(--vc) 30%, transparent);
+}

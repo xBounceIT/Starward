@@ -602,6 +602,7 @@ export function ImportVaultDialog({
                 <VaultIcon
                   icon={getVaultDisplayIcon(v)}
                   className={cn('size-3.5 shrink-0', vp.text)}
+                  style={vp.style}
                 />
                 <span className="truncate">{v.name}</span>
                 {contextLabel && (
@@ -695,6 +696,7 @@ export function ImportVaultDialog({
               <VaultIcon
                 icon={getVaultDisplayIcon(activeTargetVault)}
                 className={cn('size-3.5 shrink-0', activePalette.text)}
+                style={activePalette.style}
               />
               <span>Cartella di destinazione:</span>
             </div>

@@ -165,6 +165,7 @@ function VaultSidebarMenuItem({
               ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
               : palette.text,
           )}
+          style={palette.style}
         />
         <span className="truncate">{vault.name}</span>
         {showGroupBadge && vault.owner_group_name && (
@@ -340,6 +341,7 @@ function GroupSidebarMenuItem({
               ? 'text-sidebar-accent-foreground sync-security:text-[#ff9c00]'
               : palette.text,
           )}
+          style={palette.style}
         />
         <span className="truncate font-medium">{group.name}</span>
       </SidebarMenuButton>

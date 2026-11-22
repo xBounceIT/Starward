@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 export interface PasswordOptions {
   length: number
   uppercase: boolean
@@ -240,54 +242,58 @@ export function isRecentlyAdded(iso: string, withinDays = 7): boolean {
   }
 }
 
-export const VAULT_COLORS: Record<
-  string,
-  { label: string; bg: string; text: string; dot: string; ring: string }
-> = {
-  indigo: {
-    label: 'Indaco',
-    bg: 'bg-indigo-500/12',
-    text: 'text-indigo-600 dark:text-indigo-400',
-    dot: 'bg-indigo-500',
-    ring: 'ring-indigo-500/30',
-  },
-  emerald: {
-    label: 'Smeraldo',
-    bg: 'bg-emerald-500/12',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    dot: 'bg-emerald-500',
-    ring: 'ring-emerald-500/30',
-  },
-  amber: {
-    label: 'Ambra',
-    bg: 'bg-amber-500/12',
-    text: 'text-amber-600 dark:text-amber-400',
-    dot: 'bg-amber-500',
-    ring: 'ring-amber-500/30',
-  },
-  rose: {
-    label: 'Rosa',
-    bg: 'bg-rose-500/12',
-    text: 'text-rose-600 dark:text-rose-400',
-    dot: 'bg-rose-500',
-    ring: 'ring-rose-500/30',
-  },
-  sky: {
-    label: 'Cielo',
-    bg: 'bg-sky-500/12',
-    text: 'text-sky-600 dark:text-sky-400',
-    dot: 'bg-sky-500',
-    ring: 'ring-sky-500/30',
-  },
-  violet: {
-    label: 'Viola',
-    bg: 'bg-violet-500/12',
-    text: 'text-violet-600 dark:text-violet-400',
-    dot: 'bg-violet-500',
-    ring: 'ring-violet-500/30',
-  },
+export interface VaultColorPalette {
+  label: string
+  hex: string
+  bg: string
+  text: string
+  dot: string
+  ring: string
+  style: CSSProperties
 }
 
-export function getVaultColor(color: string) {
-  return VAULT_COLORS[color] ?? VAULT_COLORS.indigo
+function palette(label: string, hex: string): VaultColorPalette {
+  return {
+    label,
+    hex,
+    bg: 'vault-color-bg',
+    text: 'vault-color-text',
+    dot: 'vault-color-dot',
+    ring: 'vault-color-ring',
+    style: { '--vc': hex } as CSSProperties,
+  }
+}
+
+export const VAULT_COLORS: Record<string, VaultColorPalette> = {
+  indigo: palette('Indaco', '#6366f1'),
+  emerald: palette('Smeraldo', '#10b981'),
+  amber: palette('Ambra', '#f59e0b'),
+  rose: palette('Rosa', '#f43f5e'),
+  sky: palette('Cielo', '#0ea5e9'),
+  violet: palette('Viola', '#8b5cf6'),
+  orange: palette('Arancio', '#f97316'),
+  lime: palette('Lime', '#84cc16'),
+}
+
+const HEX_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
+
+export function isHexColor(color: string): boolean {
+  return HEX_COLOR_RE.test(color.trim())
+}
+
+export function normalizeHexColor(color: string): string {
+  const hex = color.trim().toLowerCase()
+  if (/^#[0-9a-f]{3}$/.test(hex)) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+  }
+  return hex
+}
+
+export function getVaultColor(color: string): VaultColorPalette {
+  const key = color?.trim().toLowerCase() ?? ''
+  if (HEX_COLOR_RE.test(key)) {
+    const hex = normalizeHexColor(key)
+    return { ...palette('Personalizzato', hex), label: `Personalizzato ${hex}` }
+  }
+  return VAULT_COLORS[key] ?? VAULT_COLORS.indigo
 }

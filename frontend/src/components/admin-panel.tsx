@@ -1741,6 +1741,7 @@ export function AdminPanel({
                               palette.bg,
                               palette.text,
                             )}
+                            style={palette.style}
                           >
                             <Users className="size-5" />
                           </div>

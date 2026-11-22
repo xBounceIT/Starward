@@ -26,9 +26,10 @@ import {
   VAULT_ICON_OPTIONS,
   VaultIcon,
 } from '@/components/vault-icon'
+import { VaultColorPicker } from '@/components/vault-color-picker'
 import { vaultApi, type Group, type Vault } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { getVaultColor, VAULT_COLORS } from '@/lib/vault-utils'
+import { getVaultColor } from '@/lib/vault-utils'
 
 interface VaultDialogProps {
   open: boolean
@@ -169,6 +170,10 @@ export function VaultDialog({
                       getVaultColor(editingVault.owner_group_color ?? 'indigo')
                         .text,
                     )}
+                    style={
+                      getVaultColor(editingVault.owner_group_color ?? 'indigo')
+                        .style
+                    }
                   />
                   <span className="text-muted-foreground">
                     Cartella del gruppo
@@ -235,6 +240,7 @@ export function VaultDialog({
                                         'size-2 rounded-full',
                                         getVaultColor(g.color).dot,
                                       )}
+                                      style={getVaultColor(g.color).style}
                                     />
                                     <span>{g.name}</span>
                                   </span>
@@ -324,24 +330,7 @@ export function VaultDialog({
 
               <div className="space-y-2">
                 <Label>Colore</Label>
-                <div className="flex flex-wrap gap-2">
-                  {Object.entries(VAULT_COLORS).map(([key, palette]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setColor(key)}
-                      className={cn(
-                        'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-                        color === key
-                          ? 'border-primary bg-accent font-medium text-accent-foreground'
-                          : 'hover:bg-muted',
-                      )}
-                    >
-                      <span className={cn('size-2.5 rounded-full', palette.dot)} />
-                      {palette.label}
-                    </button>
-                  ))}
-                </div>
+                <VaultColorPicker value={color} onChange={setColor} />
               </div>
             </div>
           </div>

@@ -451,6 +451,7 @@ export function ServiceAccountDialog({
                               <VaultIcon
                                 icon={getVaultDisplayIcon(vault)}
                                 className={cn('size-4 shrink-0', palette.text)}
+                                style={palette.style}
                               />
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
@@ -595,7 +596,10 @@ export function ServiceAccountDialog({
                                   )}
                                 </div>
                                 <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
-                                  <span className={cn('font-medium', palette.text)}>
+                                  <span
+                                    className={cn('font-medium', palette.text)}
+                                    style={palette.style}
+                                  >
                                     {cred.vault_name}
                                   </span>
                                   {cred.username && (

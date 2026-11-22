@@ -214,6 +214,7 @@ export function GroupDetailPanel({
                   palette.bg,
                   palette.text,
                 )}
+                style={palette.style}
               >
                 <Users className="size-4.5" />
               </div>
@@ -427,6 +428,7 @@ export function GroupDetailPanel({
                             vp.bg,
                             vp.text,
                           )}
+                          style={vp.style}
                         >
                           <VaultIcon
                             icon={getVaultDisplayIcon(vault)}
@@ -488,6 +490,7 @@ export function GroupDetailPanel({
                             vp.bg,
                             vp.text,
                           )}
+                          style={vp.style}
                         >
                           <VaultIcon
                             icon={getVaultDisplayIcon(vault)}

@@ -240,6 +240,7 @@ function VaultScopeSelector({
                 <VaultIcon
                   icon={getVaultDisplayIcon(v)}
                   className={cn('size-3.5', palette.text)}
+                  style={palette.style}
                 />
                 <span>{v.name}</span>
                 {selected && <Check className="size-3 text-primary" />}

@@ -485,7 +485,10 @@ export function CredentialDetail({
                 <DropdownMenuItem
                   onClick={() => onSelectVault(credential.vault_id)}
                 >
-                  <Folder className={cn('size-4', vaultPalette.text)} />
+                  <Folder
+                    className={cn('size-4', vaultPalette.text)}
+                    style={vaultPalette.style}
+                  />
                   <span className="truncate">
                     Cartella: {credential.vault_name}
                   </span>

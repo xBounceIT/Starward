@@ -463,6 +463,7 @@ export function ShareVaultDialog({
                                         'size-2 rounded-full',
                                         getVaultColor(g.color).dot,
                                       )}
+                                      style={getVaultColor(g.color).style}
                                     />
                                     <span>{g.name}</span>
                                     <span className="text-xs text-muted-foreground">
@@ -549,6 +550,7 @@ export function ShareVaultDialog({
                             palette.bg,
                             palette.text,
                           )}
+                          style={palette.style}
                         >
                           <Users className="size-4" />
                         </div>
