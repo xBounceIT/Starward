@@ -1,14 +1,23 @@
-import '@/lib/env'
+import { isDevMode, requireProdEnv } from '@/lib/env'
 import { betterAuth, type BetterAuthOptions } from 'better-auth'
 import { getMigrations } from 'better-auth/db/migration'
 import { genericOAuth } from 'better-auth/plugins'
 import { tanstackStartCookies } from 'better-auth/tanstack-start'
 import { Pool } from 'pg'
 
-const connectionString =
-  process.env.AUTH_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  'postgres://starward:starward@127.0.0.1:5432/starward'
+const DEV_DATABASE_URL = 'postgres://starward:starward@127.0.0.1:5432/starward'
+
+function resolveConnectionString(): string {
+  const raw = process.env.AUTH_DATABASE_URL?.trim() || process.env.DATABASE_URL?.trim()
+  if (raw && (isDevMode() || raw !== DEV_DATABASE_URL)) return raw
+  if (isDevMode()) return DEV_DATABASE_URL
+  throw new Error(
+    'AUTH_DATABASE_URL or DATABASE_URL must be set to a non-default value in production. ' +
+      'Set STARWARD_DEV_MODE=true for local development.',
+  )
+}
+
+const connectionString = resolveConnectionString()
 
 const database = new Pool({
   connectionString,
@@ -65,29 +74,52 @@ function isWildcardBindHost(hostname: string): boolean {
 
 function resolveAuthBaseURL(): BetterAuthOptions['baseURL'] {
   const raw = process.env.BETTER_AUTH_URL?.trim() || 'http://0.0.0.0:3000'
-  try {
-    const parsed = new URL(raw)
-    if (isWildcardBindHost(parsed.hostname)) {
-      const protocol = parsed.protocol === 'https:' ? 'https' : 'http'
-      const portSuffix = parsed.port ? `:${parsed.port}` : ''
-      return {
-        allowedHosts: ['*'],
-        protocol,
-        fallback: `${protocol}://localhost${portSuffix}`,
+  if (isDevMode()) {
+    // Dev only: a wildcard bind host is accepted and host validation is relaxed
+    // so local/LAN setups work out of the box.
+    try {
+      const parsed = new URL(raw)
+      if (isWildcardBindHost(parsed.hostname)) {
+        const protocol = parsed.protocol === 'https:' ? 'https' : 'http'
+        const portSuffix = parsed.port ? `:${parsed.port}` : ''
+        return {
+          allowedHosts: ['*'],
+          protocol,
+          fallback: `${protocol}://localhost${portSuffix}`,
+        }
       }
+    } catch {
+      // fall through to the plain value below
     }
     return raw
-  } catch {
-    return raw
   }
+  // Production: require an explicit, non-wildcard base URL so Better Auth's
+  // host validation stays enabled (allowedHosts is NOT set to ['*']).
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    throw new Error(
+      `BETTER_AUTH_URL must be a valid URL in production (got "${raw}"). ` +
+        'Set STARWARD_DEV_MODE=true for local development.',
+    )
+  }
+  if (!process.env.BETTER_AUTH_URL?.trim() || isWildcardBindHost(parsed.hostname)) {
+    throw new Error(
+      'BETTER_AUTH_URL must be set to an explicit origin (not 0.0.0.0/::) in production, ' +
+        'e.g. https://vault.example.com. Set STARWARD_DEV_MODE=true for local development.',
+    )
+  }
+  return raw
 }
 
 export const auth = betterAuth({
   appName: 'Starward',
   baseURL: resolveAuthBaseURL(),
-  secret:
-    process.env.BETTER_AUTH_SECRET ||
+  secret: requireProdEnv(
+    'BETTER_AUTH_SECRET',
     'dev-better-auth-secret-change-in-production-32chars',
+  ),
   database,
   emailAndPassword: {
     enabled: true,

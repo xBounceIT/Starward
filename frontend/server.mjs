@@ -37,7 +37,36 @@ const MIME_TYPES = {
   '.txt': 'text/plain; charset=utf-8',
 }
 
-function tryServeStatic(req, res, pathname) {
+// CSP allows the app's own assets plus the Google Fonts stylesheets/fonts it
+// links, and inline script/style (the SSR bootstrap script and theme init).
+// Everything else is locked to 'self'.
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+].join('; ')
+
+function applySecurityHeaders(target, { html = false, protocol = 'http' } = {}) {
+  target['X-Content-Type-Options'] = 'nosniff'
+  target['X-Frame-Options'] = 'DENY'
+  target['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+  if (html) {
+    target['Content-Security-Policy'] = CSP_POLICY
+  }
+  // HSTS is only meaningful (and only honored by browsers) over HTTPS.
+  if (protocol === 'https') {
+    target['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+  }
+}
+
+function tryServeStatic(req, res, pathname, protocol) {
   if (req.method !== 'GET' && req.method !== 'HEAD') return false
   if (pathname === '/' || pathname.startsWith('/api/')) return false
 
@@ -60,13 +89,18 @@ function tryServeStatic(req, res, pathname) {
   const contentType = MIME_TYPES[ext] || 'application/octet-stream'
   const isHashedAsset = pathname.startsWith('/assets/')
 
-  res.writeHead(200, {
+  const headers = {
     'Content-Type': contentType,
     'Content-Length': stats.size,
     'Cache-Control': isHashedAsset
       ? 'public, max-age=31536000, immutable'
       : 'public, max-age=3600',
+  }
+  applySecurityHeaders(headers, {
+    html: ext === '.html',
+    protocol,
   })
+  res.writeHead(200, headers)
 
   if (req.method === 'HEAD') {
     res.end()
@@ -89,7 +123,7 @@ const server = createServer(async (req, res) => {
       `localhost:${PORT}`
     const url = new URL(req.url || '/', `${protocol}://${host}`)
 
-    if (tryServeStatic(req, res, url.pathname)) {
+    if (tryServeStatic(req, res, url.pathname, protocol)) {
       return
     }
 
@@ -132,6 +166,11 @@ const server = createServer(async (req, res) => {
     if (setCookies.length > 0) {
       outHeaders['set-cookie'] = setCookies
     }
+
+    applySecurityHeaders(outHeaders, {
+      html: (webResponse.headers.get('content-type') || '').includes('text/html'),
+      protocol,
+    })
 
     res.writeHead(webResponse.status, outHeaders)
 

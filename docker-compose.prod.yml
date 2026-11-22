@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-starward}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-starward}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required in production (no default)}
       POSTGRES_DB: ${POSTGRES_DB:-starward}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -29,10 +29,10 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8080
-      DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD:-starward}@postgres:5432/${POSTGRES_DB:-starward}
-      STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:-dev-starward-auth-secret-change-in-production-32chars}
-      STARWARD_MASTER_KEY: ${STARWARD_MASTER_KEY:-dev-starward-master-key-change-in-production-32chars}
-      CORS_ORIGIN: ${BETTER_AUTH_URL:-http://0.0.0.0:3000}
+      DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starward}
+      STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:?STARWARD_AUTH_SECRET is required in production (min 32 random chars, no default)}
+      STARWARD_MASTER_KEY: ${STARWARD_MASTER_KEY:?STARWARD_MASTER_KEY is required in production (min 32 random chars, no default)}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required in production (set it to the public frontend URL, e.g. https://vault.example.com)}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       RUST_LOG: ${RUST_LOG:-starward_backend=info,tower_http=info}
     ports:
@@ -59,11 +59,11 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 3000
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://0.0.0.0:3000}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-better-auth-secret-change-in-production-32chars}
-      DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD:-starward}@postgres:5432/${POSTGRES_DB:-starward}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?BETTER_AUTH_URL is required in production (public URL, e.g. https://vault.example.com)}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required in production (min 32 random chars, no default)}
+      DATABASE_URL: postgres://${POSTGRES_USER:-starward}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-starward}
       RUST_BACKEND_URL: http://backend:8080
-      STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:-dev-starward-auth-secret-change-in-production-32chars}
+      STARWARD_AUTH_SECRET: ${STARWARD_AUTH_SECRET:?STARWARD_AUTH_SECRET is required in production (min 32 random chars, no default)}
       SSO_OIDC_NAME: ${SSO_OIDC_NAME:-SSO Aziendale (OIDC)}
       SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
       SSO_OIDC_CLIENT_SECRET: ${SSO_OIDC_CLIENT_SECRET:-}

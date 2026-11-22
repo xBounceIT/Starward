@@ -1,4 +1,4 @@
-import '@/lib/env'
+import { requireProdEnv } from '@/lib/env'
 import { createFileRoute } from '@tanstack/react-router'
 import { SignJWT } from 'jose'
 import { auth, ensureAuthMigrated } from '@/lib/auth'
@@ -6,9 +6,12 @@ import { auth, ensureAuthMigrated } from '@/lib/auth'
 const RUST_BACKEND_URL =
   process.env.RUST_BACKEND_URL || 'http://127.0.0.1:8080'
 
-const STARWARD_AUTH_SECRET =
-  process.env.STARWARD_AUTH_SECRET ||
-  'dev-starward-auth-secret-change-in-production-32chars'
+// Shared HS256 secret with the Rust backend: required in production, dev
+// default allowed only when STARWARD_DEV_MODE=true.
+const STARWARD_AUTH_SECRET = requireProdEnv(
+  'STARWARD_AUTH_SECRET',
+  'dev-starward-auth-secret-change-in-production-32chars',
+)
 
 function extractIncomingApiKey(request: Request): string | null {
   const xApiKey = request.headers.get('x-api-key')?.trim()

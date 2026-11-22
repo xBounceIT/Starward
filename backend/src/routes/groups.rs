@@ -847,6 +847,12 @@ pub async fn remove_group_member(
     Path((group_id, member_id)): Path<(String, String)>,
 ) -> AppResult<StatusCode> {
     user.require_write_permission()?;
+    if user.is_vault_restricted_api_key() {
+        return Err(AppError::Forbidden(
+            "Questa chiave è limitata a cartelle specifiche e non può rimuovere membri dal gruppo"
+                .to_string(),
+        ));
+    }
 
     let target: Option<(Option<String>, String, String)> = sqlx::query_as(
         "SELECT user_id, member_email, role FROM group_members WHERE id = $1 AND group_id = $2",

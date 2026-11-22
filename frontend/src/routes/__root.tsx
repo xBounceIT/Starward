@@ -14,6 +14,19 @@ import appCss from '@/styles/app.css?url'
 const NO_TRANSITIONS_STYLE =
   'html.no-transitions *,html.no-transitions *::before,html.no-transitions *::after{transition:none!important}'
 
+// Keep in sync with CSP_POLICY in server.mjs (sent as an HTTP header there).
+const CSP_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
 const INITIAL_LOAD_SCRIPT = `(() => {
   const root = document.documentElement;
   root.classList.add('no-transitions');
@@ -37,6 +50,8 @@ export const Route = createRootRoute({
         content:
           'Vault centralizzato con cartelle condivise, cifratura AES-256-GCM e autenticazione locale o SSO.',
       },
+      { httpEquiv: 'Content-Security-Policy', content: CSP_POLICY },
+      { name: 'referrer', content: 'strict-origin-when-cross-origin' },
     ],
     links: [
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },

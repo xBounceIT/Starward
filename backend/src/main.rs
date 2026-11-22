@@ -68,7 +68,15 @@ fn is_wildcard_cors_origin(origin: &str) -> bool {
 
 fn build_cors_origin(raw: &str) -> AllowOrigin {
     if is_wildcard_cors_origin(raw) {
-        return AllowOrigin::mirror_request();
+        if crate::config::dev_mode() {
+            // Dev only: reflect the request origin so local/LAN setups work out of the box.
+            return AllowOrigin::mirror_request();
+        }
+        panic!(
+            "CORS_ORIGIN must be an explicit origin in production (got a wildcard-like value: \"{raw}\"). \
+             Set CORS_ORIGIN to the frontend URL (e.g. https://vault.example.com), \
+             or set STARWARD_DEV_MODE=true for local development."
+        );
     }
 
     let origins: Vec<HeaderValue> = raw
@@ -272,6 +280,16 @@ async fn main() {
         .init();
 
     let config = Config::from_env();
+    // Fail fast in production before touching the database: a wildcard CORS
+    // origin (e.g. the 0.0.0.0 default) must never reach build_cors_origin.
+    if !config::dev_mode() && is_wildcard_cors_origin(&config.cors_origin) {
+        panic!(
+            "CORS_ORIGIN must be an explicit origin in production (got a wildcard-like value: \"{}\"). \
+             Set CORS_ORIGIN to the frontend URL (e.g. https://vault.example.com), \
+             or set STARWARD_DEV_MODE=true for local development.",
+            config.cors_origin
+        );
+    }
     let db = init_db(&config.database_url)
         .await
         .expect("Failed to connect to PostgreSQL and apply the schema");
