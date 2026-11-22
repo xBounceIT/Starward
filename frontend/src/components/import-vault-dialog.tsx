@@ -67,7 +67,12 @@ import { getVaultColor } from '@/lib/vault-utils'
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024
 const NO_FOLDER_FILTER = '__none__'
 
+// Scrollbar stretta e arrotondata usata nell'anteprima di importazione
+const importScrollBarClass = 'w-2 p-px'
+const importScrollThumbClass = 'rounded-full'
+
 type ImportStep = 'select' | 'preview' | 'result'
+type ImportStatusFilter = 'all' | ImportPreviewItem['status']
 
 interface ImportVaultDialogProps {
   open: boolean
@@ -103,6 +108,7 @@ export function ImportVaultDialog({
   const [folderAsTag, setFolderAsTag] = useState(true)
   const [folderFilter, setFolderFilter] = useState<string | null>(null)
   const [previewSearch, setPreviewSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ImportStatusFilter>('all')
 
   const [preview, setPreview] = useState<ImportPreviewResponse | null>(null)
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(
@@ -133,6 +139,7 @@ export function ImportVaultDialog({
     setFolderAsTag(true)
     setFolderFilter(null)
     setPreviewSearch('')
+    setStatusFilter('all')
     setPreview(null)
     setSelectedIndices(new Set())
     setPreviewLoading(false)
@@ -396,13 +403,18 @@ export function ImportVaultDialog({
 
   const visiblePreviewItems = useMemo(() => {
     const q = previewSearch.trim().toLowerCase()
-    if (!q) return folderScopedItems
     return folderScopedItems.filter((item) => {
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false
+      if (!q) return true
       const hay =
         `${item.title} ${item.username} ${item.url} ${item.source_folder ?? ''} ${item.tags.join(' ')}`.toLowerCase()
       return hay.includes(q)
     })
-  }, [folderScopedItems, previewSearch])
+  }, [folderScopedItems, previewSearch, statusFilter])
+
+  const handleStatusFilter = (status: ImportPreviewItem['status']) => {
+    setStatusFilter((prev) => (prev === status ? 'all' : status))
+  }
 
   const isItemSelectable = useCallback(
     (item: ImportPreviewItem) => {
@@ -507,12 +519,62 @@ export function ImportVaultDialog({
     setPreviewError(null)
     setFolderFilter(null)
     setPreviewSearch('')
+    setStatusFilter('all')
     setSelectedIndices(new Set())
   }
 
   if (!vault && writableVaults.length === 0) return null
 
   const activePalette = getVaultColor(activeTargetVault?.color ?? 'indigo')
+
+  const statusCards = [
+    {
+      status: 'ready',
+      label: 'Pronte',
+      count: scopedStats.ready,
+      icon: CheckCircle2,
+      cardClass:
+        'border-emerald-500/25 bg-emerald-500/10 hover:border-emerald-500/50',
+      iconClass: 'text-emerald-600 dark:text-emerald-400',
+      valueClass: 'text-emerald-600 dark:text-emerald-400',
+      activeClass:
+        'aria-pressed:border-emerald-500/60 aria-pressed:ring-2 aria-pressed:ring-emerald-500/60',
+    },
+    {
+      status: 'warning',
+      label: 'Con avvisi',
+      count: scopedStats.warning,
+      icon: AlertTriangle,
+      cardClass:
+        'border-amber-500/25 bg-amber-500/10 hover:border-amber-500/50',
+      iconClass: 'text-amber-600 dark:text-amber-400',
+      valueClass: 'text-amber-600 dark:text-amber-400',
+      activeClass:
+        'aria-pressed:border-amber-500/60 aria-pressed:ring-2 aria-pressed:ring-amber-500/60',
+    },
+    {
+      status: 'duplicate',
+      label: 'Duplicati',
+      count: scopedStats.duplicate,
+      icon: Copy,
+      cardClass: 'border-sky-500/25 bg-sky-500/10 hover:border-sky-500/50',
+      iconClass: 'text-sky-600 dark:text-sky-400',
+      valueClass: 'text-sky-600 dark:text-sky-400',
+      activeClass:
+        'aria-pressed:border-sky-500/60 aria-pressed:ring-2 aria-pressed:ring-sky-500/60',
+    },
+    {
+      status: 'skipped',
+      label: 'Saltate',
+      count: scopedStats.skipped,
+      icon: Ban,
+      cardClass: 'border-border/70 bg-muted/40 hover:border-muted-foreground/40',
+      iconClass: 'text-muted-foreground',
+      valueClass: 'text-muted-foreground',
+      activeClass:
+        'aria-pressed:border-muted-foreground/50 aria-pressed:ring-2 aria-pressed:ring-muted-foreground/40',
+    },
+  ] as const
 
   const renderTargetVaultSelect = (options?: {
     id?: string
@@ -924,52 +986,40 @@ export function ImportVaultDialog({
               </Button>
             </div>
 
-            {/* 4 Summary Badges */}
+            {/* 4 Summary Badges: clicca un riquadro per filtrare la lista */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <div className="flex items-center gap-2.5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2">
-                <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <div>
-                  <p className="text-base font-bold leading-none text-emerald-600 dark:text-emerald-400">
-                    {scopedStats.ready}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Pronte
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2">
-                <AlertTriangle className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <div>
-                  <p className="text-base font-bold leading-none text-amber-600 dark:text-amber-400">
-                    {scopedStats.warning}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Con avvisi
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2">
-                <Copy className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
-                <div>
-                  <p className="text-base font-bold leading-none text-sky-600 dark:text-sky-400">
-                    {scopedStats.duplicate}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Duplicati
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2.5 rounded-lg border border-border/70 bg-muted/40 px-3 py-2">
-                <Ban className="size-4 shrink-0 text-muted-foreground" />
-                <div>
-                  <p className="text-base font-bold leading-none text-muted-foreground">
-                    {scopedStats.skipped}
-                  </p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Saltate
-                  </p>
-                </div>
-              </div>
+              {statusCards.map((card) => {
+                const Icon = card.icon
+                return (
+                  <button
+                    key={card.status}
+                    type="button"
+                    aria-pressed={statusFilter === card.status}
+                    title={`Mostra solo: ${card.label}`}
+                    onClick={() => handleStatusFilter(card.status)}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors',
+                      card.cardClass,
+                      card.activeClass,
+                    )}
+                  >
+                    <Icon className={cn('size-4 shrink-0', card.iconClass)} />
+                    <span className="block">
+                      <span
+                        className={cn(
+                          'block text-base font-bold leading-none',
+                          card.valueClass,
+                        )}
+                      >
+                        {card.count}
+                      </span>
+                      <span className="mt-1 block text-[11px] text-muted-foreground">
+                        {card.label}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Options & Source Folder Filter */}
@@ -1116,10 +1166,26 @@ export function ImportVaultDialog({
             </div>
 
             {/* Preview Item List */}
-            <ScrollArea className="h-64 rounded-lg border border-border/70 bg-card/25">
+            <ScrollArea
+              className="h-64 rounded-lg border border-border/70 bg-card/25"
+              scrollBarClassName={importScrollBarClass}
+              thumbClassName={importScrollThumbClass}
+            >
               {visiblePreviewItems.length === 0 ? (
-                <div className="flex h-48 flex-col items-center justify-center p-6 text-center text-xs text-muted-foreground">
-                  Nessuna credenziale corrisponde ai filtri selezionati.
+                <div className="flex h-48 flex-col items-center justify-center gap-2 p-6 text-center text-xs text-muted-foreground">
+                  <span>Nessuna credenziale corrisponde ai filtri selezionati.</span>
+                  {statusFilter !== 'all' && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      className="h-7 gap-1 text-xs"
+                      onClick={() => setStatusFilter('all')}
+                    >
+                      <X className="size-3" />
+                      Mostra tutti gli stati
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="divide-y divide-border/50">
@@ -1144,16 +1210,16 @@ export function ImportVaultDialog({
                           }
                         }}
                         className={cn(
-                          'flex items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors',
+                          'flex items-center justify-between gap-3 px-3 py-2.5 text-left transition-colors',
                           selectable
                             ? 'cursor-pointer hover:bg-muted/40'
                             : 'opacity-65',
                         )}
                       >
-                        <div className="flex min-w-0 items-start gap-2.5">
+                        <div className="flex min-w-0 items-center gap-2.5">
                           <span
                             className={cn(
-                              'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
+                              'flex size-4 shrink-0 items-center justify-center rounded border transition-colors',
                               !selectable
                                 ? 'border-border/60 bg-muted/50'
                                 : checked
@@ -1164,7 +1230,7 @@ export function ImportVaultDialog({
                             {checked && <Check className="size-3" />}
                           </span>
 
-                          <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/40 text-muted-foreground">
+                          <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/70 bg-muted/40 text-muted-foreground">
                             <CategoryIcon
                               category={item.category}
                               className="size-3.5"
@@ -1340,7 +1406,11 @@ export function ImportVaultDialog({
                   Dettaglio elementi non importati (
                   {importResult.skipped_items.length})
                 </Label>
-                <ScrollArea className="h-40 rounded-lg border border-border/70 bg-card/30 p-2.5">
+                <ScrollArea
+                  className="h-40 rounded-lg border border-border/70 bg-card/30 p-2.5"
+                  scrollBarClassName={importScrollBarClass}
+                  thumbClassName={importScrollThumbClass}
+                >
                   <div className="space-y-1.5">
                     {importResult.skipped_items.map((sk) => (
                       <div

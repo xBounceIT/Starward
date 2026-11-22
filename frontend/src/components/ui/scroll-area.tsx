@@ -9,10 +9,14 @@ function ScrollArea({
   children,
   orientation = "vertical",
   viewportRef,
+  scrollBarClassName,
+  thumbClassName,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
   orientation?: "vertical" | "horizontal" | "both"
   viewportRef?: React.Ref<HTMLDivElement>
+  scrollBarClassName?: string
+  thumbClassName?: string
 }) {
   return (
     <ScrollAreaPrimitive.Root
@@ -28,10 +32,18 @@ function ScrollArea({
         {children}
       </ScrollAreaPrimitive.Viewport>
       {(orientation === "vertical" || orientation === "both") && (
-        <ScrollBar orientation="vertical" />
+        <ScrollBar
+          orientation="vertical"
+          className={scrollBarClassName}
+          thumbClassName={thumbClassName}
+        />
       )}
       {(orientation === "horizontal" || orientation === "both") && (
-        <ScrollBar orientation="horizontal" />
+        <ScrollBar
+          orientation="horizontal"
+          className={scrollBarClassName}
+          thumbClassName={thumbClassName}
+        />
       )}
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>
@@ -41,8 +53,11 @@ function ScrollArea({
 function ScrollBar({
   className,
   orientation = "vertical",
+  thumbClassName,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar> & {
+  thumbClassName?: string
+}) {
   return (
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       data-slot="scroll-area-scrollbar"
@@ -59,7 +74,10 @@ function ScrollBar({
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
-        className="relative flex-1 bg-muted-foreground/30 transition-colors hover:bg-muted-foreground/50 rounded-none sync-security:bg-[#ff9c00]/85 sync-security:hover:bg-white"
+        className={cn(
+          "relative flex-1 bg-muted-foreground/30 transition-colors hover:bg-muted-foreground/50 rounded-none sync-security:bg-[#ff9c00]/85 sync-security:hover:bg-white",
+          thumbClassName
+        )}
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   )
