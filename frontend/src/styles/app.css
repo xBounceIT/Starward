@@ -165,7 +165,41 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* App-wide scrollbar: same slim rounded style as the import dialog preview */
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--muted-foreground) 30%, transparent)
+      transparent;
   }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: color-mix(
+      in oklab,
+      var(--muted-foreground) 30%,
+      transparent
+    );
+    border: 1px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(
+      in oklab,
+      var(--muted-foreground) 50%,
+      transparent
+    );
+  }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -198,8 +232,8 @@
   }
 
   .sync-security ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 8px;
+    height: 8px;
   }
 
   .sync-security ::-webkit-scrollbar-track {
@@ -208,6 +242,7 @@
 
   .sync-security ::-webkit-scrollbar-thumb {
     background: #ff9c00;
+    border-radius: 9999px;
   }
 
   .sync-security ::-webkit-scrollbar-thumb:hover {

@@ -575,6 +575,7 @@ export const CredentialList = memo(function CredentialList({
 
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [openMenuCredId, setOpenMenuCredId] = useState<string | null>(null)
+  const [categoryEdges, setCategoryEdges] = useState({ left: false, right: false })
   const [viewportMetrics, setViewportMetrics] = useState<{
     gridCols: 1 | 2 | 3
     height: number
@@ -611,8 +612,26 @@ export const CredentialList = memo(function CredentialList({
         el.scrollLeft += delta
       }
     }
+    const updateEdges = () => {
+      const maxScroll = el.scrollWidth - el.clientWidth
+      setCategoryEdges((prev) => {
+        const left = el.scrollLeft > 1
+        const right = el.scrollLeft < maxScroll - 1
+        return prev.left === left && prev.right === right
+          ? prev
+          : { left, right }
+      })
+    }
+    updateEdges()
+    const edgeObserver = new ResizeObserver(updateEdges)
+    edgeObserver.observe(el)
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    el.addEventListener('scroll', updateEdges, { passive: true })
+    return () => {
+      edgeObserver.disconnect()
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('scroll', updateEdges)
+    }
   }, [])
 
   useEffect(() => {
@@ -1106,43 +1125,57 @@ export const CredentialList = memo(function CredentialList({
 
         {/* Category Filter Pills & Total Count */}
         <div className="flex items-center justify-between gap-3">
-          <div
-            ref={categoryScrollRef}
-            className="flex items-center gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            <button
-              type="button"
-              onClick={() => onCategoryFilterChange('')}
-              className={cn(
-                'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
-                categoryFilter === ''
-                  ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
-                  : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
-              )}
+          <div className="relative min-w-0 flex-1">
+            <div
+              ref={categoryScrollRef}
+              className="flex items-center gap-1.5 overflow-x-auto pb-0.5"
             >
-              Tutte
-            </button>
-            {CREDENTIAL_CATEGORIES.map((cat) => {
-              const active = categoryFilter === cat.value
-              return (
-                <button
-                  key={cat.value}
-                  type="button"
-                  onClick={() =>
-                    onCategoryFilterChange(active ? '' : cat.value)
-                  }
-                  className={cn(
-                    'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
-                    active
-                      ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
-                      : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
-                  )}
-                >
-                  <CategoryIcon category={cat.value} className="size-3.5" />
-                  <span>{cat.label}</span>
-                </button>
-              )
-            })}
+              <button
+                type="button"
+                onClick={() => onCategoryFilterChange('')}
+                className={cn(
+                  'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
+                  categoryFilter === ''
+                    ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
+                    : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
+                )}
+              >
+                Tutte
+              </button>
+              {CREDENTIAL_CATEGORIES.map((cat) => {
+                const active = categoryFilter === cat.value
+                return (
+                  <button
+                    key={cat.value}
+                    type="button"
+                    onClick={() =>
+                      onCategoryFilterChange(active ? '' : cat.value)
+                    }
+                    className={cn(
+                      'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
+                      active
+                        ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
+                        : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
+                    )}
+                  >
+                    <CategoryIcon category={cat.value} className="size-3.5" />
+                    <span>{cat.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            {categoryEdges.left && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 left-0 w-10 backdrop-blur-[3px] [mask-image:linear-gradient(to_right,black,transparent)] [-webkit-mask-image:linear-gradient(to_right,black,transparent)]"
+              />
+            )}
+            {categoryEdges.right && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 right-0 w-10 backdrop-blur-[3px] [mask-image:linear-gradient(to_left,black,transparent)] [-webkit-mask-image:linear-gradient(to_left,black,transparent)]"
+              />
+            )}
           </div>
 
           <span className="shrink-0 text-xs text-muted-foreground">
