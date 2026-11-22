@@ -274,6 +274,11 @@ pub async fn import_vault(
             encrypt_extra_fields(&state.crypto, &item.fields)?;
 
         let cred_id = Uuid::new_v4().to_string();
+        let created_at = item.created_at.or(item.updated_at).unwrap_or(now);
+        let mut updated_at = item.updated_at.or(item.created_at).unwrap_or(now);
+        if updated_at < created_at {
+            updated_at = created_at;
+        }
 
         sqlx::query(
             r#"
@@ -284,7 +289,7 @@ pub async fn import_vault(
                 extra_fields_ciphertext, extra_fields_nonce,
                 favorite, created_by, updated_by, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $15)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $16)
             "#,
         )
         .bind(&cred_id)
@@ -301,7 +306,8 @@ pub async fn import_vault(
         .bind(&extra_fields_nonce)
         .bind(item.favorite)
         .bind(&user.id)
-        .bind(now)
+        .bind(created_at)
+        .bind(updated_at)
         .execute(&mut *tx)
         .await?;
 
@@ -378,6 +384,8 @@ mod tests {
             favorite: false,
             source_folder: source_folder.map(str::to_string),
             tags: Vec::new(),
+            created_at: None,
+            updated_at: None,
             status: if skip_reason.is_some() {
                 "skipped".to_string()
             } else if is_duplicate {

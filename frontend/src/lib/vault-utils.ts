@@ -111,6 +111,25 @@ export function getInitials(nameOrEmail?: string | null): string {
   return cleaned.slice(0, 2).toUpperCase()
 }
 
+const RELATIVE_DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+})
+
+const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+
+const TIME_FORMATTER = new Intl.DateTimeFormat('it-IT', {
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000
+
 export function formatRelativeDate(iso: string): string {
   try {
     const date = new Date(iso)
@@ -122,11 +141,7 @@ export function formatRelativeDate(iso: string): string {
     if (diffHours < 24) return `${diffHours} ore fa`
     const diffDays = Math.floor(diffHours / 24)
     if (diffDays < 7) return `${diffDays}g fa`
-    return new Intl.DateTimeFormat('it-IT', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    }).format(date)
+    return RELATIVE_DATE_FORMATTER.format(date)
   } catch {
     return iso
   }
@@ -172,26 +187,22 @@ export function formatModifiedRelative(iso: string): string {
   }
 }
 
-export function formatShortDate(iso: string): string {
+export function formatShortDate(iso?: string | null): string {
+  if (!iso) return '—'
   try {
     const date = new Date(iso)
-    if (Number.isNaN(date.getTime())) return iso
-    return new Intl.DateTimeFormat('it-IT', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-      .format(date)
-      .replace('.', '')
+    if (Number.isNaN(date.getTime())) return '—'
+    return SHORT_DATE_FORMATTER.format(date).replace('.', '')
   } catch {
-    return iso
+    return '—'
   }
 }
 
-export function formatAccessTimestamp(iso: string): string {
+export function formatAccessTimestamp(iso?: string | null): string {
+  if (!iso) return '—'
   try {
     const date = new Date(iso)
-    if (Number.isNaN(date.getTime())) return iso
+    if (Number.isNaN(date.getTime())) return '—'
 
     const now = new Date()
     const isToday =
@@ -206,16 +217,13 @@ export function formatAccessTimestamp(iso: string): string {
       date.getMonth() === yesterday.getMonth() &&
       date.getDate() === yesterday.getDate()
 
-    const timeStr = new Intl.DateTimeFormat('it-IT', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date)
+    const timeStr = TIME_FORMATTER.format(date)
 
     if (isToday) return `Oggi, ${timeStr}`
     if (isYesterday) return `Ieri, ${timeStr}`
     return `${formatShortDate(iso)}, ${timeStr}`
   } catch {
-    return iso
+    return '—'
   }
 }
 
@@ -224,7 +232,9 @@ export function isRecentlyAdded(iso: string, withinDays = 7): boolean {
     const date = new Date(iso)
     if (Number.isNaN(date.getTime())) return false
     const diffMs = Date.now() - date.getTime()
-    return diffMs >= 0 && diffMs <= withinDays * 86400000
+    return (
+      diffMs >= -CLOCK_SKEW_TOLERANCE_MS && diffMs <= withinDays * 86400000
+    )
   } catch {
     return false
   }

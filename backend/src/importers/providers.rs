@@ -1,10 +1,14 @@
 use std::collections::BTreeMap;
 
+use chrono::{DateTime, Utc};
+
 use crate::{
     error::{AppError, AppResult},
     importers::{
-        append_note_section, clean_password, csv_parser::CsvTable,
-        detect_provider_hint_from_headers, host_from_url, parse_bool_flag, RawImportItem,
+        append_note_section, clean_password,
+        csv_parser::{CsvRow, CsvTable},
+        detect_provider_hint_from_headers, host_from_url, parse_bool_flag,
+        parse_import_timestamp, RawImportItem,
     },
 };
 
@@ -43,6 +47,45 @@ fn split_tags(raw: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(ToOwned::to_owned)
         .collect()
+}
+
+fn extract_csv_created_at(row: CsvRow<'_>) -> Option<DateTime<Utc>> {
+    [
+        "timecreated",
+        "createtime",
+        "create_time",
+        "created_at",
+        "creation_date",
+        "creationdate",
+        "creation time",
+        "creation date",
+        "created",
+        "creata",
+        "data creazione",
+    ]
+    .iter()
+    .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)))
+}
+
+fn extract_csv_updated_at(row: CsvRow<'_>) -> Option<DateTime<Utc>> {
+    [
+        "timepasswordchanged",
+        "modifytime",
+        "modify_time",
+        "updated_at",
+        "revision_date",
+        "revisiondate",
+        "last modified",
+        "last_modified",
+        "last modification time",
+        "modified",
+        "updated",
+        "ultima modifica",
+        "data modifica",
+        "timelastused",
+    ]
+    .iter()
+    .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)))
 }
 
 pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
@@ -92,6 +135,8 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder: None,
             folder_tags: Vec::new(),
             extra_tags,
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -256,6 +301,8 @@ pub(super) fn parse_lastpass(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -366,6 +413,8 @@ pub(super) fn parse_keepass(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -427,6 +476,8 @@ pub(super) fn parse_chrome(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder: None,
             folder_tags: Vec::new(),
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -478,6 +529,8 @@ pub(super) fn parse_firefox(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder: None,
             folder_tags: Vec::new(),
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -520,6 +573,8 @@ pub(super) fn parse_safari(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder: None,
             folder_tags: Vec::new(),
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -584,6 +639,8 @@ pub(super) fn parse_dashlane(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -652,6 +709,8 @@ pub(super) fn parse_protonpass(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -727,6 +786,8 @@ pub(super) fn parse_nordpass(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags: Vec::new(),
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });
@@ -873,6 +934,8 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
             source_folder,
             folder_tags,
             extra_tags,
+            created_at: extract_csv_created_at(row),
+            updated_at: extract_csv_updated_at(row),
             warning: None,
             pre_skip_reason: None,
         });

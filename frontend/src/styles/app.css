@@ -305,3 +305,11 @@
 .sync-security [data-slot="select-trigger"]:focus-visible {
   border-color: #ff9c00;
 }
+
+/* Prevent Radix ScrollArea's internal `display: table` wrapper from expanding
+   vertical-only scroll areas beyond their container width on long unbroken text. */
+[data-slot="scroll-area-viewport"][data-orientation="vertical"] > div {
+  display: flow-root !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}

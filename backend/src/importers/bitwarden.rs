@@ -7,7 +7,7 @@ use crate::{
     error::{AppError, AppResult},
     importers::{
         append_note_section, clean_password, csv_parser::CsvTable,
-        detect_provider_hint_from_headers, parse_bool_flag, RawImportItem,
+        detect_provider_hint_from_headers, parse_bool_flag, parse_import_timestamp, RawImportItem,
     },
 };
 
@@ -52,6 +52,10 @@ struct BitwardenItem {
     favorite: Option<bool>,
     #[serde(default)]
     deleted_date: Option<String>,
+    #[serde(default)]
+    creation_date: Option<String>,
+    #[serde(default)]
+    revision_date: Option<String>,
     #[serde(default)]
     fields: Option<Vec<BitwardenField>>,
     #[serde(default)]
@@ -333,12 +337,22 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                 source_folder,
                 folder_tags,
                 extra_tags: Vec::new(),
+                created_at: None,
+                updated_at: None,
                 warning: None,
                 pre_skip_reason: Some("Elemento nel cestino Bitwarden".to_string()),
             });
             continue;
         }
 
+        let created_at = item
+            .creation_date
+            .as_deref()
+            .and_then(parse_import_timestamp);
+        let updated_at = item
+            .revision_date
+            .as_deref()
+            .and_then(parse_import_timestamp);
         let mut notes = item.notes.unwrap_or_default().trim().to_string();
 
         let mut custom_field_lines = Vec::new();
@@ -532,6 +546,8 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags,
+            created_at,
+            updated_at,
             warning,
             pre_skip_reason,
         });
@@ -679,6 +695,13 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             extra_tags.push("identity".to_string());
         }
 
+        let created_at = ["creation_date", "created_at", "created"]
+            .iter()
+            .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)));
+        let updated_at = ["revision_date", "updated_at", "modified"]
+            .iter()
+            .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)));
+
         items.push(RawImportItem {
             title,
             username: row.get_trimmed("login_username").to_string(),
@@ -691,6 +714,8 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             source_folder,
             folder_tags,
             extra_tags,
+            created_at,
+            updated_at,
             warning,
             pre_skip_reason: None,
         });

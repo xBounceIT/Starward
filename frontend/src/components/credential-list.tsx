@@ -1,4 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect
 import {
   ArrowUpDown,
   ChevronDown,
@@ -73,6 +84,388 @@ const SORT_OPTIONS: { value: CredentialSortOption; label: string }[] = [
   { value: 'title_desc', label: 'Titolo (Z-A)' },
 ]
 
+const LIST_ROW_HEIGHT = 68
+const LIST_ROW_GAP = 8
+const LIST_STRIDE = LIST_ROW_HEIGHT + LIST_ROW_GAP
+const GRID_CARD_HEIGHT = 148
+const GRID_ROW_GAP = 12
+const GRID_STRIDE = GRID_CARD_HEIGHT + GRID_ROW_GAP
+const VIRTUAL_OVERSCAN_ROWS = 4
+const GRID_2COL_MIN_WIDTH = 560
+const GRID_3COL_MIN_WIDTH = 920
+
+function computeGridCols(width: number): 1 | 2 | 3 {
+  if (width >= GRID_3COL_MIN_WIDTH) return 3
+  if (width >= GRID_2COL_MIN_WIDTH) return 2
+  return 1
+}
+
+interface CredentialRowMenuButtonProps {
+  cred: Credential
+  isOpen: boolean
+  onOpenChange: (credId: string | null) => void
+  onCopyQuick: (e: React.MouseEvent, text: string, label: string) => void
+  onEditCredential: (cred: Credential) => void
+  onDeleteCredential: (cred: Credential) => void
+}
+
+const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
+  cred,
+  isOpen,
+  onOpenChange,
+  onCopyQuick,
+  onEditCredential,
+  onDeleteCredential,
+}: CredentialRowMenuButtonProps) {
+  if (!isOpen) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        className="size-7 text-muted-foreground hover:text-foreground"
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenChange(cred.id)
+        }}
+        aria-label="Azioni credenziale"
+        aria-haspopup="menu"
+        aria-expanded={false}
+      >
+        <MoreHorizontal className="size-4" />
+      </Button>
+    )
+  }
+
+  const quickCopy = getCredentialQuickCopy(cred)
+  const canWrite = cred.vault_role === 'owner' || cred.vault_role === 'editor'
+  const normalizedUrl = cred.url
+    ? /^https?:\/\//i.test(cred.url)
+      ? cred.url
+      : `https://${cred.url}`
+    : ''
+
+  return (
+    <DropdownMenu
+      open
+      onOpenChange={(open) => {
+        if (!open) onOpenChange(null)
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="size-7 text-muted-foreground hover:text-foreground"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Azioni credenziale"
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-48"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {quickCopy.primary && (
+          <DropdownMenuItem
+            onClick={(e) =>
+              onCopyQuick(
+                e,
+                quickCopy.primary!.value,
+                quickCopy.primary!.label,
+              )
+            }
+          >
+            <User className="size-4" />
+            Copia {quickCopy.primary.label.toLowerCase()}
+          </DropdownMenuItem>
+        )}
+        {quickCopy.secondary && (
+          <DropdownMenuItem
+            onClick={(e) =>
+              onCopyQuick(
+                e,
+                quickCopy.secondary!.value,
+                quickCopy.secondary!.label,
+              )
+            }
+          >
+            <Copy className="size-4" />
+            Copia {quickCopy.secondary.label.toLowerCase()}
+          </DropdownMenuItem>
+        )}
+        {normalizedUrl && (
+          <DropdownMenuItem asChild>
+            <a href={normalizedUrl} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-4" />
+              Apri URL
+            </a>
+          </DropdownMenuItem>
+        )}
+        {canWrite && (
+          <>
+            {(quickCopy.primary || quickCopy.secondary || normalizedUrl) && (
+              <DropdownMenuSeparator />
+            )}
+            <DropdownMenuItem onClick={() => onEditCredential(cred)}>
+              <Pencil className="size-4" />
+              Modifica
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => onDeleteCredential(cred)}
+            >
+              <Trash2 className="size-4" />
+              Elimina
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+})
+
+interface CredentialItemCardProps {
+  cred: Credential
+  isSelected: boolean
+  isMenuOpen: boolean
+  onSelect: (cred: Credential) => void
+  onContextMenuOpen: (credId: string) => void
+  onToggleFavorite: (cred: Credential) => void
+  onMenuOpenChange: (credId: string | null) => void
+  onCopyQuick: (e: React.MouseEvent, text: string, label: string) => void
+  onEditCredential: (cred: Credential) => void
+  onDeleteCredential: (cred: Credential) => void
+}
+
+const CredentialGridCard = memo(function CredentialGridCard({
+  cred,
+  isSelected,
+  isMenuOpen,
+  onSelect,
+  onContextMenuOpen,
+  onToggleFavorite,
+  onMenuOpenChange,
+  onCopyQuick,
+  onEditCredential,
+  onDeleteCredential,
+}: CredentialItemCardProps) {
+  const cols = getCredentialListColumns(cred)
+  const canWrite = cred.vault_role === 'owner' || cred.vault_role === 'editor'
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(cred)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenuOpen(cred.id)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(cred)
+        }
+      }}
+      className={cn(
+        'group relative flex h-[148px] min-w-0 cursor-pointer flex-col justify-between gap-2.5 overflow-hidden border p-4 text-left transition-colors rounded-lg',
+        isSelected
+          ? 'border-primary/60 bg-accent/70 ring-ring/30 sync-security:border-[#ff9c00] sync-security:bg-[#132442] ring-0 shadow-none'
+          : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
+      )}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <CredentialBrandIcon
+            credential={cred}
+            className="size-10 rounded-lg"
+            iconClassName="size-5"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
+              {cred.title}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {getCategoryLabel(cred.category)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            className="size-7"
+            disabled={!canWrite}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (canWrite) onToggleFavorite(cred)
+            }}
+            title={
+              cred.favorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'
+            }
+          >
+            <Star
+              className={cn(
+                'size-4 transition-colors',
+                cred.favorite
+                  ? 'fill-amber-400 text-amber-400'
+                  : 'text-muted-foreground/70 hover:text-amber-400',
+              )}
+            />
+          </Button>
+          <CredentialRowMenuButton
+            cred={cred}
+            isOpen={isMenuOpen}
+            onOpenChange={onMenuOpenChange}
+            onCopyQuick={onCopyQuick}
+            onEditCredential={onEditCredential}
+            onDeleteCredential={onDeleteCredential}
+          />
+        </div>
+      </div>
+
+      <div className="min-h-[34px] min-w-0 space-y-0.5 border-t border-border/50 pt-2">
+        <p className="truncate text-xs font-medium text-foreground/90">
+          {cols.primary}
+        </p>
+        {cols.secondary && (
+          <p className="truncate text-[11px] text-muted-foreground">
+            {cols.secondary}
+          </p>
+        )}
+      </div>
+
+      <div className="flex min-w-0 items-center justify-between gap-2 text-[11px] text-muted-foreground">
+        <span className="min-w-0 truncate">{cred.vault_name}</span>
+        <span className="shrink-0">
+          {formatModifiedRelative(cred.updated_at)}
+        </span>
+      </div>
+    </div>
+  )
+})
+
+const CredentialListRow = memo(function CredentialListRow({
+  cred,
+  isSelected,
+  isMenuOpen,
+  onSelect,
+  onContextMenuOpen,
+  onToggleFavorite,
+  onMenuOpenChange,
+  onCopyQuick,
+  onEditCredential,
+  onDeleteCredential,
+}: CredentialItemCardProps) {
+  const cols = getCredentialListColumns(cred)
+  const canWrite = cred.vault_role === 'owner' || cred.vault_role === 'editor'
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect(cred)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenuOpen(cred.id)
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(cred)
+        }
+      }}
+      className={cn(
+        'group relative flex h-[68px] min-w-0 cursor-pointer items-center gap-4 overflow-hidden border px-4 py-3 text-left transition-colors rounded-lg',
+        isSelected
+          ? 'border-primary/60 bg-accent/70 ring-ring/30 sync-security:border-[#ff9c00] sync-security:bg-[#132442] ring-0 shadow-none'
+          : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
+      )}
+    >
+      <CredentialBrandIcon
+        credential={cred}
+        className="size-10 rounded-lg"
+        iconClassName="size-5"
+      />
+
+      {/* Title & Category Column */}
+      <div className="min-w-0 flex-1 @[520px]:w-44 @[520px]:flex-none @[760px]:w-52">
+        <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
+          {cred.title}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+          {getCategoryLabel(cred.category)}
+        </p>
+      </div>
+
+      {/* Identifier & URL/Host Column */}
+      <div className="hidden min-w-0 flex-1 @[520px]:block">
+        <p
+          className={cn(
+            'truncate text-sm text-foreground/90',
+            cred.category === 'api_key' &&
+              !cred.username &&
+              'font-mono text-xs tracking-wider',
+          )}
+        >
+          {cols.primary}
+        </p>
+        {cols.secondary && (
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {cols.secondary}
+          </p>
+        )}
+      </div>
+
+      {/* Relative Modification Date */}
+      <div className="hidden shrink-0 text-right text-xs text-muted-foreground @[680px]:block">
+        {formatModifiedRelative(cred.updated_at)}
+      </div>
+
+      {/* Favorite Star & More Menu */}
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="size-7"
+          disabled={!canWrite}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (canWrite) onToggleFavorite(cred)
+          }}
+          title={
+            cred.favorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'
+          }
+        >
+          <Star
+            className={cn(
+              'size-4 transition-colors',
+              cred.favorite
+                ? 'fill-amber-400 text-amber-400'
+                : 'text-muted-foreground/70 hover:text-amber-400',
+            )}
+          />
+        </Button>
+        <CredentialRowMenuButton
+          cred={cred}
+          isOpen={isMenuOpen}
+          onOpenChange={onMenuOpenChange}
+          onCopyQuick={onCopyQuick}
+          onEditCredential={onEditCredential}
+          onDeleteCredential={onDeleteCredential}
+        />
+      </div>
+    </div>
+  )
+})
+
 export interface CredentialListStats {
   total: number
   favorites: number
@@ -106,7 +499,7 @@ interface CredentialListProps {
   onOpenAudit: (vault: Vault) => void
 }
 
-export function CredentialList({
+export const CredentialList = memo(function CredentialList({
   selection,
   activeVault,
   credentials,
@@ -133,8 +526,23 @@ export function CredentialList({
 }: CredentialListProps) {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const categoryScrollRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const scrollTopRef = useRef(0)
+  const rowStrideRef = useRef(LIST_STRIDE)
+  const pendingScrollTopRef = useRef<number | null>(null)
+
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [openMenuCredId, setOpenMenuCredId] = useState<string | null>(null)
+  const [viewportMetrics, setViewportMetrics] = useState<{
+    gridCols: 1 | 2 | 3
+    height: number
+  }>({ gridCols: 2, height: 800 })
+  const [visibleStartRow, setVisibleStartRow] = useState(0)
+
+  const activeCols = viewMode === 'grid' ? viewportMetrics.gridCols : 1
+  const rowStride = viewMode === 'grid' ? GRID_STRIDE : LIST_STRIDE
+  const rowGap = viewMode === 'grid' ? GRID_ROW_GAP : LIST_ROW_GAP
+  rowStrideRef.current = rowStride
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -165,18 +573,151 @@ export function CredentialList({
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  const copyQuick = async (
-    e: React.MouseEvent,
-    text: string,
-    label: string,
-  ) => {
-    e.stopPropagation()
-    if (await copyToClipboard(text)) {
-      toast.success(`${label} copiato negli appunti`)
-    } else {
-      toast.error('Impossibile copiare negli appunti')
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const updateMetrics = () => {
+      if (viewport.clientWidth === 0 || viewport.clientHeight === 0) return
+      const nextCols = computeGridCols(viewport.clientWidth)
+      const nextHeight = viewport.clientHeight
+      setViewportMetrics((prev) =>
+        prev.gridCols === nextCols && prev.height === nextHeight
+          ? prev
+          : { gridCols: nextCols, height: nextHeight },
+      )
     }
-  }
+
+    const handleScroll = () => {
+      const top = viewport.scrollTop
+      scrollTopRef.current = top
+      const nextStart = Math.max(
+        0,
+        Math.floor(top / rowStrideRef.current) - VIRTUAL_OVERSCAN_ROWS,
+      )
+      setVisibleStartRow((prev) => (prev === nextStart ? prev : nextStart))
+    }
+
+    updateMetrics()
+    handleScroll()
+
+    const observer = new ResizeObserver(updateMetrics)
+    observer.observe(viewport)
+    viewport.addEventListener('scroll', handleScroll, { passive: true })
+
+    return () => {
+      observer.disconnect()
+      viewport.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
+  const selectionKey =
+    selection.type === 'vault' ? `vault:${selection.vaultId}` : selection.type
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (viewport) {
+      viewport.scrollTop = 0
+    }
+    scrollTopRef.current = 0
+    setVisibleStartRow(0)
+  }, [selectionKey, searchQuery, categoryFilter, sortBy])
+
+  const totalRows = Math.ceil(credentials.length / activeCols)
+  const totalHeight = totalRows > 0 ? totalRows * rowStride - rowGap + 8 : 0
+
+  useIsomorphicLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport || viewport.clientHeight === 0) return
+    const maxScroll = Math.max(0, totalHeight - viewport.clientHeight)
+    if (pendingScrollTopRef.current !== null) {
+      const target = Math.min(pendingScrollTopRef.current, maxScroll)
+      pendingScrollTopRef.current = null
+      viewport.scrollTop = target
+      scrollTopRef.current = target
+      const nextStart = Math.max(
+        0,
+        Math.floor(target / rowStride) - VIRTUAL_OVERSCAN_ROWS,
+      )
+      setVisibleStartRow((prev) => (prev === nextStart ? prev : nextStart))
+      return
+    }
+    if (viewport.scrollTop > maxScroll) {
+      viewport.scrollTop = maxScroll
+      scrollTopRef.current = maxScroll
+      const nextStart = Math.max(
+        0,
+        Math.floor(maxScroll / rowStride) - VIRTUAL_OVERSCAN_ROWS,
+      )
+      setVisibleStartRow(nextStart)
+    }
+  }, [totalHeight, rowStride])
+
+  const visibleRowCount =
+    Math.ceil(Math.max(viewportMetrics.height, 400) / rowStride) +
+    VIRTUAL_OVERSCAN_ROWS * 2 +
+    1
+  const startRow = Math.min(visibleStartRow, Math.max(0, totalRows - 1))
+  const endRow = Math.min(totalRows - 1, startRow + visibleRowCount)
+
+  const visibleCredentials = useMemo(
+    () =>
+      totalRows === 0
+        ? []
+        : credentials.slice(startRow * activeCols, (endRow + 1) * activeCols),
+    [credentials, totalRows, startRow, endRow, activeCols],
+  )
+  const offsetY = startRow * rowStride
+
+  const handleViewModeChange = useCallback(
+    (nextMode: 'list' | 'grid') => {
+      if (nextMode === viewMode) return
+      const currentCols = viewMode === 'grid' ? viewportMetrics.gridCols : 1
+      const currentStride = viewMode === 'grid' ? GRID_STRIDE : LIST_STRIDE
+      const nextCols = nextMode === 'grid' ? viewportMetrics.gridCols : 1
+      const nextStride = nextMode === 'grid' ? GRID_STRIDE : LIST_STRIDE
+      const nextGap = nextMode === 'grid' ? GRID_ROW_GAP : LIST_ROW_GAP
+
+      const currentTopRow = Math.floor(scrollTopRef.current / currentStride)
+      const firstVisibleIndex = currentTopRow * currentCols
+      const nextRow = Math.floor(firstVisibleIndex / nextCols)
+
+      const nextTotalRows = Math.ceil(credentials.length / nextCols)
+      const nextTotalHeight =
+        nextTotalRows > 0 ? nextTotalRows * nextStride - nextGap + 8 : 0
+      const maxScrollTop = Math.max(0, nextTotalHeight - viewportMetrics.height)
+      const targetScrollTop = Math.min(nextRow * nextStride, maxScrollTop)
+
+      const nextStart = Math.max(
+        0,
+        Math.floor(targetScrollTop / nextStride) - VIRTUAL_OVERSCAN_ROWS,
+      )
+
+      setOpenMenuCredId(null)
+      pendingScrollTopRef.current = targetScrollTop
+      scrollTopRef.current = targetScrollTop
+      rowStrideRef.current = nextStride
+      setVisibleStartRow(nextStart)
+      setViewMode(nextMode)
+    },
+    [viewMode, viewportMetrics.gridCols, viewportMetrics.height, credentials.length],
+  )
+
+  const copyQuick = useCallback(
+    async (e: React.MouseEvent, text: string, label: string) => {
+      e.stopPropagation()
+      if (await copyToClipboard(text)) {
+        toast.success(`${label} copiato negli appunti`)
+      } else {
+        toast.error('Impossibile copiare negli appunti')
+      }
+    },
+    [],
+  )
+
+  const handleContextMenuOpen = useCallback((credId: string) => {
+    setOpenMenuCredId(credId)
+  }, [])
 
   const headerTitle =
     selection.type === 'all'
@@ -207,99 +748,8 @@ export function CredentialList({
   const currentSortLabel =
     SORT_OPTIONS.find((s) => s.value === sortBy)?.label ?? 'Ultima modifica'
 
-  const renderRowMenu = (cred: Credential) => {
-    const quickCopy = getCredentialQuickCopy(cred)
-    const canWrite =
-      cred.vault_role === 'owner' || cred.vault_role === 'editor'
-    const normalizedUrl = cred.url
-      ? /^https?:\/\//i.test(cred.url)
-        ? cred.url
-        : `https://${cred.url}`
-      : ''
-
-    return (
-      <DropdownMenu
-        open={openMenuCredId === cred.id}
-        onOpenChange={(open) => setOpenMenuCredId(open ? cred.id : null)}
-      >
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="size-7 text-muted-foreground hover:text-foreground"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Azioni credenziale"
-          >
-            <MoreHorizontal className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="w-48"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {quickCopy.primary && (
-            <DropdownMenuItem
-              onClick={(e) =>
-                copyQuick(
-                  e,
-                  quickCopy.primary!.value,
-                  quickCopy.primary!.label,
-                )
-              }
-            >
-              <User className="size-4" />
-              Copia {quickCopy.primary.label.toLowerCase()}
-            </DropdownMenuItem>
-          )}
-          {quickCopy.secondary && (
-            <DropdownMenuItem
-              onClick={(e) =>
-                copyQuick(
-                  e,
-                  quickCopy.secondary!.value,
-                  quickCopy.secondary!.label,
-                )
-              }
-            >
-              <Copy className="size-4" />
-              Copia {quickCopy.secondary.label.toLowerCase()}
-            </DropdownMenuItem>
-          )}
-          {normalizedUrl && (
-            <DropdownMenuItem asChild>
-              <a href={normalizedUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="size-4" />
-                Apri URL
-              </a>
-            </DropdownMenuItem>
-          )}
-          {canWrite && (
-            <>
-              {(quickCopy.primary || quickCopy.secondary || normalizedUrl) && (
-                <DropdownMenuSeparator />
-              )}
-              <DropdownMenuItem onClick={() => onEditCredential(cred)}>
-                <Pencil className="size-4" />
-                Modifica
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => onDeleteCredential(cred)}
-              >
-                <Trash2 className="size-4" />
-                Elimina
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    )
-  }
-
   return (
-    <section className="flex h-full min-w-0 flex-1 flex-col bg-background">
+    <section className="@container flex h-full min-w-0 flex-1 flex-col bg-background">
       {/* Top Workspace Header & Controls */}
       <div className="space-y-4 px-5 pt-5 pb-3 sm:px-6">
         {/* Title & Vault Actions */}
@@ -465,7 +915,7 @@ export function CredentialList({
         </div>
 
         {/* 4 Summary KPI Cards */}
-        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 @[760px]:grid-cols-4">
           <div className="flex items-center gap-3.5 border border-border/70 bg-card/50 px-4 py-3 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
             <div className="flex size-10 shrink-0 items-center justify-center bg-muted text-foreground rounded-full sync-security:bg-[#ff9c00] sync-security:text-[#1a2c4b]">
               <KeyRound className="size-4.5" />
@@ -547,7 +997,7 @@ export function CredentialList({
                   <X className="size-3.5" />
                 </Button>
               )}
-              <kbd className="pointer-events-none hidden rounded-md border border-border/80 bg-muted/60 px-2 py-0.5 font-sans text-[11px] font-medium text-muted-foreground sync-security:border-[#ff9c00]/35 sync-security:bg-[#1a2c4b] sync-security:text-[#ff9c00] sm:inline-block">
+              <kbd className="pointer-events-none hidden rounded-md border border-border/80 bg-muted/60 px-2 py-0.5 font-sans text-[11px] font-medium text-muted-foreground sync-security:border-[#ff9c00]/35 sync-security:bg-[#1a2c4b] sync-security:text-[#ff9c00] @[520px]:inline-block">
                 Ctrl + K
               </kbd>
             </div>
@@ -583,7 +1033,7 @@ export function CredentialList({
           <div className="flex h-10 items-center gap-0.5 border border-border/70 bg-card/50 p-1 rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
             <button
               type="button"
-              onClick={() => setViewMode('list')}
+              onClick={() => handleViewModeChange('list')}
               title="Vista lista"
               aria-label="Vista lista"
               className={cn(
@@ -597,7 +1047,7 @@ export function CredentialList({
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('grid')}
+              onClick={() => handleViewModeChange('grid')}
               title="Vista griglia"
               aria-label="Vista griglia"
               className={cn(
@@ -661,7 +1111,10 @@ export function CredentialList({
       </div>
 
       {/* Credential Items */}
-      <ScrollArea className="min-h-0 flex-1 px-5 pb-5 sm:px-6">
+      <ScrollArea
+        viewportRef={viewportRef}
+        className="min-h-0 flex-1 px-5 pb-5 sm:px-6"
+      >
         {loading ? (
           <div className="space-y-2.5">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -714,211 +1167,56 @@ export function CredentialList({
               </div>
             )}
           </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            {credentials.map((cred) => {
-              const isSelected = cred.id === selectedCredentialId
-              const cols = getCredentialListColumns(cred)
-              const canWrite =
-                cred.vault_role === 'owner' || cred.vault_role === 'editor'
-
-              return (
-                <div
-                  key={cred.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelectCredential(cred)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setOpenMenuCredId(cred.id)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      onSelectCredential(cred)
-                    }
-                  }}
-                  className={cn(
-                    'group relative flex cursor-pointer flex-col justify-between gap-3 border p-4 text-left transition-all rounded-lg',
-                    isSelected
-                      ? 'border-primary/60 bg-accent/70 ring-ring/30 sync-security:border-[#ff9c00] sync-security:bg-[#132442] ring-0 shadow-none'
-                      : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CredentialBrandIcon
-                        credential={cred}
-                        className="size-10 rounded-lg"
-                        iconClassName="size-5"
-                      />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
-                          {cred.title}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {getCategoryLabel(cred.category)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        className="size-7"
-                        disabled={!canWrite}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (canWrite) onToggleFavorite(cred)
-                        }}
-                        title={
-                          cred.favorite
-                            ? 'Rimuovi dai preferiti'
-                            : 'Aggiungi ai preferiti'
-                        }
-                      >
-                        <Star
-                          className={cn(
-                            'size-4 transition-colors',
-                            cred.favorite
-                              ? 'fill-amber-400 text-amber-400'
-                              : 'text-muted-foreground/70 hover:text-amber-400',
-                          )}
-                        />
-                      </Button>
-                      {renderRowMenu(cred)}
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 space-y-0.5 border-t border-border/50 pt-2.5">
-                    <p className="truncate text-xs font-medium text-foreground/90">
-                      {cols.primary}
-                    </p>
-                    {cols.secondary && (
-                      <p className="truncate text-[11px] text-muted-foreground">
-                        {cols.secondary}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span className="truncate">{cred.vault_name}</span>
-                    <span className="shrink-0">
-                      {formatModifiedRelative(cred.updated_at)}
-                    </span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
         ) : (
-          <div className="space-y-2">
-            {credentials.map((cred) => {
-              const isSelected = cred.id === selectedCredentialId
-              const cols = getCredentialListColumns(cred)
-              const canWrite =
-                cred.vault_role === 'owner' || cred.vault_role === 'editor'
-
-              return (
-                <div
-                  key={cred.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelectCredential(cred)}
-                  onContextMenu={(e) => {
-                    e.preventDefault()
-                    setOpenMenuCredId(cred.id)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      onSelectCredential(cred)
+          <div style={{ height: totalHeight, position: 'relative' }}>
+            <div
+              style={
+                viewMode === 'grid'
+                  ? {
+                      transform: `translate3d(0, ${offsetY}px, 0)`,
+                      gridTemplateColumns: `repeat(${activeCols}, minmax(0, 1fr))`,
                     }
-                  }}
-                  className={cn(
-                    'group relative flex cursor-pointer items-center gap-4 border px-4 py-3 text-left transition-all rounded-lg',
-                    isSelected
-                      ? 'border-primary/60 bg-accent/70 ring-ring/30 sync-security:border-[#ff9c00] sync-security:bg-[#132442] ring-0 shadow-none'
-                      : 'border-border/70 bg-card/45 hover:border-border hover:bg-card/80 sync-security:border-white/12 sync-security:bg-[#0e1b33] sync-security:hover:border-[#ff9c00]/60 sync-security:hover:bg-[#132442]',
-                  )}
-                >
-                  <CredentialBrandIcon
-                    credential={cred}
-                    className="size-10 rounded-lg"
-                    iconClassName="size-5"
-                  />
-
-                  {/* Title & Category Column */}
-                  <div className="min-w-0 flex-1 sm:w-44 sm:flex-none xl:w-52">
-                    <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
-                      {cred.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {getCategoryLabel(cred.category)}
-                    </p>
-                  </div>
-
-                  {/* Identifier & URL/Host Column */}
-                  <div className="hidden min-w-0 flex-1 sm:block">
-                    <p
-                      className={cn(
-                        'truncate text-sm text-foreground/90',
-                        cred.category === 'api_key' &&
-                          !cred.username &&
-                          'font-mono text-xs tracking-wider',
-                      )}
-                    >
-                      {cols.primary}
-                    </p>
-                    {cols.secondary && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {cols.secondary}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Relative Modification Date */}
-                  <div className="hidden shrink-0 text-right text-xs text-muted-foreground md:block">
-                    {formatModifiedRelative(cred.updated_at)}
-                  </div>
-
-                  {/* Favorite Star & More Menu */}
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      className="size-7"
-                      disabled={!canWrite}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (canWrite) onToggleFavorite(cred)
-                      }}
-                      title={
-                        cred.favorite
-                          ? 'Rimuovi dai preferiti'
-                          : 'Aggiungi ai preferiti'
-                      }
-                    >
-                      <Star
-                        className={cn(
-                          'size-4 transition-colors',
-                          cred.favorite
-                            ? 'fill-amber-400 text-amber-400'
-                            : 'text-muted-foreground/70 hover:text-amber-400',
-                        )}
-                      />
-                    </Button>
-                    {renderRowMenu(cred)}
-                  </div>
-                </div>
-              )
-            })}
+                  : { transform: `translate3d(0, ${offsetY}px, 0)` }
+              }
+              className={
+                viewMode === 'grid' ? 'grid gap-3' : 'flex flex-col gap-2'
+              }
+            >
+              {viewMode === 'grid'
+                ? visibleCredentials.map((cred) => (
+                    <CredentialGridCard
+                      key={cred.id}
+                      cred={cred}
+                      isSelected={cred.id === selectedCredentialId}
+                      isMenuOpen={openMenuCredId === cred.id}
+                      onSelect={onSelectCredential}
+                      onContextMenuOpen={handleContextMenuOpen}
+                      onToggleFavorite={onToggleFavorite}
+                      onMenuOpenChange={setOpenMenuCredId}
+                      onCopyQuick={copyQuick}
+                      onEditCredential={onEditCredential}
+                      onDeleteCredential={onDeleteCredential}
+                    />
+                  ))
+                : visibleCredentials.map((cred) => (
+                    <CredentialListRow
+                      key={cred.id}
+                      cred={cred}
+                      isSelected={cred.id === selectedCredentialId}
+                      isMenuOpen={openMenuCredId === cred.id}
+                      onSelect={onSelectCredential}
+                      onContextMenuOpen={handleContextMenuOpen}
+                      onToggleFavorite={onToggleFavorite}
+                      onMenuOpenChange={setOpenMenuCredId}
+                      onCopyQuick={copyQuick}
+                      onEditCredential={onEditCredential}
+                      onDeleteCredential={onDeleteCredential}
+                    />
+                  ))}
+            </div>
           </div>
         )}
       </ScrollArea>
     </section>
   )
-}
+})

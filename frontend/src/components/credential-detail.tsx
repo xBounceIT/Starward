@@ -115,7 +115,7 @@ export function CredentialDetail({
 
   if (!credential) {
     return (
-      <section className="hidden h-full w-full flex-col border-l border-border/80 bg-card/20 sync-security:border-white/20 sync-security:bg-[#000c20] lg:flex lg:w-[390px] lg:shrink-0 xl:w-[430px]">
+      <section className="hidden h-full w-full min-w-0 flex-col overflow-hidden border-l border-border/80 bg-card/20 sync-security:border-white/20 sync-security:bg-[#000c20] lg:flex">
         {onClose && (
           <div className="flex justify-end px-5 pt-3">
             <button
@@ -272,24 +272,24 @@ export function CredentialDetail({
         : null
 
     return (
-      <div key={field.key} className="space-y-1.5">
+      <div key={field.key} className="min-w-0 space-y-1.5">
         <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
           {label}
         </p>
 
         <div
           className={cn(
-            'flex items-center justify-between gap-2 border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]',
+            'flex min-w-0 items-center justify-between gap-2 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]',
             isMultiline && 'items-start',
           )}
         >
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 overflow-hidden">
             {!rawValue ? (
               <span className="text-xs italic text-muted-foreground">
                 Non specificato
               </span>
             ) : field.secret && !isRevealed ? (
-              <span className="block font-mono text-sm tracking-widest text-foreground select-none">
+              <span className="block truncate font-mono text-sm tracking-widest text-foreground select-none">
                 {field.type === 'secret-textarea'
                   ? '••••••••••••••••••••••••'
                   : maskSecretValue(rawValue, field.maskMode)}
@@ -301,7 +301,8 @@ export function CredentialDetail({
                   href={externalHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="truncate text-sm text-primary underline-offset-4 hover:underline sync-security:text-[#ff9c00]"
+                  title={displayValue}
+                  className="min-w-0 flex-1 truncate text-sm text-primary underline-offset-4 hover:underline sync-security:text-[#ff9c00]"
                 >
                   {displayValue}
                 </a>
@@ -309,7 +310,7 @@ export function CredentialDetail({
             ) : isMultiline ? (
               <p
                 className={cn(
-                  'whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90 select-all',
+                  'max-h-48 overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/90 select-all',
                   field.mono && 'font-mono text-xs',
                 )}
               >
@@ -317,6 +318,7 @@ export function CredentialDetail({
               </p>
             ) : (
               <span
+                title={field.secret ? undefined : displayValue}
                 className={cn(
                   'block truncate text-sm text-foreground select-all',
                   field.mono && 'font-mono',
@@ -376,7 +378,7 @@ export function CredentialDetail({
   }
 
   return (
-    <section className="flex h-full w-full flex-col border-l border-border/80 bg-card/25 sync-security:border-white/20 sync-security:bg-[#000c20] lg:w-[390px] lg:shrink-0 xl:w-[430px]">
+    <section className="flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border/80 bg-card/25 sync-security:border-white/20 sync-security:bg-[#000c20]">
       {/* Top Close bar & Header */}
       <div className="px-5 pt-3 pb-4 border-b sync-security:border-white/15">
         {onClose && (
@@ -394,14 +396,17 @@ export function CredentialDetail({
         )}
 
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3.5">
+          <div className="flex min-w-0 flex-1 items-center gap-3.5">
             <CredentialBrandIcon
               credential={credential}
               className="size-12 rounded-lg"
               iconClassName="size-6"
             />
-            <div className="min-w-0">
-              <h2 className="truncate font-bold leading-tight text-base tracking-normal">
+            <div className="min-w-0 flex-1">
+              <h2
+                title={credential.title}
+                className="truncate font-bold leading-tight text-base tracking-normal"
+              >
                 {credential.title}
               </h2>
               <div className="mt-0.5 flex items-center gap-1.5">
@@ -504,14 +509,17 @@ export function CredentialDetail({
 
       {/* Main Fields Content */}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-4 px-5 pt-4 pb-5">
+        <div className="min-w-0 space-y-4 px-5 pt-4 pb-5">
           {/* Titolo Field */}
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
               Titolo
             </p>
-            <div className="flex items-center justify-between gap-2 border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
-              <span className="truncate text-sm text-foreground select-all">
+            <div className="flex min-w-0 items-center justify-between gap-2 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+              <span
+                title={credential.title}
+                className="min-w-0 flex-1 truncate text-sm text-foreground select-all"
+              >
                 {credential.title}
               </span>
               <button
@@ -535,7 +543,7 @@ export function CredentialDetail({
 
           {/* Note Field */}
           {(credential.notes || categoryConfig.value === 'login' || categoryConfig.value === 'note') && (
-            <div className="space-y-1.5">
+            <div className="min-w-0 space-y-1.5">
               <div className="flex items-center justify-between">
                 <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
                   Note
@@ -555,9 +563,9 @@ export function CredentialDetail({
                   </button>
                 )}
               </div>
-              <div className="border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+              <div className="min-w-0 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
                 {credential.notes ? (
-                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/90">
+                  <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/90">
                     {credential.notes}
                   </p>
                 ) : (
@@ -570,7 +578,7 @@ export function CredentialDetail({
           )}
 
           {/* Tag Section */}
-          <div className="space-y-1.5">
+          <div className="min-w-0 space-y-1.5">
             <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
               Tag
             </p>
@@ -578,14 +586,16 @@ export function CredentialDetail({
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex h-7 items-center gap-1.5 border border-border/80 bg-card/60 px-2.5 text-xs text-foreground/90 rounded-[5px] sync-security:border-[#ff9c00]/35 sync-security:bg-[#0e1b33]"
+                  className="inline-flex h-7 max-w-full items-center gap-1.5 border border-border/80 bg-card/60 px-2.5 text-xs text-foreground/90 rounded-[5px] sync-security:border-[#ff9c00]/35 sync-security:bg-[#0e1b33]"
                 >
-                  <span>{tag}</span>
+                  <span className="truncate" title={tag}>
+                    {tag}
+                  </span>
                   {canWrite && (
                     <button
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
-                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                       aria-label={`Rimuovi tag ${tag}`}
                     >
                       <X className="size-3" />
@@ -629,32 +639,32 @@ export function CredentialDetail({
 
           {/* Dates & Access Metadata */}
           <div className="space-y-2.5 border-t border-border/60 pt-4 text-xs">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Plus className="size-3.5 shrink-0" />
                 <span>Creata</span>
               </div>
-              <span className="font-medium text-foreground/90">
+              <span className="shrink-0 font-medium text-foreground/90">
                 {formatShortDate(credential.created_at)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Pencil className="size-3.5 shrink-0" />
                 <span>Ultima modifica</span>
               </div>
-              <span className="font-medium text-foreground/90">
+              <span className="shrink-0 font-medium text-foreground/90">
                 {formatShortDate(credential.updated_at)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Clock className="size-3.5 shrink-0" />
                 <span>Ultimo accesso</span>
               </div>
-              <span className="font-medium text-foreground/90">
+              <span className="shrink-0 font-medium text-foreground/90">
                 {formatAccessTimestamp(
                   lastAccessedAt || credential.updated_at,
                 )}
@@ -676,7 +686,7 @@ export function CredentialDetail({
             const lbl = quickCopy.primary?.label || 'Username'
             if (val) copyField('quick-primary', val, lbl)
           }}
-          className="h-9 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
+          className="h-9 min-w-0 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
         >
           <Copy className="size-3.5 shrink-0" />
           <span className="truncate">
@@ -694,7 +704,7 @@ export function CredentialDetail({
             const lbl = quickCopy.secondary?.label || 'Password'
             if (val) copyField('quick-secondary', val, lbl)
           }}
-          className="h-9 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
+          className="h-9 min-w-0 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
         >
           <Copy className="size-3.5 shrink-0" />
           <span className="truncate">

@@ -4,6 +4,8 @@ pub mod providers;
 
 use std::collections::{BTreeMap, HashSet};
 
+use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, Utc};
+
 use crate::{
     error::{AppError, AppResult},
     models::{ImportPreviewItemDto, ImportPreviewResponseDto, ImportProviderDto},
@@ -209,6 +211,8 @@ pub(crate) struct RawImportItem {
     pub source_folder: Option<String>,
     pub folder_tags: Vec<String>,
     pub extra_tags: Vec<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub warning: Option<String>,
     pub pre_skip_reason: Option<String>,
 }
@@ -226,6 +230,8 @@ pub struct EvaluatedImportItem {
     pub favorite: bool,
     pub source_folder: Option<String>,
     pub tags: Vec<String>,
+    pub created_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<DateTime<Utc>>,
     pub status: String,
     pub is_duplicate: bool,
     pub warning: Option<String>,
@@ -405,6 +411,8 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             favorite: raw.favorite,
             source_folder,
             tags: Vec::new(),
+            created_at: None,
+            updated_at: None,
             status: "skipped".to_string(),
             is_duplicate: false,
             warning: None,
@@ -412,6 +420,8 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
         };
     }
 
+    let created_at = raw.created_at;
+    let updated_at = raw.updated_at;
     let mut category = normalize_category(&raw.category);
     let username = raw.username.trim().to_string();
     let mut password = clean_password(&raw.password);
@@ -458,6 +468,8 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             favorite: raw.favorite,
             source_folder,
             tags: Vec::new(),
+            created_at: None,
+            updated_at: None,
             status: "skipped".to_string(),
             is_duplicate: false,
             warning: None,
@@ -535,6 +547,8 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
                 favorite: raw.favorite,
                 source_folder,
                 tags,
+                created_at: None,
+                updated_at: None,
                 status: "skipped".to_string(),
                 is_duplicate: false,
                 warning: None,
@@ -591,11 +605,61 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
         favorite: raw.favorite,
         source_folder,
         tags,
+        created_at,
+        updated_at,
         status: "ready".to_string(),
         is_duplicate: false,
         warning,
         skip_reason: None,
     }
+}
+
+pub(crate) fn parse_import_timestamp(raw: &str) -> Option<DateTime<Utc>> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    let parsed = if let Ok(dt) = DateTime::parse_from_rfc3339(trimmed) {
+        Some(dt.with_timezone(&Utc))
+    } else if let Ok(dt) = DateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S%.f %:z")
+        .or_else(|_| DateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S %:z"))
+        .or_else(|_| DateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S%.f %z"))
+        .or_else(|_| DateTime::parse_from_str(trimmed, "%Y-%m-%d %H:%M:%S %z"))
+    {
+        Some(dt.with_timezone(&Utc))
+    } else if let Some(ndt) = [
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M:%S",
+    ]
+    .iter()
+    .find_map(|fmt| NaiveDateTime::parse_from_str(trimmed, fmt).ok())
+    {
+        Some(ndt.and_utc())
+    } else if let Ok(nd) = NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+        nd.and_hms_opt(0, 0, 0).map(|ndt| ndt.and_utc())
+    } else if let Ok(epoch) = trimmed.parse::<i64>() {
+        if epoch >= 1_000_000_000_000 {
+            DateTime::from_timestamp_millis(epoch)
+        } else if epoch >= 100_000_000 {
+            DateTime::from_timestamp(epoch, 0)
+        } else {
+            None
+        }
+    } else {
+        None
+    }?;
+
+    let min_valid = DateTime::from_timestamp(631_152_000, 0)?; // 1990-01-01T00:00:00Z
+    let max_valid = Utc::now() + Duration::days(1);
+    if parsed < min_valid || parsed > max_valid {
+        return None;
+    }
+
+    Some(parsed)
 }
 
 pub(crate) fn clean_password(raw: &str) -> String {
@@ -1086,5 +1150,102 @@ mod tests {
         let lp_csv = "url,username,password,totp,extra,name,grouping,fav\n";
         let err = evaluate_import("bitwarden", lp_csv, None, true, &HashSet::new()).unwrap_err();
         assert!(err.to_string().contains("LastPass"));
+    }
+
+    #[test]
+    fn parse_import_timestamp_supports_standard_formats_and_rejects_invalid() {
+        assert_eq!(
+            parse_import_timestamp("2024-05-12T10:15:30.123Z").map(|d| d.to_rfc3339()),
+            Some("2024-05-12T10:15:30.123+00:00".to_string())
+        );
+        assert_eq!(
+            parse_import_timestamp("1715508930000").map(|d| d.timestamp()),
+            Some(1_715_508_930)
+        );
+        assert_eq!(
+            parse_import_timestamp("1715508930").map(|d| d.timestamp()),
+            Some(1_715_508_930)
+        );
+        assert_eq!(
+            parse_import_timestamp("2024-05-12").map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2024-05-12".to_string())
+        );
+        assert_eq!(
+            parse_import_timestamp("2024-05-12 14:20:00").map(|d| d.format("%Y-%m-%d %H:%M:%S").to_string()),
+            Some("2024-05-12 14:20:00".to_string())
+        );
+
+        assert!(parse_import_timestamp("").is_none());
+        assert!(parse_import_timestamp("0").is_none());
+        assert!(parse_import_timestamp("1970-01-01T00:00:00Z").is_none());
+        assert!(parse_import_timestamp("not-a-date").is_none());
+    }
+
+    #[test]
+    fn importers_preserve_timestamps_when_present_and_none_when_absent() {
+        let bw_json = r#"{
+            "encrypted": false,
+            "items": [
+                {
+                    "type": 1,
+                    "name": "With Dates",
+                    "creationDate": "2023-01-15T08:30:00.000Z",
+                    "revisionDate": "2024-06-20T14:45:10.000Z",
+                    "login": { "username": "u", "password": "p" }
+                },
+                {
+                    "type": 1,
+                    "name": "No Dates",
+                    "login": { "username": "u2", "password": "p2" }
+                }
+            ]
+        }"#;
+        let bw_batch = evaluate_import("bitwarden", bw_json, Some("bw.json"), false, &HashSet::new()).unwrap();
+        assert_eq!(
+            bw_batch.items[0].created_at.map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2023-01-15".to_string())
+        );
+        assert_eq!(
+            bw_batch.items[0].updated_at.map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2024-06-20".to_string())
+        );
+        assert!(bw_batch.items[1].created_at.is_none());
+        assert!(bw_batch.items[1].updated_at.is_none());
+
+        let ff_csv = "url,username,password,httpRealm,formActionOrigin,guid,timeCreated,timeLastUsed,timePasswordChanged\n\
+            https://example.org,alice,pw,,,{1},1700000000000,1705000000000,1710000000000\n\
+            https://fallback.org,bob,pw2,,,{2},1700000000000,1706000000000,0";
+        let ff_batch = evaluate_import("firefox", ff_csv, None, false, &HashSet::new()).unwrap();
+        assert_eq!(ff_batch.items[0].created_at.map(|d| d.timestamp()), Some(1_700_000_000));
+        assert_eq!(ff_batch.items[0].updated_at.map(|d| d.timestamp()), Some(1_710_000_000));
+        assert_eq!(ff_batch.items[1].created_at.map(|d| d.timestamp()), Some(1_700_000_000));
+        assert_eq!(ff_batch.items[1].updated_at.map(|d| d.timestamp()), Some(1_706_000_000));
+
+        let kp_csv = "Group,Title,Username,Password,URL,Notes,Created,Last Modified\nWork,Server,root,pw,https://srv,,2022-03-10 09:00:00,2024-04-11 12:00:00";
+        let kp_batch = evaluate_import("keepass", kp_csv, None, false, &HashSet::new()).unwrap();
+        assert_eq!(
+            kp_batch.items[0].created_at.map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2022-03-10".to_string())
+        );
+        assert_eq!(
+            kp_batch.items[0].updated_at.map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2024-04-11".to_string())
+        );
+
+        let pp_csv = "name,url,username,email,password,note,totp,vault,type,createTime,modifyTime\nProton,https://proton.me,u,u@pm.me,pw,n,,Personal,login,1680000000,1715000000";
+        let pp_batch = evaluate_import("protonpass", pp_csv, None, false, &HashSet::new()).unwrap();
+        assert_eq!(pp_batch.items[0].created_at.map(|d| d.timestamp()), Some(1_680_000_000));
+        assert_eq!(pp_batch.items[0].updated_at.map(|d| d.timestamp()), Some(1_715_000_000));
+
+        let gen_csv = "titolo,utente,segreto,creata,ultima modifica\nPortal,admin,pw123,2023-07-01,2024-08-15";
+        let gen_batch = evaluate_import("generic_csv", gen_csv, None, false, &HashSet::new()).unwrap();
+        assert_eq!(
+            gen_batch.items[0].created_at.map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2023-07-01".to_string())
+        );
+        assert_eq!(
+            gen_batch.items[0].updated_at.map(|d| d.format("%Y-%m-%d").to_string()),
+            Some("2024-08-15".to_string())
+        );
     }
 }

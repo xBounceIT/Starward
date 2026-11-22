@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -53,9 +53,28 @@ import {
   serializeCredentialTags,
 } from '@/lib/credential-types'
 import { useTheme } from '@/lib/theme'
+import { cn } from '@/lib/utils'
 import { isRecentlyAdded, type PasswordOptions } from '@/lib/vault-utils'
 
 const LAST_ACCESSED_STORAGE_KEY = 'starward-last-accessed'
+const DETAIL_PANEL_WIDTH_STORAGE_KEY = 'starward-detail-panel-width'
+const DEFAULT_DETAIL_WIDTH = 430
+const MIN_DETAIL_WIDTH = 340
+const MAX_DETAIL_WIDTH = 920
+const MIN_LIST_WIDTH = 360
+
+function getMaxAllowedDetailWidth(containerWidth: number): number {
+  if (containerWidth <= 0) return MAX_DETAIL_WIDTH
+  return Math.max(
+    MIN_DETAIL_WIDTH,
+    Math.min(MAX_DETAIL_WIDTH, Math.floor(containerWidth - MIN_LIST_WIDTH)),
+  )
+}
+
+function clampDetailWidth(width: number, containerWidth: number): number {
+  const maxAllowed = getMaxAllowedDetailWidth(containerWidth)
+  return Math.round(Math.min(maxAllowed, Math.max(MIN_DETAIL_WIDTH, width)))
+}
 
 export const Route = createFileRoute('/vault')({
   beforeLoad: async () => {
@@ -130,6 +149,14 @@ function VaultWorkspace() {
   )
 
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
+  const [detailWidth, setDetailWidth] = useState(DEFAULT_DETAIL_WIDTH)
+  const [maxDetailWidth, setMaxDetailWidth] = useState(MAX_DETAIL_WIDTH)
+  const [isResizingDetail, setIsResizingDetail] = useState(false)
+
+  const splitContainerRef = useRef<HTMLDivElement>(null)
+  const detailWrapperRef = useRef<HTMLDivElement>(null)
+  const liveDetailWidthRef = useRef<number>(DEFAULT_DETAIL_WIDTH)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     try {
@@ -140,8 +167,33 @@ function VaultWorkspace() {
           setLastAccessedMap(parsed)
         }
       }
+      const savedWidthRaw = localStorage.getItem(DETAIL_PANEL_WIDTH_STORAGE_KEY)
+      if (savedWidthRaw) {
+        const parsedWidth = Number(savedWidthRaw)
+        if (Number.isFinite(parsedWidth) && parsedWidth > 0) {
+          const initial = Math.round(
+            Math.min(MAX_DETAIL_WIDTH, Math.max(MIN_DETAIL_WIDTH, parsedWidth)),
+          )
+          setDetailWidth(initial)
+          liveDetailWidthRef.current = initial
+        }
+      }
     } catch {
       // ignore localStorage errors
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      dragCleanupRef.current?.()
+    }
+  }, [])
+
+  const persistDetailWidth = useCallback((width: number) => {
+    try {
+      localStorage.setItem(DETAIL_PANEL_WIDTH_STORAGE_KEY, String(width))
+    } catch {
+      // ignore storage errors
     }
   }, [])
 
@@ -261,6 +313,149 @@ function VaultWorkspace() {
     }
   }, [loading, selection.type, activeGroup])
 
+  const isCredentialView =
+    !(selection.type === 'admin' && currentUser.role === 'admin') &&
+    !(selection.type === 'group' && activeGroup)
+
+  useEffect(() => {
+    if (!isCredentialView) return
+    const el = splitContainerRef.current
+    if (!el) return
+
+    const updateMax = () => {
+      const nextMax = getMaxAllowedDetailWidth(el.clientWidth)
+      setMaxDetailWidth((prev) => (prev === nextMax ? prev : nextMax))
+    }
+
+    updateMax()
+    const observer = new ResizeObserver(updateMax)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [isCredentialView])
+
+  const effectiveDetailWidth = Math.min(
+    Math.max(detailWidth, MIN_DETAIL_WIDTH),
+    maxDetailWidth,
+  )
+  const renderedDetailWidth = isResizingDetail
+    ? liveDetailWidthRef.current
+    : effectiveDetailWidth
+
+  const handleDetailResizeStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return
+      e.preventDefault()
+
+      dragCleanupRef.current?.()
+
+      const startX = e.clientX
+      const startWidth = effectiveDetailWidth
+      const containerWidth = splitContainerRef.current?.clientWidth ?? 0
+      liveDetailWidthRef.current = startWidth
+
+      setIsResizingDetail(true)
+      const prevCursor = document.body.style.cursor
+      const prevUserSelect = document.body.style.userSelect
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+
+      let rafId: number | null = null
+      let latestClientX = startX
+
+      const applyLiveWidth = () => {
+        rafId = null
+        const nextWidth = clampDetailWidth(
+          startWidth + (startX - latestClientX),
+          containerWidth,
+        )
+        liveDetailWidthRef.current = nextWidth
+        detailWrapperRef.current?.style.setProperty(
+          '--detail-panel-width',
+          `${nextWidth}px`,
+        )
+      }
+
+      const onPointerMove = (moveEvent: PointerEvent) => {
+        latestClientX = moveEvent.clientX
+        if (rafId === null) {
+          rafId = window.requestAnimationFrame(applyLiveWidth)
+        }
+      }
+
+      const finishResize = () => {
+        if (rafId !== null) {
+          window.cancelAnimationFrame(rafId)
+          rafId = null
+        }
+        const finalWidth = clampDetailWidth(
+          startWidth + (startX - latestClientX),
+          containerWidth,
+        )
+        liveDetailWidthRef.current = finalWidth
+        detailWrapperRef.current?.style.setProperty(
+          '--detail-panel-width',
+          `${finalWidth}px`,
+        )
+
+        window.removeEventListener('pointermove', onPointerMove)
+        window.removeEventListener('pointerup', finishResize)
+        window.removeEventListener('pointercancel', finishResize)
+        document.body.style.cursor = prevCursor
+        document.body.style.userSelect = prevUserSelect
+        dragCleanupRef.current = null
+
+        setIsResizingDetail(false)
+        setDetailWidth(finalWidth)
+        persistDetailWidth(finalWidth)
+      }
+
+      dragCleanupRef.current = () => {
+        if (rafId !== null) {
+          window.cancelAnimationFrame(rafId)
+          rafId = null
+        }
+        window.removeEventListener('pointermove', onPointerMove)
+        window.removeEventListener('pointerup', finishResize)
+        window.removeEventListener('pointercancel', finishResize)
+        document.body.style.cursor = prevCursor
+        document.body.style.userSelect = prevUserSelect
+      }
+
+      window.addEventListener('pointermove', onPointerMove)
+      window.addEventListener('pointerup', finishResize)
+      window.addEventListener('pointercancel', finishResize)
+    },
+    [effectiveDetailWidth, persistDetailWidth],
+  )
+
+  const handleDetailResizeDoubleClick = useCallback(() => {
+    setDetailWidth(DEFAULT_DETAIL_WIDTH)
+    persistDetailWidth(DEFAULT_DETAIL_WIDTH)
+  }, [persistDetailWidth])
+
+  const handleDetailResizeKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      const step = e.shiftKey ? 64 : 24
+      let next: number | null = null
+      if (e.key === 'ArrowLeft') {
+        next = effectiveDetailWidth + step
+      } else if (e.key === 'ArrowRight') {
+        next = effectiveDetailWidth - step
+      } else if (e.key === 'Home') {
+        next = MIN_DETAIL_WIDTH
+      } else if (e.key === 'End') {
+        next = maxDetailWidth
+      }
+      if (next === null) return
+      e.preventDefault()
+      const containerWidth = splitContainerRef.current?.clientWidth ?? 0
+      const clamped = clampDetailWidth(next, containerWidth)
+      setDetailWidth(clamped)
+      persistDetailWidth(clamped)
+    },
+    [effectiveDetailWidth, maxDetailWidth, persistDetailWidth],
+  )
+
   const scopedCredentials = useMemo(() => {
     if (selection.type === 'vault') {
       return allCredentials.filter((c) => c.vault_id === selection.vaultId)
@@ -357,7 +552,7 @@ function VaultWorkspace() {
     }
   }
 
-  const handleToggleFavorite = async (cred: Credential) => {
+  const handleToggleFavorite = useCallback(async (cred: Credential) => {
     try {
       const updated = await vaultApi.updateCredential(cred.id, {
         favorite: !cred.favorite,
@@ -370,7 +565,48 @@ function VaultWorkspace() {
         err instanceof Error ? err.message : 'Errore aggiornamento preferito',
       )
     }
-  }
+  }, [])
+
+  const handleSelectCredential = useCallback(
+    (cred: Credential) => {
+      setSelectedCredentialId(cred.id)
+      setDetailClosed(false)
+      setMobileDetailOpen(true)
+      recordAccess(cred.id)
+    },
+    [recordAccess],
+  )
+
+  const handleEditCredential = useCallback((cred: Credential) => {
+    setEditingCredential(cred)
+    setCredDialogOpen(true)
+  }, [])
+
+  const handleDeleteCredential = useCallback((cred: Credential) => {
+    setPendingDeleteCred(cred)
+  }, [])
+
+  const handleNewCredential = useCallback(() => {
+    setEditingCredential(null)
+    setCredDialogOpen(true)
+  }, [])
+
+  const handleShareVault = useCallback((vault: Vault) => {
+    setShareVaultTarget(vault)
+  }, [])
+
+  const handleEditVault = useCallback((vault: Vault) => {
+    setEditingVault(vault)
+    setVaultDialogOpen(true)
+  }, [])
+
+  const handleDeleteVault = useCallback((vault: Vault) => {
+    setPendingDeleteVault(vault)
+  }, [])
+
+  const handleOpenAudit = useCallback((vault: Vault) => {
+    setAuditVaultTarget(vault)
+  }, [])
 
   const handleUpdateTags = async (cred: Credential, nextTags: string[]) => {
     try {
@@ -572,7 +808,10 @@ function VaultWorkspace() {
             />
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div
+            ref={splitContainerRef}
+            className="flex min-h-0 flex-1 overflow-hidden"
+          >
             {/* Center Credential List */}
             <div
               className={
@@ -594,43 +833,66 @@ function VaultWorkspace() {
                 onSearchChange={setSearchQuery}
                 onCategoryFilterChange={setCategoryFilter}
                 onSortChange={setSortBy}
-                onSelectCredential={(cred) => {
-                  setSelectedCredentialId(cred.id)
-                  setDetailClosed(false)
-                  setMobileDetailOpen(true)
-                  recordAccess(cred.id)
-                }}
+                onSelectCredential={handleSelectCredential}
                 onToggleFavorite={handleToggleFavorite}
-                onEditCredential={(cred) => {
-                  setEditingCredential(cred)
-                  setCredDialogOpen(true)
-                }}
-                onDeleteCredential={(cred) => setPendingDeleteCred(cred)}
+                onEditCredential={handleEditCredential}
+                onDeleteCredential={handleDeleteCredential}
                 hasWritableVault={defaultImportVault !== null}
-                onNewCredential={() => {
-                  setEditingCredential(null)
-                  setCredDialogOpen(true)
-                }}
+                onNewCredential={handleNewCredential}
                 onImportVault={handleOpenImport}
-                onShareVault={(vault) => setShareVaultTarget(vault)}
-                onEditVault={(vault) => {
-                  setEditingVault(vault)
-                  setVaultDialogOpen(true)
-                }}
-                onDeleteVault={(vault) => setPendingDeleteVault(vault)}
-                onOpenAudit={(vault) => setAuditVaultTarget(vault)}
+                onShareVault={handleShareVault}
+                onEditVault={handleEditVault}
+                onDeleteVault={handleDeleteVault}
+                onOpenAudit={handleOpenAudit}
               />
             </div>
 
             {/* Right Detail Panel */}
             {!detailClosed && (
               <div
-                className={
-                  mobileDetailOpen
-                    ? 'flex h-full w-full lg:w-auto'
-                    : 'hidden h-full lg:flex'
+                ref={detailWrapperRef}
+                style={
+                  {
+                    '--detail-panel-width': `${renderedDetailWidth}px`,
+                  } as React.CSSProperties
                 }
+                className={cn(
+                  'relative h-full min-w-0 lg:w-[var(--detail-panel-width)] lg:shrink-0',
+                  mobileDetailOpen ? 'flex w-full' : 'hidden lg:flex',
+                )}
               >
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Ridimensiona pannello anteprima"
+                  aria-valuemin={MIN_DETAIL_WIDTH}
+                  aria-valuemax={maxDetailWidth}
+                  aria-valuenow={effectiveDetailWidth}
+                  tabIndex={0}
+                  title="Trascina per ridimensionare (doppio clic per ripristinare)"
+                  onPointerDown={handleDetailResizeStart}
+                  onDoubleClick={handleDetailResizeDoubleClick}
+                  onKeyDown={handleDetailResizeKeyDown}
+                  className="group/resize absolute inset-y-0 -left-1.5 z-20 hidden w-3 cursor-col-resize items-center justify-center outline-none lg:flex"
+                >
+                  <div
+                    className={cn(
+                      'h-full w-0.5 transition-colors',
+                      isResizingDetail
+                        ? 'bg-primary sync-security:bg-[#ff9c00]'
+                        : 'bg-transparent group-hover/resize:bg-primary/60 group-focus-visible/resize:bg-primary sync-security:group-hover/resize:bg-[#ff9c00]/70 sync-security:group-focus-visible/resize:bg-[#ff9c00]',
+                    )}
+                  />
+                  <div
+                    className={cn(
+                      'pointer-events-none absolute top-1/2 h-8 w-1 -translate-y-1/2 rounded-full transition-colors',
+                      isResizingDetail
+                        ? 'bg-primary sync-security:bg-[#ff9c00]'
+                        : 'bg-border/80 group-hover/resize:bg-primary group-focus-visible/resize:bg-primary sync-security:bg-white/25 sync-security:group-hover/resize:bg-[#ff9c00] sync-security:group-focus-visible/resize:bg-[#ff9c00]',
+                    )}
+                  />
+                </div>
+
                 <CredentialDetail
                   credential={selectedCredential}
                   lastAccessedAt={
