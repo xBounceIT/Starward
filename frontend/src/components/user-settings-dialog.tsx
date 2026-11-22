@@ -845,7 +845,7 @@ export function UserSettingsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex h-[740px] max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl flex-col overflow-hidden sm:max-w-2xl">
+        <DialogContent className="flex h-[760px] max-h-[90vh] w-[calc(100%-2rem)] max-w-5xl flex-col overflow-hidden sm:max-w-5xl">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="size-5 text-primary" />
@@ -859,15 +859,16 @@ export function UserSettingsDialog({
 
           <Tabs
             value={activeTab}
+            orientation="vertical"
             onValueChange={(v) => {
               setActiveTab(v as SettingsTab)
               if (scrollContainerRef.current) {
                 scrollContainerRef.current.scrollTop = 0
               }
             }}
-            className="flex min-h-0 min-w-0 flex-1 flex-col"
+            className="flex min-h-0 min-w-0 flex-1 max-sm:flex-col"
           >
-            <TabsList className="grid w-full shrink-0 grid-cols-5">
+            <TabsList className="grid w-full shrink-0 grid-cols-5 sm:h-full sm:w-56 sm:grid-cols-1 sm:auto-rows-fr">
               <TabsTrigger
                 value="profile"
                 className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
@@ -907,7 +908,7 @@ export function UserSettingsDialog({
 
             <div
               ref={scrollContainerRef}
-              className="mt-4 min-h-0 min-w-0 flex-1 overflow-y-auto pr-1 pb-1 [scrollbar-gutter:stable]"
+              className="mt-4 min-h-0 min-w-0 flex-1 overflow-y-auto pr-1 pb-1 [scrollbar-gutter:stable] sm:mt-0 sm:pl-3"
             >
               {/* TAB 1: PROFILE */}
               <TabsContent value="profile" className="mt-0 min-w-0 space-y-5">

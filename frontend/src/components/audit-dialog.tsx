@@ -44,7 +44,7 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="size-5 text-primary" />
@@ -55,9 +55,9 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-80 pr-3">
+        <ScrollArea className="max-h-[60vh] pr-3">
           {loading ? (
-            <div className="space-y-2.5 py-2">
+            <div className="grid grid-cols-1 gap-2.5 py-2 sm:grid-cols-2">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="space-y-2 rounded-lg border p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -73,7 +73,7 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
               Nessuna attività registrata finora.
             </p>
           ) : (
-            <div className="space-y-2.5">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {logs.map((log) => (
                 <div
                   key={log.id}

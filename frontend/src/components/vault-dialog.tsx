@@ -144,7 +144,7 @@ export function VaultDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-md">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {editingVault ? 'Modifica cartella' : 'Nuova cartella vault'}
@@ -159,184 +159,189 @@ export function VaultDialog({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col gap-4"
         >
-          <div className="flex-1 space-y-4 overflow-y-auto pr-1">
-            {editingVault?.owner_group_name && (
-              <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-xs">
-                <Users
-                  className={cn(
-                    'size-4 shrink-0',
-                    getVaultColor(editingVault.owner_group_color ?? 'indigo')
-                      .text,
-                  )}
-                />
-                <span className="text-muted-foreground">
-                  Cartella del gruppo
-                </span>
-                <Badge variant="secondary" className="font-medium">
-                  {editingVault.owner_group_name}
-                </Badge>
-              </div>
-            )}
-
-            {!editingVault && eligibleGroups.length > 0 && (
-              <div className="space-y-2">
-                <Label>Proprietà cartella</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setOwnerType('personal')}
+          <div className="grid flex-1 grid-cols-1 gap-5 overflow-y-auto pr-1 sm:grid-cols-[1.35fr_1fr]">
+            <div className="space-y-4">
+              {editingVault?.owner_group_name && (
+                <div className="flex items-center gap-2 rounded-lg border border-border/70 bg-muted/40 px-3 py-2 text-xs">
+                  <Users
                     className={cn(
-                      'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
-                      ownerType === 'personal'
-                        ? 'border-primary bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:bg-muted',
+                      'size-4 shrink-0',
+                      getVaultColor(editingVault.owner_group_color ?? 'indigo')
+                        .text,
                     )}
-                  >
-                    <User className="size-3.5" />A mio nome
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOwnerType('group')
-                      if (!ownerGroupId && eligibleGroups[0]) {
-                        setOwnerGroupId(eligibleGroups[0].id)
-                      }
-                    }}
-                    className={cn(
-                      'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
-                      ownerType === 'group'
-                        ? 'border-primary bg-accent text-accent-foreground'
-                        : 'text-muted-foreground hover:bg-muted',
-                    )}
-                  >
-                    <Users className="size-3.5" />A nome di un gruppo
-                  </button>
+                  />
+                  <span className="text-muted-foreground">
+                    Cartella del gruppo
+                  </span>
+                  <Badge variant="secondary" className="font-medium">
+                    {editingVault.owner_group_name}
+                  </Badge>
                 </div>
+              )}
 
-                {ownerType === 'group' && (
-                  <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/30 p-3">
-                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Gruppo</Label>
-                        <Select
-                          value={ownerGroupId}
-                          onValueChange={setOwnerGroupId}
-                        >
-                          <SelectTrigger className="h-9 w-full text-xs">
-                            <SelectValue placeholder="Seleziona gruppo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {eligibleGroups.map((g) => (
-                              <SelectItem key={g.id} value={g.id}>
-                                <span className="flex items-center gap-2">
-                                  <span
-                                    className={cn(
-                                      'size-2 rounded-full',
-                                      getVaultColor(g.color).dot,
-                                    )}
-                                  />
-                                  <span>{g.name}</span>
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-xs">Permessi membri</Label>
-                        <Select
-                          value={groupRole}
-                          onValueChange={(v) =>
-                            setGroupRole(v as 'editor' | 'viewer')
-                          }
-                        >
-                          <SelectTrigger className="h-9 w-full text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="editor">Editor</SelectItem>
-                            <SelectItem value="viewer">Sola lettura</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground">
-                      La cartella verrà condivisa automaticamente con tutti i{' '}
-                      {selectedGroup
-                        ? `${selectedGroup.member_count} membri`
-                        : 'membri'}{' '}
-                      del gruppo (inclusi i futuri membri aggiunti).
-                    </p>
+              {!editingVault && eligibleGroups.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Proprietà cartella</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOwnerType('personal')}
+                      className={cn(
+                        'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                        ownerType === 'personal'
+                          ? 'border-primary bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-muted',
+                      )}
+                    >
+                      <User className="size-3.5" />A mio nome
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOwnerType('group')
+                        if (!ownerGroupId && eligibleGroups[0]) {
+                          setOwnerGroupId(eligibleGroups[0].id)
+                        }
+                      }}
+                      className={cn(
+                        'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                        ownerType === 'group'
+                          ? 'border-primary bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-muted',
+                      )}
+                    >
+                      <Users className="size-3.5" />A nome di un gruppo
+                    </button>
                   </div>
-                )}
+
+                  {ownerType === 'group' && (
+                    <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/30 p-3">
+                      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Gruppo</Label>
+                          <Select
+                            value={ownerGroupId}
+                            onValueChange={setOwnerGroupId}
+                          >
+                            <SelectTrigger className="h-9 w-full text-xs">
+                              <SelectValue placeholder="Seleziona gruppo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {eligibleGroups.map((g) => (
+                                <SelectItem key={g.id} value={g.id}>
+                                  <span className="flex items-center gap-2">
+                                    <span
+                                      className={cn(
+                                        'size-2 rounded-full',
+                                        getVaultColor(g.color).dot,
+                                      )}
+                                    />
+                                    <span>{g.name}</span>
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-xs">Permessi membri</Label>
+                          <Select
+                            value={groupRole}
+                            onValueChange={(v) =>
+                              setGroupRole(v as 'editor' | 'viewer')
+                            }
+                          >
+                            <SelectTrigger className="h-9 w-full text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="editor">Editor</SelectItem>
+                              <SelectItem value="viewer">Sola lettura</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        La cartella verrà condivisa automaticamente con tutti i{' '}
+                        {selectedGroup
+                          ? `${selectedGroup.member_count} membri`
+                          : 'membri'}{' '}
+                        del gruppo (inclusi i futuri membri aggiunti).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <Label htmlFor="vault-name">Nome cartella</Label>
+                <Input
+                  id="vault-name"
+                  placeholder="es. Infrastruttura Prod, Team Marketing..."
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  autoFocus
+                  required
+                />
               </div>
-            )}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="vault-name">Nome cartella</Label>
-              <Input
-                id="vault-name"
-                placeholder="es. Infrastruttura Prod, Team Marketing..."
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="vault-desc">Descrizione (opzionale)</Label>
-              <Textarea
-                id="vault-desc"
-                placeholder="A cosa serve questa cartella?"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="min-h-16"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Icona</Label>
-              <div className="grid grid-cols-4 gap-2">
-                {VAULT_ICON_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setIcon(opt.value)}
-                    className={cn(
-                      'flex cursor-pointer flex-col items-center gap-1 rounded-md border p-2 text-xs transition-colors',
-                      icon === opt.value
-                        ? 'border-primary bg-accent font-medium text-accent-foreground'
-                        : 'text-muted-foreground hover:bg-muted',
-                    )}
-                  >
-                    <VaultIcon icon={opt.value} className="size-4" />
-                    <span className="truncate">{opt.label}</span>
-                  </button>
-                ))}
+              <div className="space-y-1.5">
+                <Label htmlFor="vault-desc">Descrizione (opzionale)</Label>
+                <Textarea
+                  id="vault-desc"
+                  placeholder="A cosa serve questa cartella?"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="min-h-16"
+                />
               </div>
+
             </div>
 
-            <div className="space-y-2">
-              <Label>Colore</Label>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(VAULT_COLORS).map(([key, palette]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setColor(key)}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-                      color === key
-                        ? 'border-primary bg-accent font-medium text-accent-foreground'
-                        : 'hover:bg-muted',
-                    )}
-                  >
-                    <span className={cn('size-2.5 rounded-full', palette.dot)} />
-                    {palette.label}
-                  </button>
-                ))}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Icona</Label>
+                <div className="grid grid-cols-4 gap-2">
+                  {VAULT_ICON_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setIcon(opt.value)}
+                      className={cn(
+                        'flex cursor-pointer flex-col items-center gap-1 rounded-md border p-2 text-xs transition-colors',
+                        icon === opt.value
+                          ? 'border-primary bg-accent font-medium text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-muted',
+                      )}
+                    >
+                      <VaultIcon icon={opt.value} className="size-4" />
+                      <span className="truncate">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Colore</Label>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(VAULT_COLORS).map(([key, palette]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setColor(key)}
+                      className={cn(
+                        'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
+                        color === key
+                          ? 'border-primary bg-accent font-medium text-accent-foreground'
+                          : 'hover:bg-muted',
+                      )}
+                    >
+                      <span className={cn('size-2.5 rounded-full', palette.dot)} />
+                      {palette.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

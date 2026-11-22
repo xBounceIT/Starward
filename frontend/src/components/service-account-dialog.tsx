@@ -234,7 +234,7 @@ export function ServiceAccountDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[92vh] flex-col sm:max-w-2xl">
+      <DialogContent className="flex max-h-[92vh] flex-col sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="size-5 text-primary sync-security:text-[#ff9c00]" />
@@ -254,6 +254,8 @@ export function ServiceAccountDialog({
           className="flex min-h-0 flex-1 flex-col gap-4"
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_1.2fr]">
+            <div className="space-y-4">
             {/* Base Info */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -324,9 +326,10 @@ export function ServiceAccountDialog({
             )}
 
             <Separator />
+            </div>
 
-            {/* Scope Selection: Specific Folders & Specific Credentials */}
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 lg:border-l lg:border-border/70 lg:pl-5">
+              {/* Scope Selection: Specific Folders & Specific Credentials */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <Label className="flex items-center gap-1.5 text-sm font-semibold">
@@ -409,7 +412,7 @@ export function ServiceAccountDialog({
                     )}
                   </div>
 
-                  <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-border/70 bg-muted/15 p-2">
+                  <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-border/70 bg-muted/15 p-2">
                     {loadingResources ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
                         Caricamento cartelle...
@@ -532,7 +535,7 @@ export function ServiceAccountDialog({
                     )}
                   </div>
 
-                  <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-xl border border-border/70 bg-muted/15 p-2">
+                  <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-border/70 bg-muted/15 p-2">
                     {loadingResources ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
                         Caricamento credenziali...
@@ -647,6 +650,7 @@ export function ServiceAccountDialog({
                 </div>
               )}
             </div>
+          </div>
 
             {/* Initial API Key section (Create mode) */}
             {!isEditing && (

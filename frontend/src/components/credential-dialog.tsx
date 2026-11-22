@@ -751,7 +751,7 @@ export function CredentialDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {editingCredential ? 'Modifica credenziale' : 'Nuova credenziale'}
@@ -818,50 +818,54 @@ export function CredentialDialog({
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {categoryConfig.fields.map(renderField)}
             </div>
 
-            {!hasCategoryTotpField &&
-              (showOptionalOtp || Boolean(extraValues.totp?.trim()) ? (
-                <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
-                  {renderTotpEditor({ allowCollapse: true })}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {!hasCategoryTotpField &&
+                (showOptionalOtp || Boolean(extraValues.totp?.trim()) ? (
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                    {renderTotpEditor({ allowCollapse: true })}
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2 border-dashed text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowOptionalOtp(true)}
+                  >
+                    <Plus className="size-3.5" />
+                    Aggiungi codice OTP (2FA / TOTP)
+                  </Button>
+                ))}
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cred-tags">Tag (separati da virgola)</Label>
+                  <Input
+                    id="cred-tags"
+                    placeholder="es. personale, produttività, cloud..."
+                    value={extraValues.tags ?? ''}
+                    onChange={(e) =>
+                      setExtraValues((prev) => ({
+                        ...prev,
+                        tags: e.target.value,
+                      }))
+                    }
+                  />
                 </div>
-              ) : (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start gap-2 border-dashed text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowOptionalOtp(true)}
-                >
-                  <Plus className="size-3.5" />
-                  Aggiungi codice OTP (2FA / TOTP)
-                </Button>
-              ))}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="cred-tags">Tag (separati da virgola)</Label>
-              <Input
-                id="cred-tags"
-                placeholder="es. personale, produttività, cloud..."
-                value={extraValues.tags ?? ''}
-                onChange={(e) =>
-                  setExtraValues((prev) => ({
-                    ...prev,
-                    tags: e.target.value,
-                  }))
-                }
-              />
+                <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm font-medium">
+                    <Star className="size-4 text-amber-500" />
+                    Aggiungi ai preferiti
+                  </span>
+                  <Switch checked={favorite} onCheckedChange={setFavorite} />
+                </label>
+              </div>
             </div>
-
-            <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-              <span className="flex items-center gap-2 text-sm font-medium">
-                <Star className="size-4 text-amber-500" />
-                Aggiungi ai preferiti
-              </span>
-              <Switch checked={favorite} onCheckedChange={setFavorite} />
-            </label>
           </div>
 
           <DialogFooter className="border-t pt-3">

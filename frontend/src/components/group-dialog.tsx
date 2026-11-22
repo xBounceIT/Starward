@@ -121,7 +121,7 @@ export function GroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="size-5 text-primary" />
@@ -135,31 +135,21 @@ export function GroupDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="group-name">Nome gruppo</Label>
-            <Input
-              id="group-name"
-              placeholder="es. DevOps, Engineering, Marketing..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoFocus
-              required
-            />
-          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="group-name">Nome gruppo</Label>
+              <Input
+                id="group-name"
+                placeholder="es. DevOps, Engineering, Marketing..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+                required
+              />
+            </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="group-desc">Descrizione (opzionale)</Label>
-            <Textarea
-              id="group-desc"
-              placeholder="Chi fa parte di questo gruppo o quale area gestisce?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="min-h-16"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Colore</Label>
+            <div className="space-y-2">
+              <Label>Colore</Label>
             <div className="flex flex-wrap gap-2">
               {Object.entries(VAULT_COLORS).map(([key, palette]) => (
                 <button
@@ -178,6 +168,18 @@ export function GroupDialog({
                 </button>
               ))}
             </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="group-desc">Descrizione (opzionale)</Label>
+            <Textarea
+              id="group-desc"
+              placeholder="Chi fa parte di questo gruppo o quale area gestisce?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="min-h-16"
+            />
           </div>
 
           {!editingGroup && (
@@ -233,7 +235,7 @@ export function GroupDialog({
                   <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
                     Utenti della piattaforma
                   </p>
-                  <div className="flex flex-col gap-1">
+                  <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                     {suggestions.slice(0, 8).map((u) => (
                       <button
                         key={u.id}

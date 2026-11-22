@@ -301,7 +301,7 @@ export function ShareVaultDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-lg">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="size-5 text-primary" />
@@ -313,7 +313,12 @@ export function ShareVaultDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+        <div
+          className={cn(
+            'grid flex-1 grid-cols-1 gap-5 overflow-y-auto pr-1',
+            isOwner ? 'lg:grid-cols-[1fr_1.15fr]' : 'lg:grid-cols-1',
+          )}
+        >
           {isOwner && (
             <div className="space-y-3">
               {/* Mode switcher: User vs Group */}
@@ -511,7 +516,13 @@ export function ShareVaultDialog({
             </div>
           )}
 
-          <Separator />
+          <div
+            className={cn(
+              'space-y-5',
+              isOwner && 'lg:border-l lg:border-border/70 lg:pl-5',
+            )}
+          >
+            <Separator className="lg:hidden" />
 
           {/* Shared Groups List */}
           {vault.shared_groups.length > 0 && (
@@ -633,7 +644,7 @@ export function ShareVaultDialog({
                   : 'Nessun membro diretto configurato.'}
               </p>
             ) : (
-              <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {vault.members.map((member) => {
                   const isSelf = member.user_id === currentUserId
                   return (
@@ -751,6 +762,7 @@ export function ShareVaultDialog({
                 })}
               </div>
             )}
+          </div>
           </div>
         </div>
       </DialogContent>

@@ -884,7 +884,7 @@ export function ServiceAccountsSection({
           if (!open) setKeyDialogAccount(null)
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="size-4.5 text-primary sync-security:text-[#ff9c00]" />
@@ -900,35 +900,37 @@ export function ServiceAccountsSection({
           </DialogHeader>
 
           <form onSubmit={handleCreateKey} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="sa-new-key-name" className="text-xs">
-                Nome chiave API *
-              </Label>
-              <Input
-                id="sa-new-key-name"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder="es. Rotazione Q4, Cluster EU-West"
-                maxLength={80}
-                required
-              />
-            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="sa-new-key-name" className="text-xs">
+                  Nome chiave API *
+                </Label>
+                <Input
+                  id="sa-new-key-name"
+                  value={newKeyName}
+                  onChange={(e) => setNewKeyName(e.target.value)}
+                  placeholder="es. Rotazione Q4, Cluster EU-West"
+                  maxLength={80}
+                  required
+                />
+              </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="sa-new-key-expiry" className="text-xs">
-                Scadenza
-              </Label>
-              <Select value={newKeyExpiry} onValueChange={setNewKeyExpiry}>
-                <SelectTrigger id="sa-new-key-expiry" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 giorni</SelectItem>
-                  <SelectItem value="90">90 giorni</SelectItem>
-                  <SelectItem value="365">1 anno</SelectItem>
-                  <SelectItem value="never">Nessuna scadenza</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-1.5">
+                <Label htmlFor="sa-new-key-expiry" className="text-xs">
+                  Scadenza
+                </Label>
+                <Select value={newKeyExpiry} onValueChange={setNewKeyExpiry}>
+                  <SelectTrigger id="sa-new-key-expiry" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 giorni</SelectItem>
+                    <SelectItem value="90">90 giorni</SelectItem>
+                    <SelectItem value="365">1 anno</SelectItem>
+                    <SelectItem value="never">Nessuna scadenza</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <DialogFooter>
