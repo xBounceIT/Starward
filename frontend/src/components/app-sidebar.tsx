@@ -534,22 +534,15 @@ export function AppSidebar({
         >
           {/* mt-1 allinea il centro del toggle (p-3.5 + mt-1 + size-8/2 = 34px)
               al centro dell'icona del titolo pagina (pt-5 + 28/2 = 34px).
-              Il titolo brand sta a sinistra del toggle; quando la sidebar
-              collassa il titolo sparisce e il toggle torna a sinistra nella
-              striscia da 3rem. */}
-          <div className="mt-1 flex items-center justify-between gap-2 group-data-[collapsible=strip]:justify-start">
-            <span
-              inert={sidebarCollapsed}
-              aria-hidden={sidebarCollapsed || undefined}
-              className="min-w-0 truncate text-xl leading-none font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=strip]:hidden"
-            >
-              Starward
-            </span>
+              Il toggle sta a sinistra del titolo brand: quando la sidebar
+              collassa il titolo sparisce e il toggle resta dov'è, a sinistra
+              nella striscia da 3rem. */}
+          <div className="mt-1 flex items-center justify-between gap-2">
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="-mr-1.5 shrink-0 text-muted-foreground hover:text-foreground group-data-[collapsible=strip]:mr-0 group-data-[collapsible=strip]:-ml-1.5"
+              className="-ml-1.5 shrink-0 text-muted-foreground hover:text-foreground"
               onClick={toggleSidebar}
               title={toggleLabel}
               aria-label={toggleLabel}
@@ -557,6 +550,13 @@ export function AppSidebar({
             >
               {toggleIcon}
             </Button>
+            <span
+              inert={sidebarCollapsed}
+              aria-hidden={sidebarCollapsed || undefined}
+              className="min-w-0 truncate text-xl leading-none font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=strip]:hidden"
+            >
+              Starward
+            </span>
           </div>
 
           <div
