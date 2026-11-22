@@ -88,6 +88,14 @@ fn extract_csv_updated_at(row: CsvRow<'_>) -> Option<DateTime<Utc>> {
     .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)))
 }
 
+fn normalize_bool_str(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_lowercase().as_str() {
+        "1" | "true" | "yes" | "y" | "si" | "sì" => Some("true"),
+        "0" | "false" | "no" | "n" => Some("false"),
+        _ => None,
+    }
+}
+
 pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
     let table = parse_csv_checking_json(content, "1Password")?;
     ensure_headers_or_hint(
@@ -119,8 +127,16 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
             "ssh key" | "ssh_key" | "ssh" => "ssh",
             "api credential" | "api_credential" | "api key" | "api_key" => "api_key",
             "software license" | "software_license" | "license" | "licenza" => "license",
+            "identity" | "identità" | "identita" => "identity",
+            "passkey" | "fido2" | "webauthn" => "passkey",
             _ => "login",
         };
+
+        if category == "passkey" {
+            if let Some(host) = host_from_url(&url) {
+                fields.insert("rp_id".to_string(), host);
+            }
+        }
 
         items.push(RawImportItem {
             title,
@@ -276,6 +292,101 @@ pub(super) fn parse_lastpass(content: &str) -> AppResult<Vec<RawImportItem>> {
                 if let Some(n) = kv.get("notes").filter(|s| !s.is_empty()) {
                     notes = n.clone();
                 }
+            } else if note_type == "address" || note_type == "identity" {
+                category = "identity".to_string();
+                if let Some(t) = kv.get("title").filter(|s| !s.is_empty()) {
+                    fields.insert("identity_title".to_string(), t.clone());
+                }
+                if let Some(fn_) = kv.get("first name").filter(|s| !s.is_empty()) {
+                    fields.insert("first_name".to_string(), fn_.clone());
+                }
+                if let Some(mn) = kv.get("middle name").filter(|s| !s.is_empty()) {
+                    fields.insert("middle_name".to_string(), mn.clone());
+                }
+                if let Some(ln) = kv.get("last name").filter(|s| !s.is_empty()) {
+                    fields.insert("last_name".to_string(), ln.clone());
+                }
+                if let Some(co) = kv.get("company").filter(|s| !s.is_empty()) {
+                    fields.insert("company".to_string(), co.clone());
+                }
+                if let Some(em) = kv
+                    .get("email address")
+                    .or_else(|| kv.get("email"))
+                    .filter(|s| !s.is_empty())
+                {
+                    username = em.clone();
+                }
+                if let Some(ph) = kv
+                    .get("phone")
+                    .or_else(|| kv.get("mobile phone"))
+                    .or_else(|| kv.get("evening phone"))
+                    .filter(|s| !s.is_empty())
+                {
+                    fields.insert("phone".to_string(), ph.clone());
+                }
+                if let Some(u) = kv.get("username").filter(|s| !s.is_empty()) {
+                    fields.insert("identity_username".to_string(), u.clone());
+                }
+                if let Some(a1) = kv.get("address 1").filter(|s| !s.is_empty()) {
+                    fields.insert("address1".to_string(), a1.clone());
+                }
+                if let Some(a2) = kv.get("address 2").filter(|s| !s.is_empty()) {
+                    fields.insert("address2".to_string(), a2.clone());
+                }
+                if let Some(a3) = kv.get("address 3").filter(|s| !s.is_empty()) {
+                    fields.insert("address3".to_string(), a3.clone());
+                }
+                if let Some(city) = kv
+                    .get("city / town")
+                    .or_else(|| kv.get("city"))
+                    .filter(|s| !s.is_empty())
+                {
+                    fields.insert("city".to_string(), city.clone());
+                }
+                if let Some(st) = kv.get("state").filter(|s| !s.is_empty()) {
+                    fields.insert("state".to_string(), st.clone());
+                }
+                if let Some(zip) = kv
+                    .get("zip / postal code")
+                    .or_else(|| kv.get("postal code"))
+                    .filter(|s| !s.is_empty())
+                {
+                    fields.insert("postal_code".to_string(), zip.clone());
+                }
+                if let Some(country) = kv.get("country").filter(|s| !s.is_empty()) {
+                    fields.insert("country".to_string(), country.clone());
+                }
+                if let Some(ssn) = kv.get("social security number").filter(|s| !s.is_empty()) {
+                    fields.insert("ssn".to_string(), ssn.clone());
+                }
+                if let Some(n) = kv.get("notes").filter(|s| !s.is_empty()) {
+                    notes = n.clone();
+                }
+            } else if note_type == "passkey" {
+                category = "passkey".to_string();
+                if let Some(rp) = kv.get("rp id").filter(|s| !s.is_empty()) {
+                    fields.insert("rp_id".to_string(), rp.clone());
+                }
+                if let Some(cid) = kv.get("credential id").filter(|s| !s.is_empty()) {
+                    fields.insert("credential_id".to_string(), cid.clone());
+                }
+                if let Some(pk) = kv.get("private key").filter(|s| !s.is_empty()) {
+                    fields.insert("private_key".to_string(), pk.clone());
+                }
+                if let Some(host) = kv.get("hostname").filter(|s| !s.is_empty()) {
+                    url = host.clone();
+                }
+                if !fields.contains_key("rp_id") {
+                    if let Some(host) = host_from_url(&url) {
+                        fields.insert("rp_id".to_string(), host);
+                    }
+                }
+                if let Some(u) = kv.get("username").filter(|s| !s.is_empty()) {
+                    username = u.clone();
+                }
+                if let Some(n) = kv.get("notes").filter(|s| !s.is_empty()) {
+                    notes = n.clone();
+                }
             } else {
                 category = "note".to_string();
                 notes = extra.to_string();
@@ -319,7 +430,8 @@ fn parse_lastpass_extra(extra: &str) -> BTreeMap<String, String> {
             // Treat as new key when key is reasonably short & alphabetic/spaces
             if !key_clean.is_empty()
                 && key_clean.len() <= 32
-                && !key_clean.contains('/')
+                && !v.starts_with("//")
+                && (!key_clean.contains('/') || key_clean.contains(" / "))
                 && !key_clean.starts_with("-----")
             {
                 if let Some(prev_key) = current_key.take() {
@@ -658,19 +770,36 @@ pub(super) fn parse_protonpass(content: &str) -> AppResult<Vec<RawImportItem>> {
         let url = row.get_trimmed("url").to_string();
         let raw_username = row.get_trimmed("username");
         let raw_email = row.get_trimmed("email");
-        let username = if !raw_username.is_empty() {
-            raw_username.to_string()
-        } else {
+
+        let raw_type = row.get_trimmed("type").to_lowercase();
+        let category = match raw_type.as_str() {
+            "note" | "secure_note" => "note",
+            "creditcard" | "credit_card" | "card" => "card",
+            "identity" => "identity",
+            "passkey" => "passkey",
+            _ => "login",
+        };
+
+        let mut fields = BTreeMap::new();
+        let mut notes = row.get_any_trimmed(&["note", "notes"]).to_string();
+
+        let username = if category == "identity" {
+            if !raw_username.is_empty() {
+                fields.insert("identity_username".to_string(), raw_username.to_string());
+            }
             raw_email.to_string()
+        } else {
+            if !raw_username.is_empty() && !raw_email.is_empty() && raw_email != raw_username {
+                append_note_section(&mut notes, None, &format!("Email: {raw_email}"));
+            }
+            if !raw_username.is_empty() {
+                raw_username.to_string()
+            } else {
+                raw_email.to_string()
+            }
         };
 
         let password = clean_password(row.get("password"));
-        let mut notes = row.get_any_trimmed(&["note", "notes"]).to_string();
-        let mut fields = BTreeMap::new();
-
-        if !raw_username.is_empty() && !raw_email.is_empty() && raw_email != raw_username {
-            append_note_section(&mut notes, None, &format!("Email: {raw_email}"));
-        }
 
         let totp = row.get_trimmed("totp");
         apply_imported_totp(totp, &mut fields, &mut notes);
@@ -683,12 +812,11 @@ pub(super) fn parse_protonpass(content: &str) -> AppResult<Vec<RawImportItem>> {
         };
         let folder_tags = source_folder.iter().cloned().collect();
 
-        let raw_type = row.get_trimmed("type").to_lowercase();
-        let category = match raw_type.as_str() {
-            "note" | "secure_note" => "note",
-            "creditcard" | "credit_card" | "card" => "card",
-            _ => "login",
-        };
+        if category == "passkey" && !fields.contains_key("rp_id") {
+            if let Some(host) = host_from_url(&url) {
+                fields.insert("rp_id".to_string(), host);
+            }
+        }
 
         items.push(RawImportItem {
             title,
@@ -716,7 +844,7 @@ pub(super) fn parse_nordpass(content: &str) -> AppResult<Vec<RawImportItem>> {
     let table = parse_csv_checking_json(content, "NordPass")?;
     ensure_headers_or_hint(
         &table,
-        &["url", "username", "password", "cardnumber"],
+        &["url", "username", "password", "cardnumber", "full_name"],
         "nordpass",
         "Intestazione CSV non riconosciuta per NordPass (attese colonne name, url, username, password, note, folder).",
     )?;
@@ -761,6 +889,68 @@ pub(super) fn parse_nordpass(content: &str) -> AppResult<Vec<RawImportItem>> {
                 fields.insert("expiry".to_string(), expiry.to_string());
             }
             "card"
+        } else if raw_type == "identity" || raw_type == "personal_info" {
+            let mut fn_val = row.get_any_trimmed(&["first_name", "firstname"]).to_string();
+            let mut ln_val = row.get_any_trimmed(&["last_name", "lastname"]).to_string();
+            if fn_val.is_empty() && ln_val.is_empty() {
+                let full_name = row.get_any_trimmed(&["full_name", "fullname"]);
+                if !full_name.is_empty() {
+                    if let Some((first, rest)) = full_name.split_once(char::is_whitespace) {
+                        fn_val = first.trim().to_string();
+                        ln_val = rest.trim().to_string();
+                    } else {
+                        fn_val = full_name.to_string();
+                    }
+                }
+            }
+            if !fn_val.is_empty() {
+                fields.insert("first_name".to_string(), fn_val);
+            }
+            if !ln_val.is_empty() {
+                fields.insert("last_name".to_string(), ln_val);
+            }
+            let email = row.get_trimmed("email");
+            if !email.is_empty() {
+                username = email.to_string();
+            }
+            let phone = row.get_any_trimmed(&["phone_number", "phone"]);
+            if !phone.is_empty() {
+                fields.insert("phone".to_string(), phone.to_string());
+            }
+            let addr1 = row.get_any_trimmed(&["address1", "address"]);
+            if !addr1.is_empty() {
+                fields.insert("address1".to_string(), addr1.to_string());
+            }
+            let addr2 = row.get_trimmed("address2");
+            if !addr2.is_empty() {
+                fields.insert("address2".to_string(), addr2.to_string());
+            }
+            let city = row.get_trimmed("city");
+            if !city.is_empty() {
+                fields.insert("city".to_string(), city.to_string());
+            }
+            let state = row.get_trimmed("state");
+            if !state.is_empty() {
+                fields.insert("state".to_string(), state.to_string());
+            }
+            let zip = row.get_any_trimmed(&["zip_code", "postal_code"]);
+            if !zip.is_empty() {
+                fields.insert("postal_code".to_string(), zip.to_string());
+            }
+            let country = row.get_trimmed("country");
+            if !country.is_empty() {
+                fields.insert("country".to_string(), country.to_string());
+            }
+            let company = row.get_trimmed("company");
+            if !company.is_empty() {
+                fields.insert("company".to_string(), company.to_string());
+            }
+            "identity"
+        } else if raw_type == "passkey" {
+            if let Some(host) = host_from_url(&url) {
+                fields.insert("rp_id".to_string(), host);
+            }
+            "passkey"
         } else if raw_type == "note" || raw_type == "secure_note" {
             "note"
         } else {
@@ -846,7 +1036,7 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
                 "servizio",
             ])
             .to_string();
-        let username = row
+        let mut username = row
             .get_any_trimmed(&[
                 "username",
                 "user",
@@ -903,8 +1093,88 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
             "ssh" | "server" => "ssh",
             "card" | "carta" | "credit card" | "credit_card" => "card",
             "license" | "licenza" => "license",
+            "identity" | "identità" | "identita" | "persona" => "identity",
+            "passkey" | "fido2" | "webauthn" => "passkey",
             _ => "login",
         };
+
+        if category == "identity" {
+            let mappings: &[(&str, &[&str])] = &[
+                ("identity_title", &["identity_title"]),
+                ("first_name", &["first_name", "firstname", "identity_first_name"]),
+                ("middle_name", &["middle_name", "middlename", "identity_middle_name"]),
+                ("last_name", &["last_name", "lastname", "cognome", "identity_last_name"]),
+                ("company", &["company", "azienda", "identity_company"]),
+                ("phone", &["phone", "telefono", "identity_phone"]),
+                ("identity_username", &["identity_username"]),
+                ("address1", &["address1", "indirizzo", "address", "identity_address1"]),
+                ("address2", &["address2", "identity_address2"]),
+                ("address3", &["address3", "identity_address3"]),
+                ("city", &["city", "citta", "città", "identity_city"]),
+                ("state", &["state", "provincia", "stato", "identity_state"]),
+                ("postal_code", &["postal_code", "cap", "zip", "identity_postal_code"]),
+                ("country", &["country", "paese", "nazione", "identity_country"]),
+                ("ssn", &["ssn", "codice_fiscale", "identity_ssn"]),
+                ("passport_number", &["passport_number", "passaporto", "identity_passport_number"]),
+                ("license_number", &["license_number", "patente", "identity_license_number"]),
+            ];
+            for (field_key, aliases) in mappings {
+                let val = row.get_any_trimmed(aliases);
+                if !val.is_empty() {
+                    fields.insert((*field_key).to_string(), val.to_string());
+                }
+            }
+            let raw_email = row.get_trimmed("email");
+            let raw_user = row.get_any_trimmed(&[
+                "username",
+                "user",
+                "utente",
+                "login",
+                "login_username",
+                "login name",
+            ]);
+            if !raw_email.is_empty() {
+                username = raw_email.to_string();
+                if !raw_user.is_empty()
+                    && !raw_user.eq_ignore_ascii_case(raw_email)
+                    && !fields.contains_key("identity_username")
+                {
+                    fields.insert("identity_username".to_string(), raw_user.to_string());
+                }
+            }
+        } else if category == "passkey" {
+            let mappings: &[(&str, &[&str])] = &[
+                ("rp_id", &["rp_id", "fido2_rp_id", "passkey_rp_id"]),
+                ("rp_name", &["rp_name", "fido2_rp_name", "passkey_rp_name"]),
+                ("credential_id", &["credential_id", "fido2_credential_id", "passkey_credential_id"]),
+                ("private_key", &["private_key", "key_value", "fido2_key_value", "passkey_key_value"]),
+                ("user_display_name", &["user_display_name", "fido2_user_display_name", "passkey_user_display_name"]),
+                ("user_handle", &["user_handle", "fido2_user_handle", "passkey_user_handle"]),
+                ("key_type", &["key_type", "fido2_key_type", "passkey_key_type"]),
+                ("key_algorithm", &["key_algorithm", "fido2_key_algorithm", "passkey_key_algorithm"]),
+                ("key_curve", &["key_curve", "fido2_key_curve", "passkey_key_curve"]),
+                ("counter", &["counter", "fido2_counter", "passkey_counter"]),
+                ("discoverable", &["discoverable", "fido2_discoverable", "passkey_discoverable"]),
+                ("creation_date", &["creation_date", "fido2_creation_date", "passkey_creation_date"]),
+            ];
+            for (field_key, aliases) in mappings {
+                let val = row.get_any_trimmed(aliases);
+                if !val.is_empty() {
+                    if *field_key == "discoverable" {
+                        if let Some(norm) = normalize_bool_str(val) {
+                            fields.insert((*field_key).to_string(), norm.to_string());
+                        }
+                    } else {
+                        fields.insert((*field_key).to_string(), val.to_string());
+                    }
+                }
+            }
+            if !fields.contains_key("rp_id") {
+                if let Some(host) = host_from_url(&url) {
+                    fields.insert("rp_id".to_string(), host);
+                }
+            }
+        }
 
         let favorite = parse_bool_flag(row.get_any_trimmed(&["favorite", "preferito", "fav"]));
         let extra_tags = split_tags(row.get_any_trimmed(&["tags", "tag", "labels"]));

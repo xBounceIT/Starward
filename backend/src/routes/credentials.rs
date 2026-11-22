@@ -677,7 +677,13 @@ pub(crate) async fn create_credential_for_user(
     let category = normalize_category(&payload.category);
     let mut fields = clean_extra_fields(&payload.fields);
     normalize_and_validate_totp_field(&mut fields)?;
-    validate_credential_fields(&category, &payload.password, &payload.notes, &fields)?;
+    validate_credential_fields(
+        &category,
+        payload.username.trim(),
+        &payload.password,
+        &payload.notes,
+        &fields,
+    )?;
 
     let enc_password = state.crypto.encrypt(&payload.password)?;
     let enc_notes = state.crypto.encrypt(payload.notes.trim())?;
@@ -812,7 +818,7 @@ pub(crate) async fn update_credential_for_user(
     };
     let favorite = payload.favorite.unwrap_or(existing.favorite);
 
-    validate_credential_fields(&category, password, notes, &fields)?;
+    validate_credential_fields(&category, username, password, notes, &fields)?;
 
     let enc_password = state.crypto.encrypt(password)?;
     let enc_notes = state.crypto.encrypt(notes)?;
@@ -987,11 +993,41 @@ pub(crate) fn encrypt_extra_fields(
 
 pub(crate) fn validate_credential_fields(
     category: &str,
+    username: &str,
     password: &str,
     notes: &str,
     fields: &BTreeMap<String, String>,
 ) -> AppResult<()> {
     match category {
+        "passkey" => {
+            let has_rp_id = fields
+                .get("rp_id")
+                .map(|v| !v.trim().is_empty())
+                .unwrap_or(false);
+            let has_credential_id = fields
+                .get("credential_id")
+                .map(|v| !v.trim().is_empty())
+                .unwrap_or(false);
+            let has_private_key = fields
+                .get("private_key")
+                .map(|v| !v.trim().is_empty())
+                .unwrap_or(false);
+            if password.is_empty() && !has_rp_id && !has_credential_id && !has_private_key {
+                return Err(AppError::BadRequest(
+                    "Inserisci almeno il Relying Party ID (RP ID), il Credential ID o la chiave privata della passkey".to_string(),
+                ));
+            }
+        }
+        "identity" => {
+            let has_extra = fields
+                .iter()
+                .any(|(k, v)| k != "tags" && k != "totp" && !v.trim().is_empty());
+            if username.trim().is_empty() && notes.trim().is_empty() && !has_extra {
+                return Err(AppError::BadRequest(
+                    "Inserisci almeno un dato dell'identità (es. nome, email, telefono, indirizzo o documento)".to_string(),
+                ));
+            }
+        }
         "note" => {
             if notes.trim().is_empty() && password.is_empty() {
                 return Err(AppError::BadRequest(
@@ -1044,9 +1080,8 @@ pub(crate) fn validate_credential_fields(
 
 pub(crate) fn normalize_category(input: &str) -> String {
     match input.trim().to_lowercase().as_str() {
-        "login" | "api_key" | "database" | "ssh" | "card" | "license" | "note" => {
-            input.trim().to_lowercase()
-        }
+        "login" | "passkey" | "identity" | "api_key" | "database" | "ssh" | "card"
+        | "license" | "note" => input.trim().to_lowercase(),
         _ => "login".to_string(),
     }
 }
@@ -1058,6 +1093,8 @@ mod tests {
     #[test]
     fn normalize_category_supports_all_known_and_defaults_unknown() {
         assert_eq!(normalize_category("LOGIN"), "login");
+        assert_eq!(normalize_category("passkey"), "passkey");
+        assert_eq!(normalize_category("IDENTITY"), "identity");
         assert_eq!(normalize_category(" api_key "), "api_key");
         assert_eq!(normalize_category("database"), "database");
         assert_eq!(normalize_category("ssh"), "ssh");
@@ -1092,30 +1129,53 @@ mod tests {
         let empty_fields = BTreeMap::new();
 
         // login & database require password
-        assert!(validate_credential_fields("login", "", "n", &empty_fields).is_err());
-        assert!(validate_credential_fields("login", "pw", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("database", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("database", "dbpw", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("login", "", "", "n", &empty_fields).is_err());
+        assert!(validate_credential_fields("login", "", "pw", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("database", "", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("database", "", "dbpw", "", &empty_fields).is_ok());
 
         // api_key, card, license require secret
-        assert!(validate_credential_fields("api_key", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("api_key", "sk_live_123", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("card", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("card", "4242", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("license", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("license", "XXXX-YYYY", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("api_key", "", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("api_key", "", "sk_live_123", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("card", "", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("card", "", "4242", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("license", "", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("license", "", "XXXX-YYYY", "", &empty_fields).is_ok());
 
         // note allows empty password when notes is non-empty
-        assert!(validate_credential_fields("note", "", "   ", &empty_fields).is_err());
-        assert!(validate_credential_fields("note", "", "Codice Wi-Fi: 1234", &empty_fields).is_ok());
-        assert!(validate_credential_fields("note", "legacy-pw", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("note", "", "", "   ", &empty_fields).is_err());
+        assert!(validate_credential_fields("note", "", "", "Codice Wi-Fi: 1234", &empty_fields).is_ok());
+        assert!(validate_credential_fields("note", "", "legacy-pw", "", &empty_fields).is_ok());
 
         // ssh allows empty password if private_key is provided
-        assert!(validate_credential_fields("ssh", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("ssh", "", "", "", &empty_fields).is_err());
         let mut ssh_fields = BTreeMap::new();
         ssh_fields.insert("private_key".to_string(), "-----BEGIN OPENSSH PRIVATE KEY-----".to_string());
-        assert!(validate_credential_fields("ssh", "", "", &ssh_fields).is_ok());
-        assert!(validate_credential_fields("ssh", "passphrase", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("ssh", "", "", "", &ssh_fields).is_ok());
+        assert!(validate_credential_fields("ssh", "", "passphrase", "", &empty_fields).is_ok());
+
+        // passkey requires rp_id, credential_id, private_key, or password
+        assert!(validate_credential_fields("passkey", "alice", "", "note", &empty_fields).is_err());
+        let mut pk_rp = BTreeMap::new();
+        pk_rp.insert("rp_id".to_string(), "github.com".to_string());
+        assert!(validate_credential_fields("passkey", "", "", "", &pk_rp).is_ok());
+        let mut pk_cid = BTreeMap::new();
+        pk_cid.insert("credential_id".to_string(), "cred-123".to_string());
+        assert!(validate_credential_fields("passkey", "", "", "", &pk_cid).is_ok());
+        let mut pk_key = BTreeMap::new();
+        pk_key.insert("private_key".to_string(), "MIGHAgEAMBMGByqGSM49AgEG".to_string());
+        assert!(validate_credential_fields("passkey", "", "", "", &pk_key).is_ok());
+
+        // identity requires username (email), notes, or any non-tag extra field
+        assert!(validate_credential_fields("identity", "  ", "", "   ", &empty_fields).is_err());
+        let mut only_tags = BTreeMap::new();
+        only_tags.insert("tags".to_string(), "personal".to_string());
+        assert!(validate_credential_fields("identity", "", "", "", &only_tags).is_err());
+        assert!(validate_credential_fields("identity", "mario@acme.it", "", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("identity", "", "", "Dettagli documento", &empty_fields).is_ok());
+        let mut id_name = BTreeMap::new();
+        id_name.insert("first_name".to_string(), "Mario".to_string());
+        assert!(validate_credential_fields("identity", "", "", "", &id_name).is_ok());
     }
 
     #[test]

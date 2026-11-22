@@ -1,13 +1,16 @@
 use std::collections::{BTreeMap, HashMap};
 
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{
     error::{AppError, AppResult},
     importers::{
-        append_note_section, apply_imported_totp, clean_password, csv_parser::CsvTable,
-        detect_provider_hint_from_headers, parse_bool_flag, parse_import_timestamp, RawImportItem,
+        append_note_section, apply_imported_totp, clean_password,
+        csv_parser::{CsvRow, CsvTable},
+        detect_provider_hint_from_headers, host_from_url, parse_bool_flag,
+        parse_import_timestamp, RawImportItem,
     },
 };
 
@@ -77,6 +80,7 @@ struct BitwardenField {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct BitwardenLogin {
     #[serde(default)]
     uris: Option<Vec<BitwardenUri>>,
@@ -86,6 +90,39 @@ struct BitwardenLogin {
     password: Option<String>,
     #[serde(default)]
     totp: Option<String>,
+    #[serde(default, alias = "fido2_credentials")]
+    fido2_credentials: Option<Vec<BitwardenFido2Credential>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BitwardenFido2Credential {
+    #[serde(default, alias = "credentialID", alias = "credential_id")]
+    credential_id: Option<String>,
+    #[serde(default, alias = "key_type")]
+    key_type: Option<String>,
+    #[serde(default, alias = "key_algorithm")]
+    key_algorithm: Option<String>,
+    #[serde(default, alias = "key_curve")]
+    key_curve: Option<String>,
+    #[serde(default, alias = "key_value")]
+    key_value: Option<String>,
+    #[serde(default, alias = "rpID", alias = "rp_id")]
+    rp_id: Option<String>,
+    #[serde(default, alias = "rp_name")]
+    rp_name: Option<String>,
+    #[serde(default, alias = "user_handle")]
+    user_handle: Option<String>,
+    #[serde(default, alias = "user_name", alias = "username")]
+    user_name: Option<String>,
+    #[serde(default, alias = "user_display_name")]
+    user_display_name: Option<String>,
+    #[serde(default)]
+    counter: Option<Value>,
+    #[serde(default)]
+    discoverable: Option<Value>,
+    #[serde(default, alias = "creation_date")]
+    creation_date: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,7 +170,7 @@ struct BitwardenIdentity {
     #[serde(default)]
     state: Option<String>,
     #[serde(default)]
-    postal_code: Option<String>,
+    postal_code: Option<Value>,
     #[serde(default)]
     country: Option<String>,
     #[serde(default)]
@@ -141,15 +178,15 @@ struct BitwardenIdentity {
     #[serde(default)]
     email: Option<String>,
     #[serde(default)]
-    phone: Option<String>,
+    phone: Option<Value>,
     #[serde(default)]
-    ssn: Option<String>,
+    ssn: Option<Value>,
     #[serde(default)]
     username: Option<String>,
     #[serde(default)]
-    passport_number: Option<String>,
+    passport_number: Option<Value>,
     #[serde(default)]
-    license_number: Option<String>,
+    license_number: Option<Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -375,12 +412,15 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
         let mut password = String::new();
         let mut url = String::new();
         let mut fields = BTreeMap::new();
-        let mut extra_tags = Vec::new();
+        let extra_tags = Vec::new();
         let mut warning = None;
         let mut pre_skip_reason = None;
+        let mut extra_items: Vec<RawImportItem> = Vec::new();
+        let mut skip_primary = false;
 
         let category = match item.item_type {
             Some(1) => {
+                let mut fido2_creds: Vec<BitwardenFido2Credential> = Vec::new();
                 if let Some(login) = item.login {
                     username = login.username.unwrap_or_default().trim().to_string();
                     password = clean_password(&login.password.unwrap_or_default());
@@ -409,6 +449,67 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                     if let Some(totp) = login.totp {
                         apply_imported_totp(&totp, &mut fields, &mut notes);
                     }
+
+                    fido2_creds = login
+                        .fido2_credentials
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(is_non_empty_fido2)
+                        .collect();
+                }
+
+                if !fido2_creds.is_empty() {
+                    let total = fido2_creds.len();
+                    if password.is_empty() {
+                        skip_primary = true;
+                        let mut passkey_notes = notes.clone();
+                        if !custom_field_lines.is_empty() {
+                            append_note_section(
+                                &mut passkey_notes,
+                                Some("Campi personalizzati:"),
+                                &custom_field_lines.join("\n"),
+                            );
+                        }
+                        for (idx, fido2) in fido2_creds.iter().enumerate() {
+                            let mut pk_item = build_passkey_raw_item(
+                                &title,
+                                &username,
+                                &url,
+                                passkey_notes.clone(),
+                                favorite,
+                                source_folder.clone(),
+                                folder_tags.clone(),
+                                fido2,
+                                idx + 1,
+                                total,
+                                false,
+                                created_at,
+                                updated_at,
+                            );
+                            if let Some(totp_val) = fields.get("totp") {
+                                pk_item.fields.insert("totp".to_string(), totp_val.clone());
+                            }
+                            extra_items.push(pk_item);
+                        }
+                    } else {
+                        for (idx, fido2) in fido2_creds.iter().enumerate() {
+                            extra_items.push(build_passkey_raw_item(
+                                &title,
+                                &username,
+                                &url,
+                                String::new(),
+                                favorite,
+                                source_folder.clone(),
+                                folder_tags.clone(),
+                                fido2,
+                                idx + 1,
+                                total,
+                                true,
+                                created_at,
+                                updated_at,
+                            ));
+                        }
+                    }
                 }
                 "login".to_string()
             }
@@ -435,56 +536,31 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
             }
             Some(4) => {
                 if let Some(ident) = item.identity {
-                    let mut lines = Vec::new();
-                    let full_name = [
-                        ident.title,
-                        ident.first_name,
-                        ident.middle_name,
-                        ident.last_name,
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>()
-                    .join(" ");
-
-                    if !full_name.is_empty() {
-                        lines.push(format!("Nome completo: {full_name}"));
-                    }
-                    push_identity_line(&mut lines, "Azienda", ident.company);
-                    push_identity_line(&mut lines, "Email", ident.email);
-                    push_identity_line(&mut lines, "Telefono", ident.phone);
-                    push_identity_line(&mut lines, "Username", ident.username);
-                    let addr = [
-                        ident.address1,
-                        ident.address2,
-                        ident.address3,
-                        ident.city,
-                        ident.state,
-                        ident.postal_code,
-                        ident.country,
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                    if !addr.is_empty() {
-                        lines.push(format!("Indirizzo: {addr}"));
-                    }
-                    push_identity_line(&mut lines, "Codice Fiscale / SSN", ident.ssn);
-                    push_identity_line(&mut lines, "Passaporto", ident.passport_number);
-                    push_identity_line(&mut lines, "Patente / Licenza", ident.license_number);
-
-                    if !lines.is_empty() {
-                        append_note_section(&mut notes, Some("Dati identità:"), &lines.join("\n"));
-                    }
+                    username = ident.email.unwrap_or_default().trim().to_string();
+                    insert_opt_field(&mut fields, "identity_title", ident.title.as_deref());
+                    insert_opt_field(&mut fields, "first_name", ident.first_name.as_deref());
+                    insert_opt_field(&mut fields, "middle_name", ident.middle_name.as_deref());
+                    insert_opt_field(&mut fields, "last_name", ident.last_name.as_deref());
+                    insert_opt_field(&mut fields, "company", ident.company.as_deref());
+                    let phone = json_val_to_string(ident.phone.as_ref());
+                    insert_trimmed_field(&mut fields, "phone", &phone);
+                    insert_opt_field(&mut fields, "identity_username", ident.username.as_deref());
+                    insert_opt_field(&mut fields, "address1", ident.address1.as_deref());
+                    insert_opt_field(&mut fields, "address2", ident.address2.as_deref());
+                    insert_opt_field(&mut fields, "address3", ident.address3.as_deref());
+                    insert_opt_field(&mut fields, "city", ident.city.as_deref());
+                    insert_opt_field(&mut fields, "state", ident.state.as_deref());
+                    let postal_code = json_val_to_string(ident.postal_code.as_ref());
+                    insert_trimmed_field(&mut fields, "postal_code", &postal_code);
+                    insert_opt_field(&mut fields, "country", ident.country.as_deref());
+                    let ssn = json_val_to_string(ident.ssn.as_ref());
+                    insert_trimmed_field(&mut fields, "ssn", &ssn);
+                    let passport = json_val_to_string(ident.passport_number.as_ref());
+                    insert_trimmed_field(&mut fields, "passport_number", &passport);
+                    let license = json_val_to_string(ident.license_number.as_ref());
+                    insert_trimmed_field(&mut fields, "license_number", &license);
                 }
-                extra_tags.push("identity".to_string());
-                warning = Some("Identità Bitwarden importata come Nota Sicura".to_string());
-                "note".to_string()
+                "identity".to_string()
             }
             Some(5) => {
                 if let Some(ssh) = item.ssh_key {
@@ -523,42 +599,214 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
             }
         };
 
-        if !custom_field_lines.is_empty() {
-            append_note_section(
-                &mut notes,
-                Some("Campi personalizzati:"),
-                &custom_field_lines.join("\n"),
-            );
+        if !skip_primary {
+            if !custom_field_lines.is_empty() {
+                append_note_section(
+                    &mut notes,
+                    Some("Campi personalizzati:"),
+                    &custom_field_lines.join("\n"),
+                );
+            }
+
+            parsed_items.push(RawImportItem {
+                title,
+                username,
+                password,
+                url,
+                category,
+                notes,
+                fields,
+                favorite,
+                source_folder,
+                folder_tags,
+                extra_tags,
+                created_at,
+                updated_at,
+                warning,
+                pre_skip_reason,
+            });
         }
 
-        parsed_items.push(RawImportItem {
-            title,
-            username,
-            password,
-            url,
-            category,
-            notes,
-            fields,
-            favorite,
-            source_folder,
-            folder_tags,
-            extra_tags,
-            created_at,
-            updated_at,
-            warning,
-            pre_skip_reason,
-        });
+        parsed_items.extend(extra_items);
     }
 
     Ok(parsed_items)
 }
 
-fn push_identity_line(lines: &mut Vec<String>, label: &str, value: Option<String>) {
+fn insert_trimmed_field(fields: &mut BTreeMap<String, String>, key: &str, value: &str) {
+    let trimmed = value.trim();
+    if !trimmed.is_empty() {
+        fields.insert(key.to_string(), trimmed.to_string());
+    }
+}
+
+fn insert_opt_field(fields: &mut BTreeMap<String, String>, key: &str, value: Option<&str>) {
     if let Some(v) = value {
-        let trimmed = v.trim();
-        if !trimmed.is_empty() {
-            lines.push(format!("{label}: {trimmed}"));
+        insert_trimmed_field(fields, key, v);
+    }
+}
+
+fn normalize_bool_value(val: Option<&Value>) -> Option<&'static str> {
+    match val {
+        Some(Value::Bool(b)) => Some(if *b { "true" } else { "false" }),
+        Some(Value::Number(n)) => match n.as_u64() {
+            Some(1) => Some("true"),
+            Some(0) => Some("false"),
+            _ => None,
+        },
+        Some(Value::String(s)) => match s.trim().to_lowercase().as_str() {
+            "1" | "true" | "yes" | "y" | "si" | "sì" => Some("true"),
+            "0" | "false" | "no" | "n" => Some("false"),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn is_non_empty_fido2(f: &BitwardenFido2Credential) -> bool {
+    [
+        f.credential_id.as_deref(),
+        f.key_value.as_deref(),
+        f.rp_id.as_deref(),
+        f.rp_name.as_deref(),
+        f.user_name.as_deref(),
+        f.user_handle.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    .any(|s| !s.trim().is_empty())
+}
+
+fn url_from_rp_id(rp_id: &str) -> String {
+    let trimmed = rp_id.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    if lower.starts_with("http://") || lower.starts_with("https://") {
+        trimmed.to_string()
+    } else if trimmed.contains('.') {
+        format!("https://{trimmed}")
+    } else {
+        String::new()
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_passkey_raw_item(
+    parent_title: &str,
+    fallback_username: &str,
+    fallback_url: &str,
+    notes: String,
+    favorite: bool,
+    source_folder: Option<String>,
+    folder_tags: Vec<String>,
+    fido2: &BitwardenFido2Credential,
+    idx: usize,
+    total: usize,
+    is_companion: bool,
+    parent_created_at: Option<DateTime<Utc>>,
+    parent_updated_at: Option<DateTime<Utc>>,
+) -> RawImportItem {
+    let rp_id = fido2.rp_id.as_deref().unwrap_or("").trim().to_string();
+    let rp_name = fido2.rp_name.as_deref().unwrap_or("").trim().to_string();
+    let fido2_user_name = fido2.user_name.as_deref().unwrap_or("").trim().to_string();
+    let user_display_name = fido2
+        .user_display_name
+        .as_deref()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+
+    let username = if !fido2_user_name.is_empty() {
+        fido2_user_name
+    } else if !fallback_username.trim().is_empty() {
+        fallback_username.trim().to_string()
+    } else {
+        user_display_name.clone()
+    };
+
+    let url = if !fallback_url.trim().is_empty() {
+        fallback_url.trim().to_string()
+    } else {
+        url_from_rp_id(&rp_id)
+    };
+    let rp_id = if !rp_id.is_empty() {
+        rp_id
+    } else {
+        host_from_url(&url).unwrap_or_default()
+    };
+
+    let base_title = if !parent_title.trim().is_empty() {
+        parent_title.trim().to_string()
+    } else if !rp_name.is_empty() {
+        rp_name.clone()
+    } else if !rp_id.is_empty() {
+        rp_id.clone()
+    } else {
+        String::new()
+    };
+
+    let title = if base_title.is_empty() {
+        if total > 1 {
+            format!("Passkey #{idx}")
+        } else {
+            String::new()
         }
+    } else if is_companion {
+        if total > 1 {
+            format!("{base_title} (Passkey #{idx})")
+        } else if base_title.to_lowercase().contains("passkey") {
+            base_title
+        } else {
+            format!("{base_title} (Passkey)")
+        }
+    } else if total > 1 {
+        format!("{base_title} (Passkey #{idx})")
+    } else {
+        base_title
+    };
+
+    let mut fields = BTreeMap::new();
+    insert_opt_field(&mut fields, "credential_id", fido2.credential_id.as_deref());
+    insert_trimmed_field(&mut fields, "rp_id", &rp_id);
+    insert_trimmed_field(&mut fields, "rp_name", &rp_name);
+    insert_trimmed_field(&mut fields, "user_display_name", &user_display_name);
+    insert_opt_field(&mut fields, "user_handle", fido2.user_handle.as_deref());
+    insert_opt_field(&mut fields, "key_type", fido2.key_type.as_deref());
+    insert_opt_field(&mut fields, "key_algorithm", fido2.key_algorithm.as_deref());
+    insert_opt_field(&mut fields, "key_curve", fido2.key_curve.as_deref());
+    insert_opt_field(&mut fields, "private_key", fido2.key_value.as_deref());
+    let counter = json_val_to_string(fido2.counter.as_ref());
+    insert_trimmed_field(&mut fields, "counter", &counter);
+    if let Some(disc) = normalize_bool_value(fido2.discoverable.as_ref()) {
+        fields.insert("discoverable".to_string(), disc.to_string());
+    }
+    insert_opt_field(&mut fields, "creation_date", fido2.creation_date.as_deref());
+
+    let created_at = fido2
+        .creation_date
+        .as_deref()
+        .and_then(parse_import_timestamp)
+        .or(parent_created_at);
+    let updated_at = parent_updated_at;
+
+    RawImportItem {
+        title,
+        username,
+        password: String::new(),
+        url,
+        category: "passkey".to_string(),
+        notes,
+        fields,
+        favorite,
+        source_folder,
+        folder_tags,
+        extra_tags: Vec::new(),
+        created_at,
+        updated_at,
+        warning: None,
+        pre_skip_reason: None,
     }
 }
 
@@ -602,6 +850,67 @@ fn split_bitwarden_csv_uris(raw_uri: &str) -> Vec<String> {
     result
 }
 
+fn extract_csv_fido2_credentials(row: CsvRow<'_>) -> Vec<BitwardenFido2Credential> {
+    let json_raw = row.get_any_trimmed(&["fido2_credentials", "fido2credentials", "passkeys"]);
+    if !json_raw.is_empty() {
+        let parsed: Vec<BitwardenFido2Credential> = if json_raw.starts_with('[') {
+            serde_json::from_str(json_raw).unwrap_or_default()
+        } else if json_raw.starts_with('{') {
+            serde_json::from_str::<BitwardenFido2Credential>(json_raw)
+                .map(|c| vec![c])
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        let filtered: Vec<BitwardenFido2Credential> =
+            parsed.into_iter().filter(is_non_empty_fido2).collect();
+        if !filtered.is_empty() {
+            return filtered;
+        }
+    }
+
+    let opt_str = |aliases: &[&str]| -> Option<String> {
+        let val = row.get_any_trimmed(aliases);
+        if val.is_empty() {
+            None
+        } else {
+            Some(val.to_string())
+        }
+    };
+
+    let candidate = BitwardenFido2Credential {
+        credential_id: opt_str(&["fido2_credential_id", "passkey_credential_id", "credential_id"]),
+        key_type: opt_str(&["fido2_key_type", "passkey_key_type", "key_type"]),
+        key_algorithm: opt_str(&["fido2_key_algorithm", "passkey_key_algorithm", "key_algorithm"]),
+        key_curve: opt_str(&["fido2_key_curve", "passkey_key_curve", "key_curve"]),
+        key_value: opt_str(&[
+            "fido2_key_value",
+            "passkey_key_value",
+            "key_value",
+            "private_key",
+        ]),
+        rp_id: opt_str(&["fido2_rp_id", "passkey_rp_id", "rp_id"]),
+        rp_name: opt_str(&["fido2_rp_name", "passkey_rp_name", "rp_name"]),
+        user_handle: opt_str(&["fido2_user_handle", "passkey_user_handle", "user_handle"]),
+        user_name: opt_str(&["fido2_user_name", "passkey_user_name"]),
+        user_display_name: opt_str(&[
+            "fido2_user_display_name",
+            "passkey_user_display_name",
+            "user_display_name",
+        ]),
+        counter: opt_str(&["fido2_counter", "passkey_counter", "counter"]).map(Value::String),
+        discoverable: opt_str(&["fido2_discoverable", "passkey_discoverable", "discoverable"])
+            .map(Value::String),
+        creation_date: opt_str(&["fido2_creation_date", "passkey_creation_date", "creation_date"]),
+    };
+
+    if is_non_empty_fido2(&candidate) {
+        vec![candidate]
+    } else {
+        Vec::new()
+    }
+}
+
 fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
     let table = CsvTable::parse(content)?;
 
@@ -611,6 +920,11 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
         "login_uri",
         "login_totp",
         "reprompt",
+        "identity_first_name",
+        "identity_email",
+        "fido2_credential_id",
+        "passkey_credential_id",
+        "fido2_credentials",
     ]);
     if !has_bw_specific {
         if let Some(hint) = detect_provider_hint_from_headers(&table.headers, "bitwarden") {
@@ -665,32 +979,15 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             append_note_section(&mut notes, Some("Altri URL:"), &extra_urls);
         }
 
-        let mut fields = BTreeMap::new();
-        apply_imported_totp(totp, &mut fields, &mut notes);
+        let mut base_fields = BTreeMap::new();
+        apply_imported_totp(totp, &mut base_fields, &mut notes);
 
         if !custom_fields.is_empty() {
             append_note_section(&mut notes, Some("Campi personalizzati:"), custom_fields);
         }
 
-        let category = match item_type.as_str() {
-            "note" | "securenote" | "secure_note" => "note",
-            "card" => "card",
-            "ssh" | "sshkey" | "ssh_key" => "ssh",
-            "identity" => "note",
-            _ => "login",
-        };
-
-        let warning = if item_type == "identity" {
-            Some("Identità Bitwarden importata come Nota Sicura".to_string())
-        } else {
-            None
-        };
-
-        let mut extra_tags = Vec::new();
-        if item_type == "identity" {
-            extra_tags.push("identity".to_string());
-        }
-
+        let login_username = row.get_trimmed("login_username");
+        let password = clean_password(row.get("login_password"));
         let created_at = ["creation_date", "created_at", "created"]
             .iter()
             .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)));
@@ -698,21 +995,274 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             .iter()
             .find_map(|alias| parse_import_timestamp(row.get_trimmed(alias)));
 
+        if matches!(item_type.as_str(), "identity" | "identità" | "identita") {
+            let mut fields = base_fields;
+            insert_trimmed_field(
+                &mut fields,
+                "identity_title",
+                row.get_any_trimmed(&["identity_title"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "first_name",
+                row.get_any_trimmed(&["identity_first_name", "first_name", "firstname"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "middle_name",
+                row.get_any_trimmed(&["identity_middle_name", "middle_name", "middlename"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "last_name",
+                row.get_any_trimmed(&["identity_last_name", "last_name", "lastname"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "company",
+                row.get_any_trimmed(&["identity_company", "company"]),
+            );
+            let email = row.get_any_trimmed(&["identity_email", "email"]);
+            insert_trimmed_field(
+                &mut fields,
+                "phone",
+                row.get_any_trimmed(&["identity_phone", "phone"]),
+            );
+            let ident_user = row.get_any_trimmed(&["identity_username"]);
+            insert_trimmed_field(&mut fields, "identity_username", ident_user);
+            insert_trimmed_field(
+                &mut fields,
+                "address1",
+                row.get_any_trimmed(&["identity_address1", "address1"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "address2",
+                row.get_any_trimmed(&["identity_address2", "address2"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "address3",
+                row.get_any_trimmed(&["identity_address3", "address3"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "city",
+                row.get_any_trimmed(&["identity_city", "city"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "state",
+                row.get_any_trimmed(&["identity_state", "state"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "postal_code",
+                row.get_any_trimmed(&["identity_postal_code", "postal_code", "postalcode"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "country",
+                row.get_any_trimmed(&["identity_country", "country"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "ssn",
+                row.get_any_trimmed(&["identity_ssn", "ssn"]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "passport_number",
+                row.get_any_trimmed(&[
+                    "identity_passport_number",
+                    "passport_number",
+                    "passportnumber",
+                ]),
+            );
+            insert_trimmed_field(
+                &mut fields,
+                "license_number",
+                row.get_any_trimmed(&[
+                    "identity_license_number",
+                    "license_number",
+                    "licensenumber",
+                ]),
+            );
+
+            let mut username = email.to_string();
+            if username.is_empty() && !login_username.is_empty() {
+                if login_username.contains('@') {
+                    username = login_username.to_string();
+                } else if ident_user.is_empty() {
+                    insert_trimmed_field(&mut fields, "identity_username", login_username);
+                }
+            } else if !login_username.is_empty()
+                && ident_user.is_empty()
+                && !login_username.eq_ignore_ascii_case(&username)
+            {
+                insert_trimmed_field(&mut fields, "identity_username", login_username);
+            }
+
+            items.push(RawImportItem {
+                title,
+                username,
+                password: String::new(),
+                url,
+                category: "identity".to_string(),
+                notes,
+                fields,
+                favorite,
+                source_folder,
+                folder_tags,
+                extra_tags: Vec::new(),
+                created_at,
+                updated_at,
+                warning: None,
+                pre_skip_reason: None,
+            });
+            continue;
+        }
+
+        let fido2_creds = extract_csv_fido2_credentials(row);
+
+        if matches!(
+            item_type.as_str(),
+            "passkey" | "fido2" | "fido2_credential" | "webauthn"
+        ) {
+            if fido2_creds.is_empty() {
+                let mut fields = base_fields;
+                if let Some(host) = host_from_url(&url) {
+                    fields.insert("rp_id".to_string(), host);
+                }
+                items.push(RawImportItem {
+                    title,
+                    username: login_username.to_string(),
+                    password: String::new(),
+                    url,
+                    category: "passkey".to_string(),
+                    notes,
+                    fields,
+                    favorite,
+                    source_folder,
+                    folder_tags,
+                    extra_tags: Vec::new(),
+                    created_at,
+                    updated_at,
+                    warning: None,
+                    pre_skip_reason: None,
+                });
+            } else {
+                let total = fido2_creds.len();
+                for (idx, fido2) in fido2_creds.iter().enumerate() {
+                    let mut pk_item = build_passkey_raw_item(
+                        &title,
+                        login_username,
+                        &url,
+                        notes.clone(),
+                        favorite,
+                        source_folder.clone(),
+                        folder_tags.clone(),
+                        fido2,
+                        idx + 1,
+                        total,
+                        false,
+                        created_at,
+                        updated_at,
+                    );
+                    if let Some(totp_val) = base_fields.get("totp") {
+                        pk_item.fields.insert("totp".to_string(), totp_val.clone());
+                    }
+                    items.push(pk_item);
+                }
+            }
+            continue;
+        }
+
+        if (item_type.is_empty() || item_type == "login") && !fido2_creds.is_empty() {
+            let total = fido2_creds.len();
+            if password.is_empty() {
+                for (idx, fido2) in fido2_creds.iter().enumerate() {
+                    let mut pk_item = build_passkey_raw_item(
+                        &title,
+                        login_username,
+                        &url,
+                        notes.clone(),
+                        favorite,
+                        source_folder.clone(),
+                        folder_tags.clone(),
+                        fido2,
+                        idx + 1,
+                        total,
+                        false,
+                        created_at,
+                        updated_at,
+                    );
+                    if let Some(totp_val) = base_fields.get("totp") {
+                        pk_item.fields.insert("totp".to_string(), totp_val.clone());
+                    }
+                    items.push(pk_item);
+                }
+            } else {
+                items.push(RawImportItem {
+                    title: title.clone(),
+                    username: login_username.to_string(),
+                    password,
+                    url: url.clone(),
+                    category: "login".to_string(),
+                    notes,
+                    fields: base_fields,
+                    favorite,
+                    source_folder: source_folder.clone(),
+                    folder_tags: folder_tags.clone(),
+                    extra_tags: Vec::new(),
+                    created_at,
+                    updated_at,
+                    warning: None,
+                    pre_skip_reason: None,
+                });
+                for (idx, fido2) in fido2_creds.iter().enumerate() {
+                    items.push(build_passkey_raw_item(
+                        &title,
+                        login_username,
+                        &url,
+                        String::new(),
+                        favorite,
+                        source_folder.clone(),
+                        folder_tags.clone(),
+                        fido2,
+                        idx + 1,
+                        total,
+                        true,
+                        created_at,
+                        updated_at,
+                    ));
+                }
+            }
+            continue;
+        }
+
+        let category = match item_type.as_str() {
+            "note" | "securenote" | "secure_note" => "note",
+            "card" => "card",
+            "ssh" | "sshkey" | "ssh_key" => "ssh",
+            _ => "login",
+        };
+
         items.push(RawImportItem {
             title,
-            username: row.get_trimmed("login_username").to_string(),
-            password: clean_password(row.get("login_password")),
+            username: login_username.to_string(),
+            password,
             url,
             category: category.to_string(),
             notes,
-            fields,
+            fields: base_fields,
             favorite,
             source_folder,
             folder_tags,
-            extra_tags,
+            extra_tags: Vec::new(),
             created_at,
             updated_at,
-            warning,
+            warning: None,
             pre_skip_reason: None,
         });
     }

@@ -407,7 +407,7 @@ export function ImportVaultDialog({
       if (statusFilter !== 'all' && item.status !== statusFilter) return false
       if (!q) return true
       const hay =
-        `${item.title} ${item.username} ${item.url} ${item.source_folder ?? ''} ${item.tags.join(' ')}`.toLowerCase()
+        `${item.title} ${item.username} ${item.url} ${getCategoryLabel(item.category)} ${item.source_folder ?? ''} ${item.tags.join(' ')}`.toLowerCase()
       return hay.includes(q)
     })
   }, [folderScopedItems, previewSearch, statusFilter])
@@ -1269,9 +1269,13 @@ export function ImportVaultDialog({
                               {[item.username, item.url]
                                 .filter(Boolean)
                                 .join(' · ') ||
-                                (item.has_notes
-                                  ? 'Contiene note cifrate'
-                                  : 'Nessun dettaglio aggiuntivo')}
+                                (item.extra_field_count > 0
+                                  ? item.extra_field_count === 1
+                                    ? '1 campo strutturato'
+                                    : `${item.extra_field_count} campi strutturati`
+                                  : item.has_notes
+                                    ? 'Contiene note cifrate'
+                                    : 'Nessun dettaglio aggiuntivo')}
                             </p>
 
                             {item.warning && (

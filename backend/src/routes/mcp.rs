@@ -30,6 +30,8 @@ const MAX_BATCH_SIZE: usize = 50;
 
 const CREDENTIAL_CATEGORY_ENUM: &[&str] = &[
     "login",
+    "passkey",
+    "identity",
     "api_key",
     "database",
     "ssh",
@@ -323,7 +325,7 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                     "fields": {
                         "type": "object",
                         "additionalProperties": { "type": "string" },
-                        "description": "Campi extra opzionali (es. totp [segreto Base32 o URI otpauth://totp/...], provider, environment, db_type, port, private_key)"
+                        "description": "Campi extra opzionali (es. totp [segreto Base32 o URI otpauth://totp/...], provider, environment, db_type, port, private_key, rp_id, credential_id, first_name, last_name, phone, address1)"
                     },
                     "favorite": { "type": "boolean", "default": false }
                 },
@@ -1283,6 +1285,29 @@ mod tests {
                 "create_vault"
             ]
         );
+
+        assert!(CREDENTIAL_CATEGORY_ENUM.contains(&"passkey"));
+        assert!(CREDENTIAL_CATEGORY_ENUM.contains(&"identity"));
+
+        let list_tool = frw_tools
+            .iter()
+            .find(|t| t["name"] == "list_credentials")
+            .unwrap();
+        let list_cats = list_tool["inputSchema"]["properties"]["category"]["enum"]
+            .as_array()
+            .unwrap();
+        assert!(list_cats.iter().any(|v| v == "passkey"));
+        assert!(list_cats.iter().any(|v| v == "identity"));
+
+        let create_tool = frw_tools
+            .iter()
+            .find(|t| t["name"] == "create_credential")
+            .unwrap();
+        let create_cats = create_tool["inputSchema"]["properties"]["category"]["enum"]
+            .as_array()
+            .unwrap();
+        assert!(create_cats.iter().any(|v| v == "passkey"));
+        assert!(create_cats.iter().any(|v| v == "identity"));
     }
 
     #[tokio::test]

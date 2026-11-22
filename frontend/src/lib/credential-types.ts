@@ -2,6 +2,8 @@ import type { Credential } from '@/lib/api'
 
 export type CredentialCategory =
   | 'login'
+  | 'passkey'
+  | 'identity'
   | 'api_key'
   | 'database'
   | 'ssh'
@@ -14,6 +16,8 @@ export const CREDENTIAL_CATEGORIES: readonly {
   label: string
 }[] = [
   { value: 'login', label: 'Login Web' },
+  { value: 'passkey', label: 'Passkey' },
+  { value: 'identity', label: 'Identità' },
   { value: 'api_key', label: 'API Key / Token' },
   { value: 'database', label: 'Database' },
   { value: 'ssh', label: 'SSH / Server' },
@@ -76,6 +80,11 @@ const ENVIRONMENT_OPTIONS: CredentialFieldOption[] = [
   { value: 'development', label: 'Sviluppo' },
 ]
 
+const DISCOVERABLE_OPTIONS: CredentialFieldOption[] = [
+  { value: 'true', label: 'Sì (Resident Key)' },
+  { value: 'false', label: 'No' },
+]
+
 export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   CredentialCategory,
   CredentialCategoryConfig
@@ -130,6 +139,309 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
         storage: 'core',
         label: 'Note cifrate',
         placeholder: 'Codici di recupero, dettagli 2FA, istruzioni accesso...',
+        type: 'textarea',
+        colSpan: 2,
+      },
+    ],
+  },
+  passkey: {
+    value: 'passkey',
+    label: 'Passkey',
+    fields: [
+      {
+        key: 'username',
+        storage: 'core',
+        label: 'Username / Account',
+        placeholder: 'utente@esempio.it',
+        type: 'text',
+        colSpan: 2,
+      },
+      {
+        key: 'rp_id',
+        storage: 'extra',
+        label: 'Relying Party ID (RP ID)',
+        placeholder: 'github.com',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'rp_name',
+        storage: 'extra',
+        label: 'Servizio / Relying Party',
+        placeholder: 'GitHub',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'user_display_name',
+        storage: 'extra',
+        label: 'Nome visualizzato',
+        placeholder: 'Mario Rossi',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'user_handle',
+        storage: 'extra',
+        label: 'User Handle',
+        placeholder: 'base64url / opaque id',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'credential_id',
+        storage: 'extra',
+        label: 'Credential ID',
+        placeholder: 'ID credenziale WebAuthn / FIDO2',
+        type: 'text',
+        mono: true,
+        colSpan: 2,
+      },
+      {
+        key: 'private_key',
+        storage: 'extra',
+        label: 'Chiave Privata (PKCS#8 / FIDO2)',
+        placeholder: 'MIGHAgEAMBMGByqGSM49AgEG...',
+        type: 'secret-textarea',
+        mono: true,
+        secret: true,
+        colSpan: 2,
+      },
+      {
+        key: 'key_type',
+        storage: 'extra',
+        label: 'Tipo chiave',
+        placeholder: 'public-key',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'key_algorithm',
+        storage: 'extra',
+        label: 'Algoritmo',
+        placeholder: 'ECDSA',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'key_curve',
+        storage: 'extra',
+        label: 'Curva crittografica',
+        placeholder: 'P-256',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'discoverable',
+        storage: 'extra',
+        label: 'Discoverable',
+        placeholder: 'Seleziona',
+        type: 'select',
+        options: DISCOVERABLE_OPTIONS,
+        colSpan: 1,
+      },
+      {
+        key: 'counter',
+        storage: 'extra',
+        label: 'Contatore firme',
+        placeholder: '0',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'creation_date',
+        storage: 'extra',
+        label: 'Data creazione',
+        placeholder: '2026-01-01T00:00:00Z',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'url',
+        storage: 'core',
+        label: 'URL Sito Web',
+        placeholder: 'https://github.com',
+        type: 'url',
+        isLink: true,
+        colSpan: 2,
+      },
+      {
+        key: 'notes',
+        storage: 'core',
+        label: 'Note cifrate',
+        placeholder: 'Dispositivo registrato, dettagli passkey, note recupero...',
+        type: 'textarea',
+        colSpan: 2,
+      },
+    ],
+  },
+  identity: {
+    value: 'identity',
+    label: 'Identità',
+    fields: [
+      {
+        key: 'identity_title',
+        storage: 'extra',
+        label: 'Titolo / Appellativo',
+        placeholder: 'Sig., Dott., Ing.',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'first_name',
+        storage: 'extra',
+        label: 'Nome',
+        placeholder: 'Mario',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'middle_name',
+        storage: 'extra',
+        label: 'Secondo nome',
+        placeholder: 'Luigi',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'last_name',
+        storage: 'extra',
+        label: 'Cognome',
+        placeholder: 'Rossi',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'company',
+        storage: 'extra',
+        label: 'Azienda / Organizzazione',
+        placeholder: 'Acme S.r.l.',
+        type: 'text',
+        colSpan: 2,
+      },
+      {
+        key: 'username',
+        storage: 'core',
+        label: 'Email',
+        placeholder: 'mario.rossi@azienda.it',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'phone',
+        storage: 'extra',
+        label: 'Telefono',
+        placeholder: '+39 02 1234567',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'identity_username',
+        storage: 'extra',
+        label: 'Username',
+        placeholder: 'mrossi',
+        type: 'text',
+        colSpan: 2,
+      },
+      {
+        key: 'address1',
+        storage: 'extra',
+        label: 'Indirizzo (riga 1)',
+        placeholder: 'Via Roma 10',
+        type: 'text',
+        colSpan: 2,
+      },
+      {
+        key: 'address2',
+        storage: 'extra',
+        label: 'Indirizzo (riga 2)',
+        placeholder: 'Scala B, Int. 4',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'address3',
+        storage: 'extra',
+        label: 'Indirizzo (riga 3)',
+        placeholder: 'Presso...',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'city',
+        storage: 'extra',
+        label: 'Città',
+        placeholder: 'Milano',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'state',
+        storage: 'extra',
+        label: 'Provincia / Stato',
+        placeholder: 'MI',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'postal_code',
+        storage: 'extra',
+        label: 'CAP / Codice postale',
+        placeholder: '20121',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'country',
+        storage: 'extra',
+        label: 'Paese',
+        placeholder: 'Italia',
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'ssn',
+        storage: 'extra',
+        label: 'Codice Fiscale / SSN',
+        placeholder: 'RSSMRA80A01F205X',
+        type: 'password',
+        mono: true,
+        secret: true,
+        colSpan: 2,
+      },
+      {
+        key: 'passport_number',
+        storage: 'extra',
+        label: 'Numero passaporto',
+        placeholder: 'YA1234567',
+        type: 'password',
+        mono: true,
+        secret: true,
+        colSpan: 1,
+      },
+      {
+        key: 'license_number',
+        storage: 'extra',
+        label: 'Patente / Documento',
+        placeholder: 'MI1234567A',
+        type: 'password',
+        mono: true,
+        secret: true,
+        colSpan: 1,
+      },
+      {
+        key: 'notes',
+        storage: 'core',
+        label: 'Note cifrate',
+        placeholder: 'Note personali, riferimenti aggiuntivi...',
         type: 'textarea',
         colSpan: 2,
       },
@@ -538,9 +850,52 @@ export function maskSecretValue(
   return '•'.repeat(Math.min(20, Math.max(10, value.length)))
 }
 
+export function getIdentityFullName(fields: Record<string, string>): string {
+  return [
+    fields.identity_title,
+    fields.first_name,
+    fields.middle_name,
+    fields.last_name,
+  ]
+    .map((s) => s?.trim())
+    .filter(Boolean)
+    .join(' ')
+}
+
+export function getIdentityAddress(fields: Record<string, string>): string {
+  return [
+    fields.address1,
+    fields.address2,
+    fields.address3,
+    fields.city,
+    fields.state,
+    fields.postal_code,
+    fields.country,
+  ]
+    .map((s) => s?.trim())
+    .filter(Boolean)
+    .join(', ')
+}
+
 export function getCredentialSubtitle(cred: Credential): string {
   const fields = cred.fields ?? {}
   switch (cred.category) {
+    case 'passkey': {
+      const parts = [
+        fields.rp_name || fields.rp_id,
+        cred.username || fields.user_display_name,
+      ].filter(Boolean)
+      return parts.join(' · ') || cred.url || 'Passkey FIDO2'
+    }
+    case 'identity': {
+      const fullName = getIdentityFullName(fields)
+      const parts = [
+        fullName,
+        cred.username || fields.phone,
+        fields.company,
+      ].filter(Boolean)
+      return parts.join(' · ') || getIdentityAddress(fields) || 'Identità'
+    }
     case 'note': {
       const firstLine = cred.notes
         .split('\n')
@@ -604,6 +959,41 @@ export function getCredentialQuickCopy(cred: Credential): {
 } {
   const fields = cred.fields ?? {}
   switch (cred.category) {
+    case 'passkey': {
+      const primaryValue = cred.username || fields.rp_id || ''
+      const primaryLabel = cred.username ? 'Username' : 'RP ID'
+      const secondaryValue =
+        fields.credential_id || fields.private_key || cred.password || ''
+      const secondaryLabel = fields.credential_id
+        ? 'Credential ID'
+        : 'Chiave privata'
+      return {
+        primary: primaryValue
+          ? { label: primaryLabel, value: primaryValue }
+          : undefined,
+        secondary: secondaryValue
+          ? { label: secondaryLabel, value: secondaryValue }
+          : undefined,
+      }
+    }
+    case 'identity': {
+      const fullName = getIdentityFullName(fields)
+      const address = getIdentityAddress(fields)
+      return {
+        primary: cred.username
+          ? { label: 'Email', value: cred.username }
+          : fullName
+            ? { label: 'Nome', value: fullName }
+            : undefined,
+        secondary: fields.phone
+          ? { label: 'Telefono', value: fields.phone }
+          : address
+            ? { label: 'Indirizzo', value: address }
+            : fields.ssn
+              ? { label: 'Codice Fiscale', value: fields.ssn }
+              : undefined,
+      }
+    }
     case 'note':
       return cred.notes
         ? { secondary: { label: 'Nota', value: cred.notes } }
@@ -666,6 +1056,34 @@ export function getCredentialListColumns(cred: Credential): {
   const fields = cred.fields ?? {}
 
   switch (cred.category) {
+    case 'passkey': {
+      const primary =
+        cred.username ||
+        fields.user_display_name ||
+        fields.rp_id ||
+        'Passkey'
+      const credIdPreview = fields.credential_id
+        ? fields.credential_id.length > 18
+          ? `ID: ${fields.credential_id.slice(0, 18)}…`
+          : `ID: ${fields.credential_id}`
+        : ''
+      const secondary =
+        fields.rp_id || cred.url || fields.rp_name || credIdPreview
+      return { primary, secondary }
+    }
+    case 'identity': {
+      const fullName = getIdentityFullName(fields)
+      const address = getIdentityAddress(fields)
+      const primary = fullName || cred.username || fields.company || 'Identità'
+      const secondary = [
+        cred.username && cred.username !== primary ? cred.username : '',
+        fields.phone,
+        address,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      return { primary, secondary }
+    }
     case 'database': {
       const primary = cred.username || fields.database_name || 'db_user'
       const engine = fields.db_type || 'postgresql'
@@ -781,6 +1199,23 @@ export function getSearchableMetadata(cred: Credential): string {
     fields.database_name,
     fields.brand,
     fields.product,
+    fields.rp_id,
+    fields.rp_name,
+    fields.user_display_name,
+    fields.credential_id,
+    fields.key_algorithm,
+    fields.identity_title,
+    fields.first_name,
+    fields.middle_name,
+    fields.last_name,
+    fields.company,
+    fields.phone,
+    fields.identity_username,
+    fields.address1,
+    fields.city,
+    fields.state,
+    fields.postal_code,
+    fields.country,
     fields.tags,
     hasCredentialTotp(cred) ? 'otp totp 2fa' : '',
   ]

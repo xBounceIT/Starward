@@ -4,8 +4,10 @@ import {
   CreditCard,
   Database,
   FileText,
+  FingerprintPattern,
   Folder,
   Globe,
+  IdCard,
   KeyRound,
   KeySquare,
   Lock,
@@ -75,6 +77,10 @@ export function CategoryIcon({
   className?: string
 }) {
   switch (category) {
+    case 'passkey':
+      return <FingerprintPattern className={className} />
+    case 'identity':
+      return <IdCard className={className} />
     case 'api_key':
       return <Code2 className={className} />
     case 'database':
@@ -105,8 +111,12 @@ type BrandKey =
   | 'discord'
   | 'slack'
 
-function detectBrand(cred: Pick<Credential, 'title' | 'url' | 'fields'>): BrandKey | null {
-  const hay = `${cred.title} ${cred.url} ${cred.fields?.provider ?? ''}`.toLowerCase()
+function detectBrand(
+  cred: Pick<Credential, 'title' | 'url' | 'category' | 'fields'>,
+): BrandKey | null {
+  if (cred.category === 'identity') return null
+  const hay =
+    `${cred.title} ${cred.url} ${cred.fields?.provider ?? ''} ${cred.fields?.rp_id ?? ''} ${cred.fields?.rp_name ?? ''}`.toLowerCase()
   if (hay.includes('google') || hay.includes('gmail') || hay.includes('youtube'))
     return 'google'
   if (hay.includes('github')) return 'github'
@@ -301,6 +311,28 @@ export function CredentialBrandIcon({
 
   // Category-styled icon fallback matching the screenshot
   switch (credential.category) {
+    case 'passkey':
+      return (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center border border-cyan-500/25 bg-cyan-500/15 text-cyan-400 sync-security:border-[#ff9c00]/35 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]',
+            className,
+          )}
+        >
+          <FingerprintPattern className={iconClassName} />
+        </div>
+      )
+    case 'identity':
+      return (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center border border-indigo-500/25 bg-indigo-500/15 text-indigo-400 sync-security:border-[#ff9c00]/35 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]',
+            className,
+          )}
+        >
+          <IdCard className={iconClassName} />
+        </div>
+      )
     case 'database':
       return (
         <div

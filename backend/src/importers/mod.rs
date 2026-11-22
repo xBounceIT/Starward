@@ -34,7 +34,12 @@ pub enum ImportProvider {
 impl ImportProvider {
     pub fn from_id(raw: &str) -> AppResult<Self> {
         match raw.trim().to_lowercase().as_str() {
-            "bitwarden" => Ok(Self::Bitwarden),
+            "bitwarden"
+            | "vaultwarden"
+            | "bitwarden_org"
+            | "bitwarden-org"
+            | "bitwarden_personal"
+            | "bitwarden-personal" => Ok(Self::Bitwarden),
             "bitwarden_json" | "bitwarden-json" => Ok(Self::BitwardenJson),
             "bitwarden_csv" | "bitwarden-csv" => Ok(Self::BitwardenCsv),
             "1password" | "1password_csv" | "onepassword" => Ok(Self::OnePassword),
@@ -96,7 +101,7 @@ pub fn all_provider_dtos() -> Vec<ImportProviderDto> {
             id: "bitwarden".to_string(),
             name: "Bitwarden".to_string(),
             description:
-                "Export vault personale o organizzazione (Login, Note, Carte, Identità, Chiavi SSH)"
+                "Export vault personale, organizzazione o Vaultwarden (Login, Passkey, Identità, Note, Carte, Chiavi SSH)"
                     .to_string(),
             formats: vec!["JSON".to_string(), "CSV".to_string()],
             extensions: vec![".json".to_string(), ".csv".to_string()],
@@ -115,7 +120,7 @@ pub fn all_provider_dtos() -> Vec<ImportProviderDto> {
         ImportProviderDto {
             id: "lastpass".to_string(),
             name: "LastPass".to_string(),
-            description: "Export CSV con supporto a gruppi, carte, database e chiavi SSH"
+            description: "Export CSV con supporto a gruppi, carte, identità, database e chiavi SSH"
                 .to_string(),
             formats: vec!["CSV".to_string()],
             extensions: vec![".csv".to_string()],
@@ -179,7 +184,7 @@ pub fn all_provider_dtos() -> Vec<ImportProviderDto> {
         ImportProviderDto {
             id: "nordpass".to_string(),
             name: "NordPass".to_string(),
-            description: "Export CSV da NordPass (login, carte e cartelle)".to_string(),
+            description: "Export CSV da NordPass (login, carte, identità e cartelle)".to_string(),
             formats: vec!["CSV".to_string()],
             extensions: vec![".csv".to_string()],
             featured: false,
@@ -188,7 +193,7 @@ pub fn all_provider_dtos() -> Vec<ImportProviderDto> {
         ImportProviderDto {
             id: "generic_csv".to_string(),
             name: "CSV Generico".to_string(),
-            description: "File CSV personalizzato (colonne name/title, username, password, url, notes)"
+            description: "File CSV personalizzato (colonne name/title, username, password, url, notes, category)"
                 .to_string(),
             formats: vec!["CSV".to_string()],
             extensions: vec![".csv".to_string()],
@@ -430,10 +435,58 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
     let mut fields = clean_extra_fields(&raw.fields);
     let mut warning = raw.warning;
 
+    let identity_fallback_title = if category == "identity" {
+        let ident_name = [
+            fields.get("first_name"),
+            fields.get("middle_name"),
+            fields.get("last_name"),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
+        if !ident_name.is_empty() {
+            Some(ident_name)
+        } else {
+            fields
+                .get("company")
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        }
+    } else {
+        None
+    };
+
+    let passkey_rp_name = if category == "passkey" {
+        fields
+            .get("rp_name")
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+
+    let passkey_rp_id = if category == "passkey" {
+        fields
+            .get("rp_id")
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+
     let candidate_title = if !raw.title.trim().is_empty() {
         raw.title.trim().to_string()
+    } else if let Some(rp_name) = passkey_rp_name {
+        rp_name
     } else if let Some(host) = host_from_url(&url) {
         host
+    } else if let Some(rp_id) = passkey_rp_id {
+        rp_id
+    } else if let Some(ident_title) = identity_fallback_title {
+        ident_title
     } else if !username.is_empty() {
         username.clone()
     } else if category == "note" {
@@ -521,7 +574,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
         fields.remove("tags");
     }
 
-    if validate_credential_fields(&category, &password, &notes, &fields).is_err() {
+    if validate_credential_fields(&category, &username, &password, &notes, &fields).is_err() {
         let has_non_tag_extra = fields.keys().any(|k| k != "tags");
         let has_metadata =
             !username.is_empty() || !url.is_empty() || !notes.is_empty() || has_non_tag_extra;
@@ -533,6 +586,8 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
                 "ssh" => "Password e chiave privata SSH mancanti",
                 "api_key" => "Chiave API / token mancante",
                 "license" => "Chiave di licenza mancante",
+                "passkey" => "Dati passkey mancanti (RP ID, Credential ID o chiave privata)",
+                "identity" => "Dati identità mancanti",
                 _ => "Password mancante",
             };
             return EvaluatedImportItem {
@@ -582,6 +637,8 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             "card" => "Numero carta mancante: importata come Nota Sicura",
             "api_key" => "Token mancante: importata come Nota Sicura",
             "license" => "Chiave di licenza mancante: importata come Nota Sicura",
+            "passkey" => "Dati passkey incompleti: importata come Nota Sicura",
+            "identity" => "Dati identità incompleti: importata come Nota Sicura",
             "note" => "Nota ricostruita dai metadati disponibili",
             _ => "Password mancante: importata come Nota Sicura",
         };
@@ -790,7 +847,15 @@ pub(crate) fn detect_provider_hint_from_headers(
 ) -> Option<String> {
     let has = |col: &str| headers.iter().any(|h| h == col);
 
-    let suggested = if has("login_username") || has("login_password") || has("login_uri") {
+    let suggested = if has("login_username")
+        || has("login_password")
+        || has("login_uri")
+        || has("identity_first_name")
+        || has("identity_email")
+        || has("fido2_credential_id")
+        || has("passkey_credential_id")
+        || has("fido2_credentials")
+    {
         Some(("bitwarden", "Bitwarden"))
     } else if has("grouping") && has("extra") && has("fav") {
         Some(("lastpass", "LastPass"))
@@ -937,8 +1002,8 @@ mod tests {
         let batch = evaluate_import("bitwarden", json, Some("bw.json"), true, &HashSet::new()).unwrap();
         assert_eq!(batch.detected_format, "JSON");
         assert_eq!(batch.total_parsed, 6);
-        assert_eq!(batch.ready_count, 4);
-        assert_eq!(batch.warning_count, 1);
+        assert_eq!(batch.ready_count, 5);
+        assert_eq!(batch.warning_count, 0);
         assert_eq!(batch.skipped_count, 1);
         assert_eq!(batch.source_folders, vec!["Infrastruttura"]);
         assert!(batch.has_items_without_folder);
@@ -967,13 +1032,15 @@ mod tests {
         assert_eq!(card.fields.get("cvv").map(String::as_str), Some("999"));
         assert_eq!(card.fields.get("expiry").map(String::as_str), Some("04/29"));
 
-        // Identity -> Note with warning
+        // Identity -> native identity category without warning
         let ident = &batch.items[3];
-        assert_eq!(ident.category, "note");
-        assert_eq!(ident.status, "warning");
-        assert!(ident.warning.is_some());
-        assert!(ident.notes.contains("Mario Rossi"));
-        assert!(ident.tags.contains(&"identity".to_string()));
+        assert_eq!(ident.category, "identity");
+        assert_eq!(ident.status, "ready");
+        assert!(ident.warning.is_none());
+        assert_eq!(ident.username, "mario@acme.it");
+        assert_eq!(ident.fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(ident.fields.get("last_name").map(String::as_str), Some("Rossi"));
+        assert_eq!(ident.fields.get("city").map(String::as_str), Some("Milano"));
 
         // SSH Key
         let ssh = &batch.items[4];
@@ -986,6 +1053,296 @@ mod tests {
         let deleted = &batch.items[5];
         assert_eq!(deleted.status, "skipped");
         assert!(deleted.skip_reason.as_deref().unwrap().contains("cestino"));
+    }
+
+    #[test]
+    fn bitwarden_json_passkeys_handles_passkey_only_hybrid_multiple_and_vaultwarden_types() {
+        let json = r#"{
+            "encrypted": false,
+            "folders": [{ "id": "f1", "name": "Sicurezza" }],
+            "collections": [{ "id": "c1", "name": "DevOps" }],
+            "items": [
+                {
+                    "type": 1,
+                    "folderId": "f1",
+                    "name": "GitHub Passkey",
+                    "notes": "Passkey principale",
+                    "favorite": true,
+                    "fields": [{ "name": "Env", "value": "prod" }],
+                    "login": {
+                        "uris": [{ "uri": "https://github.com" }],
+                        "username": "octocat",
+                        "password": "",
+                        "fido2Credentials": [
+                            {
+                                "credentialId": "76c3b5c8-d880-46e6-9f57-ced060607557",
+                                "keyType": "public-key",
+                                "keyAlgorithm": "ECDSA",
+                                "keyCurve": "P-256",
+                                "keyValue": "MIGHAgEAMBMGByqGSM49AgEG-PK-1",
+                                "rpId": "github.com",
+                                "userHandle": "b2N0b2NhdA",
+                                "userName": "octocat@github.com",
+                                "counter": "0",
+                                "rpName": "GitHub",
+                                "userDisplayName": "Octo Cat",
+                                "discoverable": "true",
+                                "creationDate": "2025-05-15T11:10:37.341Z"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": 1,
+                    "collectionIds": ["c1"],
+                    "name": "Google Workspace",
+                    "notes": "Account admin",
+                    "login": {
+                        "username": "admin@acme.it",
+                        "password": "StrongPassword!1",
+                        "totp": "otpauth://totp/Google",
+                        "fido2Credentials": [
+                            {
+                                "credentialId": "vw-cred-1",
+                                "keyType": "public-key",
+                                "keyAlgorithm": "ECDSA",
+                                "keyCurve": "P-256",
+                                "keyValue": "MIGHAgEAMBMGByqGSM49AgEG-VW-1",
+                                "rpId": "accounts.google.com",
+                                "userHandle": "dXNlci0x",
+                                "userName": "",
+                                "counter": 4,
+                                "rpName": "Google",
+                                "userDisplayName": "Admin Acme",
+                                "discoverable": true,
+                                "creationDate": "2026-02-10T09:00:00Z"
+                            },
+                            {
+                                "credentialId": "vw-cred-2",
+                                "rpId": "google.com",
+                                "rpName": "Google Backup",
+                                "userName": "admin@acme.it",
+                                "counter": 0,
+                                "discoverable": false
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": 1,
+                    "name": "Cloudflare",
+                    "login": {
+                        "username": "cf@acme.it",
+                        "password": "CfPassword!99",
+                        "uris": [{ "uri": "https://dash.cloudflare.com" }],
+                        "fido2Credentials": [
+                            {
+                                "credentialId": "cf-cred-1",
+                                "rpId": "dash.cloudflare.com",
+                                "rpName": "Cloudflare",
+                                "userName": "cf@acme.it",
+                                "keyValue": "MIGH-CF-SECRET"
+                            }
+                        ]
+                    }
+                }
+            ]
+        }"#;
+
+        let batch = evaluate_import("vaultwarden", json, Some("vw.json"), true, &HashSet::new()).unwrap();
+        assert_eq!(batch.detected_format, "JSON");
+        // Item 0 -> 1 passkey-only; Item 1 -> 1 login + 2 passkeys; Item 2 -> 1 login + 1 passkey = 6
+        assert_eq!(batch.total_parsed, 6);
+        assert_eq!(batch.ready_count, 6);
+        assert_eq!(batch.warning_count, 0);
+        assert_eq!(batch.skipped_count, 0);
+
+        // Passkey-only item keeps notes, custom fields, folder, favorite
+        let pk_only = &batch.items[0];
+        assert_eq!(pk_only.category, "passkey");
+        assert_eq!(pk_only.title, "GitHub Passkey");
+        assert_eq!(pk_only.username, "octocat@github.com");
+        assert_eq!(pk_only.url, "https://github.com");
+        assert!(pk_only.favorite);
+        assert_eq!(pk_only.source_folder.as_deref(), Some("Sicurezza"));
+        assert!(pk_only.notes.contains("Passkey principale"));
+        assert!(pk_only.notes.contains("Env: prod"));
+        assert_eq!(pk_only.fields.get("rp_id").map(String::as_str), Some("github.com"));
+        assert_eq!(pk_only.fields.get("rp_name").map(String::as_str), Some("GitHub"));
+        assert_eq!(pk_only.fields.get("credential_id").map(String::as_str), Some("76c3b5c8-d880-46e6-9f57-ced060607557"));
+        assert_eq!(pk_only.fields.get("private_key").map(String::as_str), Some("MIGHAgEAMBMGByqGSM49AgEG-PK-1"));
+        assert_eq!(pk_only.fields.get("discoverable").map(String::as_str), Some("true"));
+        assert_eq!(pk_only.fields.get("counter").map(String::as_str), Some("0"));
+
+        // Hybrid item with 2 passkeys & Vaultwarden numeric counter + boolean discoverable
+        let google_login = &batch.items[1];
+        assert_eq!(google_login.category, "login");
+        assert_eq!(google_login.password, "StrongPassword!1");
+        assert!(google_login.notes.contains("TOTP: otpauth://totp/Google"));
+
+        let google_pk1 = &batch.items[2];
+        assert_eq!(google_pk1.category, "passkey");
+        assert_eq!(google_pk1.title, "Google Workspace (Passkey #1)");
+        assert_eq!(google_pk1.username, "admin@acme.it"); // falls back to login.username
+        assert_eq!(google_pk1.url, "https://accounts.google.com"); // derived from rpId
+        assert!(google_pk1.notes.is_empty()); // does not duplicate login secrets
+        assert_eq!(google_pk1.fields.get("counter").map(String::as_str), Some("4"));
+        assert_eq!(google_pk1.fields.get("discoverable").map(String::as_str), Some("true"));
+        assert_eq!(google_pk1.source_folder.as_deref(), Some("DevOps"));
+
+        let google_pk2 = &batch.items[3];
+        assert_eq!(google_pk2.category, "passkey");
+        assert_eq!(google_pk2.title, "Google Workspace (Passkey #2)");
+        assert_eq!(google_pk2.fields.get("discoverable").map(String::as_str), Some("false"));
+
+        // Hybrid item with single passkey
+        let cf_login = &batch.items[4];
+        assert_eq!(cf_login.category, "login");
+        let cf_pk = &batch.items[5];
+        assert_eq!(cf_pk.category, "passkey");
+        assert_eq!(cf_pk.title, "Cloudflare (Passkey)");
+
+        // Re-evaluating with all generated dedup keys marks every passkey & login as duplicate
+        let mut existing = HashSet::new();
+        for it in &batch.items {
+            existing.insert(make_dedup_key(&it.category, &it.title, &it.username, &it.url));
+        }
+        let re_batch = evaluate_import("bitwarden", json, Some("vw.json"), true, &existing).unwrap();
+        assert_eq!(re_batch.duplicate_count, 6);
+        assert_eq!(re_batch.ready_count, 0);
+    }
+
+    #[test]
+    fn bitwarden_json_identity_maps_all_fields_and_handles_empty() {
+        let json = r#"{
+            "encrypted": false,
+            "items": [
+                {
+                    "type": 4,
+                    "name": "Identità Completa",
+                    "notes": "Nota riservata",
+                    "favorite": true,
+                    "identity": {
+                        "title": "Ing.",
+                        "firstName": "Mario",
+                        "middleName": "Luigi",
+                        "lastName": "Rossi",
+                        "address1": "Via Roma 10",
+                        "address2": "Scala B",
+                        "address3": "Interno 4",
+                        "city": "Milano",
+                        "state": "MI",
+                        "postalCode": 20121,
+                        "country": "Italia",
+                        "company": "Acme Srl",
+                        "email": "mario.rossi@acme.it",
+                        "phone": "+39021234567",
+                        "ssn": "RSSMRA80A01F205X",
+                        "username": "mrossi",
+                        "passportNumber": "YA1234567",
+                        "licenseNumber": "MI987654"
+                    }
+                },
+                {
+                    "type": 4,
+                    "name": "",
+                    "identity": {
+                        "firstName": "Giulia",
+                        "lastName": "Bianchi",
+                        "email": "giulia@acme.it"
+                    }
+                },
+                {
+                    "type": 4,
+                    "name": "Identità Vuota",
+                    "identity": {}
+                }
+            ]
+        }"#;
+
+        let batch = evaluate_import("bitwarden_json", json, None, true, &HashSet::new()).unwrap();
+        assert_eq!(batch.total_parsed, 3);
+        assert_eq!(batch.ready_count, 2);
+        assert_eq!(batch.skipped_count, 1);
+
+        let full = &batch.items[0];
+        assert_eq!(full.category, "identity");
+        assert_eq!(full.title, "Identità Completa");
+        assert_eq!(full.username, "mario.rossi@acme.it");
+        assert_eq!(full.notes, "Nota riservata");
+        assert!(full.favorite);
+        assert_eq!(full.fields.get("identity_title").map(String::as_str), Some("Ing."));
+        assert_eq!(full.fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(full.fields.get("middle_name").map(String::as_str), Some("Luigi"));
+        assert_eq!(full.fields.get("last_name").map(String::as_str), Some("Rossi"));
+        assert_eq!(full.fields.get("address1").map(String::as_str), Some("Via Roma 10"));
+        assert_eq!(full.fields.get("address2").map(String::as_str), Some("Scala B"));
+        assert_eq!(full.fields.get("address3").map(String::as_str), Some("Interno 4"));
+        assert_eq!(full.fields.get("city").map(String::as_str), Some("Milano"));
+        assert_eq!(full.fields.get("state").map(String::as_str), Some("MI"));
+        assert_eq!(full.fields.get("postal_code").map(String::as_str), Some("20121"));
+        assert_eq!(full.fields.get("country").map(String::as_str), Some("Italia"));
+        assert_eq!(full.fields.get("company").map(String::as_str), Some("Acme Srl"));
+        assert_eq!(full.fields.get("phone").map(String::as_str), Some("+39021234567"));
+        assert_eq!(full.fields.get("ssn").map(String::as_str), Some("RSSMRA80A01F205X"));
+        assert_eq!(full.fields.get("identity_username").map(String::as_str), Some("mrossi"));
+        assert_eq!(full.fields.get("passport_number").map(String::as_str), Some("YA1234567"));
+        assert_eq!(full.fields.get("license_number").map(String::as_str), Some("MI987654"));
+
+        let fallback_title = &batch.items[1];
+        assert_eq!(fallback_title.category, "identity");
+        assert_eq!(fallback_title.title, "Giulia Bianchi");
+        assert_eq!(fallback_title.username, "giulia@acme.it");
+
+        let empty = &batch.items[2];
+        assert_eq!(empty.status, "skipped");
+        assert_eq!(empty.skip_reason.as_deref(), Some("Dati identità mancanti"));
+    }
+
+    #[test]
+    fn bitwarden_csv_handles_identities_and_passkeys() {
+        let csv = concat!(
+            "folder,favorite,type,name,notes,fields,login_uri,login_username,login_password,",
+            "identity_first_name,identity_last_name,identity_email,identity_phone,identity_city,",
+            "fido2_credential_id,fido2_rp_id,fido2_rp_name,fido2_key_value,fido2_credentials\n",
+            "Personale,1,identity,Profilo Mario,Doc,, ,mrossi,,Mario,Rossi,mario@acme.it,+39123,Roma,,,,,\n",
+            "Sicurezza,0,passkey,GitHub Hardware,YubiKey,,https://github.com,octocat,,,,,,,cred-gh,github.com,GitHub,MIGH-PK,\n",
+            "Work,0,login,Portal Hybrid,Note,,https://portal.it,alice,Pwd!123,,,,,,, , , ,\"[{\"\"credentialId\"\":\"\"c1\"\",\"\"rpId\"\":\"\"portal.it\"\",\"\"keyValue\"\":\"\"MIGH-H1\"\"}]\"\n",
+            ",0,identity,Profilo Anna,,,,anna@acme.it,,Anna,Verdi,anna@acme.it,,,,,,,\n"
+        );
+
+        let batch = evaluate_import("bitwarden_csv", csv, Some("bw.csv"), true, &HashSet::new()).unwrap();
+        assert_eq!(batch.detected_format, "CSV");
+        assert_eq!(batch.total_parsed, 5);
+        assert_eq!(batch.ready_count, 5);
+
+        let ident = &batch.items[0];
+        assert_eq!(ident.category, "identity");
+        assert_eq!(ident.username, "mario@acme.it");
+        assert_eq!(ident.fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(ident.fields.get("last_name").map(String::as_str), Some("Rossi"));
+        assert_eq!(ident.fields.get("identity_username").map(String::as_str), Some("mrossi"));
+        assert_eq!(ident.fields.get("phone").map(String::as_str), Some("+39123"));
+        assert_eq!(ident.fields.get("city").map(String::as_str), Some("Roma"));
+
+        let pk = &batch.items[1];
+        assert_eq!(pk.category, "passkey");
+        assert_eq!(pk.username, "octocat");
+        assert_eq!(pk.fields.get("credential_id").map(String::as_str), Some("cred-gh"));
+        assert_eq!(pk.fields.get("rp_id").map(String::as_str), Some("github.com"));
+        assert_eq!(pk.fields.get("private_key").map(String::as_str), Some("MIGH-PK"));
+
+        let hybrid_login = &batch.items[2];
+        assert_eq!(hybrid_login.category, "login");
+        let hybrid_pk = &batch.items[3];
+        assert_eq!(hybrid_pk.category, "passkey");
+        assert_eq!(hybrid_pk.title, "Portal Hybrid (Passkey)");
+        assert_eq!(hybrid_pk.fields.get("credential_id").map(String::as_str), Some("c1"));
+
+        let ident_same = &batch.items[4];
+        assert_eq!(ident_same.category, "identity");
+        assert_eq!(ident_same.username, "anna@acme.it");
+        assert_eq!(ident_same.fields.get("identity_username"), None);
     }
 
     #[test]
@@ -1095,20 +1452,29 @@ mod tests {
     #[test]
     fn all_other_providers_parse_cleanly() {
         // 1Password
-        let op = "Title,URL,Username,Password,OTPAuth,Favorite,Tags,Notes,Type\nStripe,https://stripe.com,ops,sk_123,otpauth://1p,true,\"billing, prod\",API access,API Credential";
+        let op = "Title,URL,Username,Password,OTPAuth,Favorite,Tags,Notes,Type\n\
+            Stripe,https://stripe.com,ops,sk_123,otpauth://1p,true,\"billing, prod\",API access,API Credential\n\
+            Mario ID,,mario@acme.it,,,,personal,Passaporto 123,Identity\n\
+            GitHub Passkey,https://github.com,octocat,,,,,,Passkey";
         let b = evaluate_import("1password", op, None, true, &HashSet::new()).unwrap();
         assert_eq!(b.items[0].category, "api_key");
         assert_eq!(b.items[0].tags, vec!["billing", "prod"]);
+        assert_eq!(b.items[1].category, "identity");
+        assert_eq!(b.items[1].username, "mario@acme.it");
+        assert_eq!(b.items[2].category, "passkey");
+        assert_eq!(b.items[2].status, "ready");
+        assert_eq!(b.items[2].fields.get("rp_id").map(String::as_str), Some("github.com"));
 
-        // LastPass (login + card + ssh + database + note)
+        // LastPass (login + card + ssh + database + address/identity + note)
         let lp = "url,username,password,totp,extra,name,grouping,fav\n\
             https://lp.com,user,pw123,TOTP1,Note body,Portal,Dev,1\n\
             http://sn,,,,\"NoteType:Payment Card\nName on Card:Mario\nNumber:40001234\nSecurity Code:123\nType:Mastercard\nExpiration Month:11\nExpiration Year:2028\",My Card,Finance,0\n\
             http://sn,,,,\"NoteType:SSH Key\nHostname:10.0.0.1\nUsername:root\nPrivate Key:-----BEGIN KEY-----\n\",Server Key,Ops,0\n\
             http://sn,,,,\"NoteType:Database\nType:PostgreSQL\nHostname:db.int\nPort:5432\nDatabase:app\nUsername:pg\nPassword:dbpw\",Prod DB,Ops,0\n\
+            http://sn,,,,\"NoteType:Address\nFirst Name:Mario\nLast Name:Rossi\nEmail Address:mario@lp.it\nMobile Phone:+39123456\nCity / Town:Roma\nCountry:Italia\",Home Addr,Personal,0\n\
             http://sn,,,,Just plain secret note,Plain Note,,0";
         let b = evaluate_import("lastpass", lp, None, true, &HashSet::new()).unwrap();
-        assert_eq!(b.total_parsed, 5);
+        assert_eq!(b.total_parsed, 6);
         assert_eq!(b.items[0].category, "login");
         assert_eq!(b.items[0].source_folder.as_deref(), Some("Dev"));
         assert_eq!(b.items[1].category, "card");
@@ -1116,7 +1482,11 @@ mod tests {
         assert_eq!(b.items[2].category, "ssh");
         assert_eq!(b.items[3].category, "database");
         assert_eq!(b.items[3].fields.get("db_type").map(String::as_str), Some("postgresql"));
-        assert_eq!(b.items[4].category, "note");
+        assert_eq!(b.items[4].category, "identity");
+        assert_eq!(b.items[4].username, "mario@lp.it");
+        assert_eq!(b.items[4].fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(b.items[4].fields.get("city").map(String::as_str), Some("Roma"));
+        assert_eq!(b.items[5].category, "note");
 
         // KeePassXC & KeePass 2.x
         let kp = "Group,Title,Username,Password,URL,Notes,TOTP\nRoot/Servers/Prod,SSH GW,ubuntu,pw,ssh://gw,jump,123456";
@@ -1150,26 +1520,49 @@ mod tests {
         assert_eq!(b.items[0].source_folder.as_deref(), Some("Cloud"));
 
         // Proton Pass
-        let pp = "name,url,username,email,password,note,totp,vault,type\nProton,https://proton.me,u,u@pm.me,pw,n,totp,Personal,login";
+        let pp = "name,url,username,email,password,note,totp,vault,type\n\
+            Proton,https://proton.me,u,u@pm.me,pw,n,totp,Personal,login\n\
+            Mario ID,,mrossi,mario@pm.me,,Doc,,Personal,identity";
         let b = evaluate_import("protonpass", pp, None, true, &HashSet::new()).unwrap();
         assert_eq!(b.items[0].source_folder.as_deref(), Some("Personal"));
         assert!(b.items[0].notes.contains("Email: u@pm.me"));
+        assert_eq!(b.items[1].category, "identity");
+        assert_eq!(b.items[1].username, "mario@pm.me");
+        assert_eq!(b.items[1].fields.get("identity_username").map(String::as_str), Some("mrossi"));
 
         // NordPass
-        let np = "name,url,username,password,note,folder,cardholdername,cardnumber,cvc,expirydate\n\
-            Site,https://s.it,u,pw,n,Work,,,,\n\
-            Visa,,, ,n,Finance,Mario Rossi,4111000011112222,321,10/29";
+        let np = "name,url,username,password,note,folder,cardholdername,cardnumber,cvc,expirydate,type,full_name,email,phone_number,city,country\n\
+            Site,https://s.it,u,pw,n,Work,,,,,,,,,,\n\
+            Visa,,, ,n,Finance,Mario Rossi,4111000011112222,321,10/29,credit_card,,,,,\n\
+            My Info,,, ,n,Personal,,,,,personal_info,Mario Rossi,mario@np.it,+39555,Torino,Italia";
         let b = evaluate_import("nordpass", np, None, true, &HashSet::new()).unwrap();
         assert_eq!(b.items[0].category, "login");
         assert_eq!(b.items[1].category, "card");
         assert_eq!(b.items[1].password, "4111000011112222");
+        assert_eq!(b.items[2].category, "identity");
+        assert_eq!(b.items[2].username, "mario@np.it");
+        assert_eq!(b.items[2].fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(b.items[2].fields.get("last_name").map(String::as_str), Some("Rossi"));
+        assert_eq!(b.items[2].fields.get("city").map(String::as_str), Some("Torino"));
 
-        // Generic CSV (Italian)
-        let generic = "titolo,utente,segreto,sito,note,categoria,preferito,cartella\nPannello,admin,pw123,https://x.it,nota,login,si,Infra";
+        // Generic CSV (Italian + Identity & Passkey)
+        let generic = "titolo,utente,email,segreto,sito,note,categoria,preferito,cartella,first_name,cognome,rp_id,credential_id,discoverable\n\
+            Pannello,admin,,pw123,https://x.it,nota,login,si,Infra,,,,,\n\
+            Mario,mrossi,mario@it.it,, ,nota,identità,no,Personale,Mario,Rossi,,,\n\
+            GitHub Passkey,octocat,,,https://github.com,,passkey,si,Sicurezza,,,github.com,cid-1,si";
         let b = evaluate_import("generic_csv", generic, None, true, &HashSet::new()).unwrap();
         assert_eq!(b.items[0].title, "Pannello");
         assert!(b.items[0].favorite);
         assert_eq!(b.items[0].source_folder.as_deref(), Some("Infra"));
+        assert_eq!(b.items[1].category, "identity");
+        assert_eq!(b.items[1].username, "mario@it.it");
+        assert_eq!(b.items[1].fields.get("identity_username").map(String::as_str), Some("mrossi"));
+        assert_eq!(b.items[1].fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(b.items[1].fields.get("last_name").map(String::as_str), Some("Rossi"));
+        assert_eq!(b.items[2].category, "passkey");
+        assert_eq!(b.items[2].fields.get("rp_id").map(String::as_str), Some("github.com"));
+        assert_eq!(b.items[2].fields.get("credential_id").map(String::as_str), Some("cid-1"));
+        assert_eq!(b.items[2].fields.get("discoverable").map(String::as_str), Some("true"));
     }
 
     #[test]

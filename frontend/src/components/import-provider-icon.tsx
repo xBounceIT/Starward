@@ -20,6 +20,7 @@ const PROVIDER_LOGO_MAP: Record<string, string> = {
   bitwarden: bitwardenLogo,
   bitwarden_json: bitwardenLogo,
   bitwarden_csv: bitwardenLogo,
+  vaultwarden: bitwardenLogo,
   '1password': onePasswordLogo,
   lastpass: lastPassLogo,
   keepass: keePassLogo,

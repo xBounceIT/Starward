@@ -187,6 +187,34 @@ export function CredentialDialog({
 
   const validateForCategory = (): boolean => {
     switch (categoryConfig.value) {
+      case 'passkey':
+        if (
+          !extraValues.rp_id?.trim() &&
+          !extraValues.credential_id?.trim() &&
+          !extraValues.private_key?.trim()
+        ) {
+          toast.error(
+            'Inserisci almeno il Relying Party ID (RP ID), il Credential ID o la chiave privata della passkey',
+          )
+          return false
+        }
+        return true
+      case 'identity': {
+        const hasAnyExtra = categoryConfig.fields.some(
+          (f) => f.storage === 'extra' && Boolean(extraValues[f.key]?.trim()),
+        )
+        if (
+          !coreValues.username.trim() &&
+          !coreValues.notes.trim() &&
+          !hasAnyExtra
+        ) {
+          toast.error(
+            "Inserisci almeno un dato dell'identità (es. nome, email, telefono, indirizzo o documento)",
+          )
+          return false
+        }
+        return true
+      }
       case 'note':
         if (!coreValues.notes.trim()) {
           toast.error('Inserisci il contenuto della nota sicura')
@@ -657,7 +685,11 @@ export function CredentialDialog({
               placeholder={field.placeholder}
               value={value}
               onChange={(e) => setFieldValue(field, e.target.value)}
-              className={cn('min-h-24', field.rowsClass)}
+              className={cn(
+                'min-h-24',
+                field.mono && 'font-mono text-xs',
+                field.rowsClass,
+              )}
               required={field.required}
             />
           )
@@ -778,7 +810,7 @@ export function CredentialDialog({
               <Label htmlFor="cred-title">Titolo</Label>
               <Input
                 id="cred-title"
-                placeholder="es. AWS Console, Postgres Prod, Carta aziendale..."
+                placeholder="es. AWS Console, GitHub Passkey, Identità Mario Rossi..."
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus

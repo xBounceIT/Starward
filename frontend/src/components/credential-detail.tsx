@@ -320,7 +320,7 @@ export function CredentialDetail({
               <p
                 className={cn(
                   'max-h-48 overflow-y-auto whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-relaxed text-foreground/90 select-all',
-                  field.mono && 'font-mono text-xs',
+                  field.mono && 'font-mono text-xs break-all',
                 )}
               >
                 {displayValue}

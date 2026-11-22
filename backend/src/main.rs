@@ -2066,7 +2066,45 @@ mod tests {
                         "username": "admin@acme.io",
                         "password": "TopSecretImportPassword!",
                         "uris": [{ "uri": "https://console.aws.amazon.com" }],
-                        "totp": "otpauth://totp/AWS"
+                        "totp": "otpauth://totp/AWS",
+                        "fido2Credentials": [
+                            {
+                                "credentialId": "aws-fido2-cred-id",
+                                "keyType": "public-key",
+                                "keyAlgorithm": "ECDSA",
+                                "keyCurve": "P-256",
+                                "keyValue": "MIGH-AWS-PASSKEY-PRIVATE-KEY",
+                                "rpId": "signin.aws.amazon.com",
+                                "rpName": "AWS",
+                                "userName": "admin@acme.io",
+                                "counter": "0",
+                                "discoverable": "true"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "type": 1,
+                    "folderId": "f1",
+                    "name": "GitHub Passkey Only",
+                    "login": {
+                        "uris": [{ "uri": "https://github.com" }],
+                        "username": "octocat",
+                        "password": "",
+                        "fido2Credentials": [
+                            {
+                                "credentialId": "gh-fido2-cred-id",
+                                "keyType": "public-key",
+                                "keyAlgorithm": "ECDSA",
+                                "keyCurve": "P-256",
+                                "keyValue": "MIGH-GH-PASSKEY-PRIVATE-KEY",
+                                "rpId": "github.com",
+                                "rpName": "GitHub",
+                                "userName": "octocat",
+                                "counter": 2,
+                                "discoverable": true
+                            }
+                        ]
                     }
                 },
                 {
@@ -2092,7 +2130,9 @@ mod tests {
                     "identity": {
                         "firstName": "Mario",
                         "lastName": "Rossi",
-                        "email": "mario@acme.io"
+                        "email": "mario@acme.io",
+                        "ssn": "RSSMRA80A01F205X",
+                        "passportNumber": "YA9988776"
                     }
                 },
                 {
@@ -2165,10 +2205,15 @@ mod tests {
         assert!(!preview_text.contains("SECRET-NOTE-LINE-123"));
         assert!(!preview_text.contains("4111000099998888"));
         assert!(!preview_text.contains("BEGIN OPENSSH PRIVATE KEY"));
+        assert!(!preview_text.contains("MIGH-AWS-PASSKEY-PRIVATE-KEY"));
+        assert!(!preview_text.contains("MIGH-GH-PASSKEY-PRIVATE-KEY"));
+        assert!(!preview_text.contains("RSSMRA80A01F205X"));
+        assert!(!preview_text.contains("YA9988776"));
         let preview_json: Value = serde_json::from_str(&preview_text).unwrap();
-        assert_eq!(preview_json["total_parsed"], 5);
-        assert_eq!(preview_json["ready_count"], 4);
-        assert_eq!(preview_json["warning_count"], 1);
+        // Hybrid AWS (login + passkey) + GitHub passkey-only + Note + Card + Identity + SSH = 7
+        assert_eq!(preview_json["total_parsed"], 7);
+        assert_eq!(preview_json["ready_count"], 7);
+        assert_eq!(preview_json["warning_count"], 0);
 
         // 5. Commit import succeeds and encrypts at rest
         let res = app
@@ -2188,19 +2233,24 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::CREATED);
         let import_res = read_json(res).await;
-        assert_eq!(import_res["imported_count"], 5);
+        assert_eq!(import_res["imported_count"], 7);
 
         // Verify encrypted at rest and decrypted via GET /api/credentials
-        let raw_ciphers: Vec<(String,)> =
-            sqlx::query_as("SELECT password_ciphertext FROM credentials WHERE vault_id = $1")
-                .bind(&vault_id)
-                .fetch_all(&db)
-                .await
-                .unwrap();
-        assert_eq!(raw_ciphers.len(), 5);
-        for (cipher,) in &raw_ciphers {
+        let raw_ciphers: Vec<(String, String)> = sqlx::query_as(
+            "SELECT password_ciphertext, extra_fields_ciphertext FROM credentials WHERE vault_id = $1",
+        )
+        .bind(&vault_id)
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert_eq!(raw_ciphers.len(), 7);
+        for (cipher, extra_cipher) in &raw_ciphers {
             assert!(!cipher.contains("TopSecretImportPassword!"));
             assert!(!cipher.contains("4111000099998888"));
+            assert!(!extra_cipher.contains("MIGH-AWS-PASSKEY-PRIVATE-KEY"));
+            assert!(!extra_cipher.contains("MIGH-GH-PASSKEY-PRIVATE-KEY"));
+            assert!(!extra_cipher.contains("RSSMRA80A01F205X"));
+            assert!(!extra_cipher.contains("YA9988776"));
         }
 
         let res = app
@@ -2217,9 +2267,48 @@ mod tests {
             .unwrap();
         assert_eq!(res.status(), StatusCode::OK);
         let creds = read_json(res).await;
-        assert_eq!(creds.as_array().unwrap().len(), 5);
+        assert_eq!(creds.as_array().unwrap().len(), 7);
 
-        // 6. Re-import with duplicate_strategy = "skip" skips all 5
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials?vault_id={vault_id}&category=passkey"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let passkey_creds = read_json(res).await;
+        assert_eq!(passkey_creds.as_array().unwrap().len(), 2);
+        assert!(passkey_creds
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["fields"]["private_key"] == "MIGH-GH-PASSKEY-PRIVATE-KEY"));
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri(format!("/api/credentials?vault_id={vault_id}&category=identity"))
+                    .header("Authorization", format!("Bearer {owner_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let identity_creds = read_json(res).await;
+        assert_eq!(identity_creds.as_array().unwrap().len(), 1);
+        assert_eq!(identity_creds[0]["fields"]["ssn"], "RSSMRA80A01F205X");
+        assert_eq!(identity_creds[0]["fields"]["passport_number"], "YA9988776");
+
+        // 6. Re-import with duplicate_strategy = "skip" skips all 7
         let res = app
             .clone()
             .oneshot(
@@ -2243,7 +2332,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::CREATED);
         let reimport_res = read_json(res).await;
         assert_eq!(reimport_res["imported_count"], 0);
-        assert_eq!(reimport_res["duplicate_skipped_count"], 5);
+        assert_eq!(reimport_res["duplicate_skipped_count"], 7);
 
         // 7. Audit log contains vault.imported
         let res = app
