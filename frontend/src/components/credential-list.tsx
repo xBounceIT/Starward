@@ -97,8 +97,9 @@ interface CredentialListProps {
   onToggleFavorite: (cred: Credential) => void
   onEditCredential: (cred: Credential) => void
   onDeleteCredential: (cred: Credential) => void
+  hasWritableVault: boolean
   onNewCredential: () => void
-  onImportVault: (vault: Vault) => void
+  onImportVault: (vault: Vault | null) => void
   onShareVault: (vault: Vault) => void
   onEditVault: (vault: Vault) => void
   onDeleteVault: (vault: Vault) => void
@@ -122,6 +123,7 @@ export function CredentialList({
   onToggleFavorite,
   onEditCredential,
   onDeleteCredential,
+  hasWritableVault,
   onNewCredential,
   onImportVault,
   onShareVault,
@@ -199,6 +201,8 @@ export function CredentialList({
     !activeVault ||
     activeVault.role === 'owner' ||
     activeVault.role === 'editor'
+
+  const canImport = activeVault ? canCreateInCurrent : hasWritableVault
 
   const currentSortLabel =
     SORT_OPTIONS.find((s) => s.value === sortBy)?.label ?? 'Ultima modifica'
@@ -299,8 +303,8 @@ export function CredentialList({
       {/* Top Workspace Header & Controls */}
       <div className="space-y-4 px-5 pt-5 pb-3 sm:px-6">
         {/* Title & Vault Actions */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-[200px] flex-1">
             <div className="flex items-center gap-2.5">
               <SidebarTrigger className="-ml-1 hidden shrink-0 md:inline-flex lg:hidden" />
               {selection.type === 'all' ? (
@@ -346,9 +350,9 @@ export function CredentialList({
             </p>
           </div>
 
-          {activeVault && (
-            <div className="flex shrink-0 items-center gap-1.5">
-              {activeVault.is_shared && (
+          {(activeVault || canImport) && (
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+              {activeVault?.is_shared && (
                 <div className="mr-1 hidden items-center -space-x-1.5 sm:flex">
                   {activeVault.members.slice(0, 3).map((m) => (
                     <Avatar
@@ -362,7 +366,7 @@ export function CredentialList({
                   ))}
                 </div>
               )}
-              {canCreateInCurrent && (
+              {canImport && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -370,88 +374,92 @@ export function CredentialList({
                   onClick={() => onImportVault(activeVault)}
                 >
                   <Upload className="size-3.5" />
-                  Importa
+                  Importa da altri password manager
                 </Button>
               )}
 
-              <Button
-                variant={activeVault.is_shared ? 'secondary' : 'outline'}
-                size="sm"
-                className="h-8 gap-1.5 text-xs"
-                onClick={() => onShareVault(activeVault)}
-              >
-                {activeVault.is_shared ? (
-                  <Users className="size-3.5" />
-                ) : (
-                  <Share2 className="size-3.5" />
-                )}
-                {activeVault.role === 'owner'
-                  ? 'Condividi'
-                  : `Membri (${activeVault.member_count})`}
-              </Button>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" className="">
-                    <MoreVertical className="size-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  {canCreateInCurrent && (
-                    <>
-                      <DropdownMenuItem onClick={onNewCredential}>
-                        <Plus className="size-4" />
-                        Nuova credenziale
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => onImportVault(activeVault)}
-                      >
-                        <Upload className="size-4" />
-                        Importa credenziali
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {activeVault.role === 'owner' && (
-                    <DropdownMenuItem onClick={() => onEditVault(activeVault)}>
-                      <Pencil className="size-4" />
-                      Rinomina
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => onShareVault(activeVault)}>
-                    {activeVault.role === 'owner' ? (
-                      <>
-                        <Share2 className="size-4" />
-                        Condividi
-                      </>
+              {activeVault && (
+                <>
+                  <Button
+                    variant={activeVault.is_shared ? 'secondary' : 'outline'}
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs"
+                    onClick={() => onShareVault(activeVault)}
+                  >
+                    {activeVault.is_shared ? (
+                      <Users className="size-3.5" />
                     ) : (
-                      <>
-                        <Users className="size-4" />
-                        Membri ({activeVault.member_count})
-                      </>
+                      <Share2 className="size-3.5" />
                     )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onOpenAudit(activeVault)}>
-                    <History className="size-4" />
-                    Registro attività
-                  </DropdownMenuItem>
-                  {activeVault.role === 'owner' && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        disabled={activeVault.is_personal}
-                        onClick={() => {
-                          if (!activeVault.is_personal)
-                            onDeleteVault(activeVault)
-                        }}
-                      >
-                        <Trash2 className="size-4" />
-                        Cancella
+                    {activeVault.role === 'owner'
+                      ? 'Condividi'
+                      : `Membri (${activeVault.member_count})`}
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" className="">
+                        <MoreVertical className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      {canCreateInCurrent && (
+                        <>
+                          <DropdownMenuItem onClick={onNewCredential}>
+                            <Plus className="size-4" />
+                            Nuova credenziale
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => onImportVault(activeVault)}
+                          >
+                            <Upload className="size-4" />
+                            Importa credenziali
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                      {activeVault.role === 'owner' && (
+                        <DropdownMenuItem onClick={() => onEditVault(activeVault)}>
+                          <Pencil className="size-4" />
+                          Rinomina
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => onShareVault(activeVault)}>
+                        {activeVault.role === 'owner' ? (
+                          <>
+                            <Share2 className="size-4" />
+                            Condividi
+                          </>
+                        ) : (
+                          <>
+                            <Users className="size-4" />
+                            Membri ({activeVault.member_count})
+                          </>
+                        )}
                       </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      <DropdownMenuItem onClick={() => onOpenAudit(activeVault)}>
+                        <History className="size-4" />
+                        Registro attività
+                      </DropdownMenuItem>
+                      {activeVault.role === 'owner' && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={activeVault.is_personal}
+                            onClick={() => {
+                              if (!activeVault.is_personal)
+                                onDeleteVault(activeVault)
+                            }}
+                          >
+                            <Trash2 className="size-4" />
+                            Cancella
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -693,14 +701,14 @@ export function CredentialList({
                   <Plus className="size-4" />
                   Aggiungi credenziale
                 </Button>
-                {activeVault && (
+                {canImport && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => onImportVault(activeVault)}
                   >
                     <Upload className="size-4" />
-                    Importa da file
+                    Importa da altri password manager
                   </Button>
                 )}
               </div>

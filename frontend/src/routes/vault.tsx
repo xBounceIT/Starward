@@ -115,6 +115,7 @@ function VaultWorkspace() {
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<Group | null>(null)
   const [shareVaultTarget, setShareVaultTarget] = useState<Vault | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importVaultTarget, setImportVaultTarget] = useState<Vault | null>(null)
   const [auditVaultTarget, setAuditVaultTarget] = useState<Vault | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -215,6 +216,34 @@ function VaultWorkspace() {
       symbols: userSettings.password_generator_symbols,
     }
   }, [userSettings])
+
+  const defaultImportVault = useMemo(() => {
+    const writable = vaults.filter(
+      (v) => v.role === 'owner' || v.role === 'editor',
+    )
+    if (userSettings?.default_vault_id) {
+      const preferred = writable.find(
+        (v) => v.id === userSettings.default_vault_id,
+      )
+      if (preferred) return preferred
+    }
+    return writable.find((v) => v.is_personal) ?? writable[0] ?? null
+  }, [vaults, userSettings?.default_vault_id])
+
+  const handleOpenImport = useCallback(
+    (vault: Vault | null) => {
+      const target = vault ?? defaultImportVault
+      if (!target) {
+        toast.error(
+          'Nessuna cartella con permessi di scrittura disponibile per importare credenziali',
+        )
+        return
+      }
+      setImportVaultTarget(target)
+      setImportDialogOpen(true)
+    },
+    [defaultImportVault],
+  )
 
   const activeVault = useMemo(() => {
     if (selection.type !== 'vault') return null
@@ -427,7 +456,7 @@ function VaultWorkspace() {
           setEditingCredential(null)
           setCredDialogOpen(true)
         }}
-        onImportVault={(vault) => setImportVaultTarget(vault)}
+        onImportVault={(vault) => handleOpenImport(vault)}
         onNewVault={() => {
           setEditingVault(null)
           setVaultDefaultOwnerGroupId(null)
@@ -577,11 +606,12 @@ function VaultWorkspace() {
                   setCredDialogOpen(true)
                 }}
                 onDeleteCredential={(cred) => setPendingDeleteCred(cred)}
+                hasWritableVault={defaultImportVault !== null}
                 onNewCredential={() => {
                   setEditingCredential(null)
                   setCredDialogOpen(true)
                 }}
-                onImportVault={(vault) => setImportVaultTarget(vault)}
+                onImportVault={handleOpenImport}
                 onShareVault={(vault) => setShareVaultTarget(vault)}
                 onEditVault={(vault) => {
                   setEditingVault(vault)
@@ -727,8 +757,9 @@ function VaultWorkspace() {
       />
 
       <ImportVaultDialog
-        open={Boolean(importVaultTarget)}
+        open={importDialogOpen}
         onOpenChange={(open) => {
+          setImportDialogOpen(open)
           if (!open) setImportVaultTarget(null)
         }}
         vault={importVaultTarget}
