@@ -28,6 +28,7 @@ import {
   Plus,
   Search,
   Share2,
+  ShieldCheck,
   Star,
   Trash2,
   Upload,
@@ -63,7 +64,9 @@ import {
   getCategoryLabel,
   getCredentialListColumns,
   getCredentialQuickCopy,
+  hasCredentialTotp,
 } from '@/lib/credential-types'
+import { generateTotpFromRaw } from '@/lib/otp'
 import { cn, copyToClipboard } from '@/lib/utils'
 import {
   formatModifiedRelative,
@@ -197,6 +200,22 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
             Copia {quickCopy.secondary.label.toLowerCase()}
           </DropdownMenuItem>
         )}
+        {hasCredentialTotp(cred) && (
+          <DropdownMenuItem
+            onClick={(e) => {
+              e.stopPropagation()
+              const otp = generateTotpFromRaw(cred.fields.totp)
+              if (!otp) {
+                toast.error('Configurazione OTP non valida')
+                return
+              }
+              onCopyQuick(e, otp.code, 'Codice OTP')
+            }}
+          >
+            <ShieldCheck className="size-4" />
+            Copia codice OTP
+          </DropdownMenuItem>
+        )}
         {normalizedUrl && (
           <DropdownMenuItem asChild>
             <a href={normalizedUrl} target="_blank" rel="noreferrer">
@@ -207,9 +226,10 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
         )}
         {canWrite && (
           <>
-            {(quickCopy.primary || quickCopy.secondary || normalizedUrl) && (
-              <DropdownMenuSeparator />
-            )}
+            {(quickCopy.primary ||
+              quickCopy.secondary ||
+              normalizedUrl ||
+              hasCredentialTotp(cred)) && <DropdownMenuSeparator />}
             <DropdownMenuItem onClick={() => onEditCredential(cred)}>
               <Pencil className="size-4" />
               Modifica
@@ -289,9 +309,20 @@ const CredentialGridCard = memo(function CredentialGridCard({
             <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
               {cred.title}
             </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {getCategoryLabel(cred.category)}
-            </p>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+              <p className="truncate text-xs text-muted-foreground">
+                {getCategoryLabel(cred.category)}
+              </p>
+              {hasCredentialTotp(cred) && (
+                <Badge
+                  variant="secondary"
+                  className="h-4 shrink-0 gap-0.5 px-1.5 py-0 font-mono text-[9px] font-semibold tracking-wider uppercase sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+                >
+                  <ShieldCheck className="size-2.5" />
+                  OTP
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
 
@@ -399,9 +430,20 @@ const CredentialListRow = memo(function CredentialListRow({
         <p className="truncate text-sm font-semibold text-foreground transition-colors sync-security:group-hover:text-[#ff9c00]">
           {cred.title}
         </p>
-        <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {getCategoryLabel(cred.category)}
-        </p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+          <p className="truncate text-xs text-muted-foreground">
+            {getCategoryLabel(cred.category)}
+          </p>
+          {hasCredentialTotp(cred) && (
+            <Badge
+              variant="secondary"
+              className="h-4 shrink-0 gap-0.5 px-1.5 py-0 font-mono text-[9px] font-semibold tracking-wider uppercase sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
+            >
+              <ShieldCheck className="size-2.5" />
+              OTP
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Identifier & URL/Host Column */}

@@ -26,6 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { OtpCodeCard } from '@/components/otp-code-card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { CredentialBrandIcon } from '@/components/vault-icon'
 import type { Credential } from '@/lib/api'
@@ -38,6 +39,7 @@ import {
   parseCredentialTags,
   type CredentialFieldDef,
 } from '@/lib/credential-types'
+import { generateTotpFromRaw } from '@/lib/otp'
 import { cn, copyToClipboard } from '@/lib/utils'
 import {
   formatAccessTimestamp,
@@ -78,6 +80,7 @@ function getDetailFieldLabel(category: string, field: CredentialFieldDef): strin
     if (field.key === 'url') return 'URL'
     if (field.key === 'notes') return 'Note'
   }
+  if (field.key === 'totp') return 'Codice OTP (2FA)'
   if (field.key === 'notes') return 'Note'
   return field.label
 }
@@ -254,12 +257,18 @@ export function CredentialDetail({
         ? getCoreValue(credential, field.key)
         : (extraFields[field.key] ?? '')
 
+    const label = getDetailFieldLabel(credential.category, field)
+
+    if (field.type === 'totp') {
+      if (!rawValue) return null
+      return <OtpCodeCard key={field.key} totpValue={rawValue} label={label} />
+    }
+
     const displayValue =
       field.type === 'select' && rawValue
         ? getSelectOptionLabel(field, rawValue)
         : rawValue
 
-    const label = getDetailFieldLabel(credential.category, field)
     const isRevealed = Boolean(revealedFields[field.key])
     const isMultiline =
       field.type === 'textarea' || field.type === 'secret-textarea'
@@ -489,6 +498,22 @@ export function CredentialDetail({
                   <Copy className="size-4" />
                   Copia titolo
                 </DropdownMenuItem>
+                {extraFields.totp?.trim() &&
+                  generateTotpFromRaw(extraFields.totp.trim()) && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        const freshOtp = generateTotpFromRaw(
+                          extraFields.totp!.trim(),
+                        )
+                        if (freshOtp) {
+                          void copyField('otp', freshOtp.code, 'Codice OTP')
+                        }
+                      }}
+                    >
+                      <ShieldCheck className="size-4" />
+                      Copia codice OTP
+                    </DropdownMenuItem>
+                  )}
                 {canWrite && (
                   <>
                     <DropdownMenuSeparator />
@@ -540,6 +565,10 @@ export function CredentialDetail({
           {/* Primary Category Fields */}
           {visibleMainFields.map(renderFieldBox)}
           {legacyCoreFallbacks.map(renderFieldBox)}
+          {!categoryConfig.fields.some((f) => f.key === 'totp') &&
+            extraFields.totp?.trim() && (
+              <OtpCodeCard totpValue={extraFields.totp.trim()} />
+            )}
 
           {/* Note Field */}
           {(credential.notes || categoryConfig.value === 'login' || categoryConfig.value === 'note') && (

@@ -159,6 +159,16 @@ export interface Credential {
   updated_at: string
 }
 
+export interface TotpCodeResponse {
+  credential_id: string
+  code: string
+  remaining_seconds: number
+  period: number
+  digits: number
+  algorithm: string
+  expires_at: string
+}
+
 export interface AuditLog {
   id: string
   vault_id: string
@@ -781,4 +791,7 @@ export const vaultApi = {
     request<void>(`/credentials/${credentialId}`, {
       method: 'DELETE',
     }),
+
+  getCredentialOtp: (credentialId: string) =>
+    request<TotpCodeResponse>(`/credentials/${credentialId}/otp`),
 }

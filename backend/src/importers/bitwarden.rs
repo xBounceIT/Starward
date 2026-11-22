@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::{
     error::{AppError, AppResult},
     importers::{
-        append_note_section, clean_password, csv_parser::CsvTable,
+        append_note_section, apply_imported_totp, clean_password, csv_parser::CsvTable,
         detect_provider_hint_from_headers, parse_bool_flag, parse_import_timestamp, RawImportItem,
     },
 };
@@ -407,10 +407,7 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                     }
 
                     if let Some(totp) = login.totp {
-                        let clean_totp = totp.trim();
-                        if !clean_totp.is_empty() {
-                            append_note_section(&mut notes, None, &format!("TOTP: {clean_totp}"));
-                        }
+                        apply_imported_totp(&totp, &mut fields, &mut notes);
                     }
                 }
                 "login".to_string()
@@ -668,9 +665,8 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             append_note_section(&mut notes, Some("Altri URL:"), &extra_urls);
         }
 
-        if !totp.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {totp}"));
-        }
+        let mut fields = BTreeMap::new();
+        apply_imported_totp(totp, &mut fields, &mut notes);
 
         if !custom_fields.is_empty() {
             append_note_section(&mut notes, Some("Campi personalizzati:"), custom_fields);
@@ -709,7 +705,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             url,
             category: category.to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite,
             source_folder,
             folder_tags,

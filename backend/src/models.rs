@@ -471,6 +471,17 @@ pub struct CredentialMetadataDto {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotpCodeDto {
+    pub credential_id: String,
+    pub code: String,
+    pub remaining_seconds: u64,
+    pub period: u64,
+    pub digits: u32,
+    pub algorithm: String,
+    pub expires_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct CreateCredentialRequest {
     pub vault_id: String,

@@ -569,7 +569,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             fallback_lines.push(format!("URL: {url}"));
         }
         for (k, v) in &fields {
-            if k != "tags" {
+            if k != "tags" && k != "totp" {
                 fallback_lines.push(format!("{k}: {v}"));
             }
         }
@@ -660,6 +660,22 @@ pub(crate) fn parse_import_timestamp(raw: &str) -> Option<DateTime<Utc>> {
     }
 
     Some(parsed)
+}
+
+pub(crate) fn apply_imported_totp(
+    raw_totp: &str,
+    fields: &mut BTreeMap<String, String>,
+    notes: &mut String,
+) {
+    let clean = raw_totp.trim();
+    if clean.is_empty() {
+        return;
+    }
+    if let Ok(normalized) = crate::otp::normalize_totp_storage_value(clean) {
+        fields.insert("totp".to_string(), normalized);
+    } else {
+        append_note_section(notes, None, &format!("TOTP: {clean}"));
+    }
 }
 
 pub(crate) fn clean_password(raw: &str) -> String {
@@ -991,10 +1007,89 @@ mod tests {
         assert_eq!(batch.total_parsed, 2);
         assert_eq!(batch.items[0].url, "https://a.it");
         assert!(batch.items[0].notes.contains("https://b.it"));
-        assert!(batch.items[0].notes.contains("TOTP: JBSWY3DPEHPK3PXP"));
+        assert_eq!(
+            batch.items[0].fields.get("totp").map(String::as_str),
+            Some("JBSWY3DPEHPK3PXP")
+        );
+        assert!(!batch.items[0].notes.contains("TOTP:"));
         assert!(batch.items[0].notes.contains("PIN: 4242"));
         assert_eq!(batch.items[0].source_folder.as_deref(), Some("Work"));
         assert_eq!(batch.items[1].category, "note");
+    }
+
+    #[test]
+    fn importers_store_valid_totp_in_fields_and_fallback_invalid_to_notes() {
+        let bw_json = r#"{
+            "encrypted": false,
+            "items": [
+                {
+                    "type": 1,
+                    "name": "GitHub Valid Base32",
+                    "login": {
+                        "username": "alice",
+                        "password": "pw",
+                        "totp": " jbsw-y3dp ehpk 3pxp "
+                    }
+                },
+                {
+                    "type": 1,
+                    "name": "AWS Valid URI",
+                    "login": {
+                        "username": "bob",
+                        "password": "pw",
+                        "totp": "otpauth://totp/AWS:bob?secret=JBSWY3DPEHPK3PXP&algorithm=SHA256&digits=8&period=60"
+                    }
+                },
+                {
+                    "type": 1,
+                    "name": "Invalid Placeholder",
+                    "login": {
+                        "username": "carol",
+                        "password": "pw",
+                        "totp": "hardware-key"
+                    }
+                }
+            ]
+        }"#;
+        let batch = evaluate_import("bitwarden", bw_json, None, true, &HashSet::new()).unwrap();
+        assert_eq!(
+            batch.items[0].fields.get("totp").map(String::as_str),
+            Some("JBSWY3DPEHPK3PXP")
+        );
+        assert_eq!(
+            batch.items[1].fields.get("totp").map(String::as_str),
+            Some("otpauth://totp/AWS:bob?secret=JBSWY3DPEHPK3PXP&algorithm=SHA256&digits=8&period=60")
+        );
+        assert!(batch.items[2].fields.get("totp").is_none());
+        assert!(batch.items[2].notes.contains("TOTP: hardware-key"));
+
+        let op = "Title,URL,Username,Password,OTPAuth\nStripe,https://stripe.com,ops,pw,otpauth://totp/Stripe?secret=JBSWY3DPEHPK3PXP";
+        let op_batch = evaluate_import("1password", op, None, true, &HashSet::new()).unwrap();
+        assert_eq!(
+            op_batch.items[0].fields.get("totp").map(String::as_str),
+            Some("otpauth://totp/Stripe?secret=JBSWY3DPEHPK3PXP")
+        );
+
+        let sf = "Title,URL,Username,Password,Notes,OTPAuth\nApple,https://apple.com,a@b.c,pw,,jbswy3dpehpk3pxp";
+        let sf_batch = evaluate_import("safari", sf, None, true, &HashSet::new()).unwrap();
+        assert_eq!(
+            sf_batch.items[0].fields.get("totp").map(String::as_str),
+            Some("JBSWY3DPEHPK3PXP")
+        );
+
+        let pp = "name,url,username,email,password,note,totp,vault,type\nProton,https://proton.me,u,u@pm.me,pw,,JBSWY3DPEHPK3PXP,Personal,login";
+        let pp_batch = evaluate_import("protonpass", pp, None, true, &HashSet::new()).unwrap();
+        assert_eq!(
+            pp_batch.items[0].fields.get("totp").map(String::as_str),
+            Some("JBSWY3DPEHPK3PXP")
+        );
+
+        let generic = "title,username,password,url,totp\nGrafana,admin,pw,https://grafana.local,JBSWY3DPEHPK3PXP";
+        let gen_batch = evaluate_import("generic_csv", generic, None, true, &HashSet::new()).unwrap();
+        assert_eq!(
+            gen_batch.items[0].fields.get("totp").map(String::as_str),
+            Some("JBSWY3DPEHPK3PXP")
+        );
     }
 
     #[test]

@@ -15,7 +15,8 @@ use crate::{
     crypto::VaultCrypto,
     error::{AppError, AppResult},
     models::{
-        CreateCredentialRequest, CredentialDto, CredentialMetadataDto, UpdateCredentialRequest,
+        CreateCredentialRequest, CredentialDto, CredentialMetadataDto, TotpCodeDto,
+        UpdateCredentialRequest,
     },
     routes::{record_audit, require_vault_role},
     AppState,
@@ -599,6 +600,47 @@ pub(crate) async fn get_credential_for_user(
     Ok(dto)
 }
 
+pub(crate) async fn get_credential_otp_for_user(
+    state: &AppState,
+    user: &AuthenticatedUser,
+    credential_id: &str,
+    audit_suffix: Option<&str>,
+) -> AppResult<TotpCodeDto> {
+    let dto = fetch_credential_dto(state, credential_id, user).await?;
+    let raw_totp = dto
+        .fields
+        .get("totp")
+        .map(String::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            AppError::NotFound("Nessun codice OTP configurato per questa credenziale".to_string())
+        })?;
+
+    let config = crate::otp::parse_totp_config(raw_totp).map_err(AppError::BadRequest)?;
+    let otp = crate::otp::generate_totp_now(&dto.id, &config);
+
+    let details = append_audit_suffix(
+        format!(
+            "Codice OTP generato per la credenziale '{}' nella cartella '{}'",
+            dto.title, dto.vault_name
+        ),
+        audit_suffix,
+    );
+
+    record_audit(
+        &state.db,
+        &dto.vault_id,
+        Some(&dto.id),
+        user,
+        "credential.accessed",
+        &details,
+    )
+    .await?;
+
+    Ok(otp)
+}
+
 pub async fn get_credential(
     State(state): State<AppState>,
     user: AuthenticatedUser,
@@ -606,6 +648,15 @@ pub async fn get_credential(
 ) -> AppResult<Json<CredentialDto>> {
     let dto = get_credential_for_user(&state, &user, &credential_id, None).await?;
     Ok(Json(dto))
+}
+
+pub async fn get_credential_otp(
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(credential_id): Path<String>,
+) -> AppResult<impl axum::response::IntoResponse> {
+    let dto = get_credential_otp_for_user(&state, &user, &credential_id, None).await?;
+    Ok(([(axum::http::header::CACHE_CONTROL, "no-store")], Json(dto)))
 }
 
 pub(crate) async fn create_credential_for_user(
@@ -624,7 +675,8 @@ pub(crate) async fn create_credential_for_user(
     }
 
     let category = normalize_category(&payload.category);
-    let fields = clean_extra_fields(&payload.fields);
+    let mut fields = clean_extra_fields(&payload.fields);
+    normalize_and_validate_totp_field(&mut fields)?;
     validate_credential_fields(&category, &payload.password, &payload.notes, &fields)?;
 
     let enc_password = state.crypto.encrypt(&payload.password)?;
@@ -750,11 +802,14 @@ pub(crate) async fn update_credential_for_user(
         .as_deref()
         .map(normalize_category)
         .unwrap_or_else(|| existing.category.clone());
-    let fields = payload
-        .fields
-        .as_ref()
-        .map(clean_extra_fields)
-        .unwrap_or_else(|| existing.fields.clone());
+    let fields = match payload.fields.as_ref() {
+        Some(raw_fields) => {
+            let mut cleaned = clean_extra_fields(raw_fields);
+            normalize_and_validate_totp_field(&mut cleaned)?;
+            cleaned
+        }
+        None => existing.fields.clone(),
+    };
     let favorite = payload.favorite.unwrap_or(existing.favorite);
 
     validate_credential_fields(&category, password, notes, &fields)?;
@@ -889,6 +944,17 @@ pub async fn delete_credential(
 ) -> AppResult<StatusCode> {
     delete_credential_for_user(&state, &user, &credential_id, None).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub(crate) fn normalize_and_validate_totp_field(
+    fields: &mut BTreeMap<String, String>,
+) -> AppResult<()> {
+    if let Some(raw_totp) = fields.get("totp").cloned() {
+        let normalized = crate::otp::normalize_totp_storage_value(&raw_totp)
+            .map_err(AppError::BadRequest)?;
+        fields.insert("totp".to_string(), normalized);
+    }
+    Ok(())
 }
 
 pub(crate) fn clean_extra_fields(fields: &BTreeMap<String, String>) -> BTreeMap<String, String> {
@@ -1067,5 +1133,33 @@ mod tests {
         let decrypted = crypto.decrypt(&cipher, &nonce).unwrap();
         let parsed: BTreeMap<String, String> = serde_json::from_str(&decrypted).unwrap();
         assert_eq!(parsed, fields);
+    }
+
+    #[test]
+    fn normalize_and_validate_totp_field_validates_and_normalizes() {
+        let mut base32_fields = BTreeMap::new();
+        base32_fields.insert("totp".to_string(), " jbsw-y3dp ehpk 3pxp ".to_string());
+        normalize_and_validate_totp_field(&mut base32_fields).unwrap();
+        assert_eq!(
+            base32_fields.get("totp").map(String::as_str),
+            Some("JBSWY3DPEHPK3PXP")
+        );
+
+        let mut uri_fields = BTreeMap::new();
+        let uri = "otpauth://totp/GitHub:alice?secret=JBSWY3DPEHPK3PXP&algorithm=SHA256&digits=8&period=60";
+        uri_fields.insert("totp".to_string(), format!("  {uri}  "));
+        normalize_and_validate_totp_field(&mut uri_fields).unwrap();
+        assert_eq!(uri_fields.get("totp").map(String::as_str), Some(uri));
+
+        let mut bad_base32 = BTreeMap::new();
+        bad_base32.insert("totp".to_string(), "not-valid-base32!".to_string());
+        assert!(normalize_and_validate_totp_field(&mut bad_base32).is_err());
+
+        let mut hotp_fields = BTreeMap::new();
+        hotp_fields.insert(
+            "totp".to_string(),
+            "otpauth://hotp/Test?secret=JBSWY3DPEHPK3PXP&counter=1".to_string(),
+        );
+        assert!(normalize_and_validate_totp_field(&mut hotp_fields).is_err());
     }
 }

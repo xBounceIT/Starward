@@ -40,6 +40,7 @@ export interface CredentialFieldDef {
     | 'url'
     | 'select'
     | 'date'
+    | 'totp'
   options?: CredentialFieldOption[]
   required?: boolean
   mono?: boolean
@@ -102,6 +103,17 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
         secret: true,
         showGenerator: true,
         showStrength: true,
+        colSpan: 2,
+      },
+      {
+        key: 'totp',
+        storage: 'extra',
+        label: 'Codice OTP (2FA / TOTP)',
+        placeholder:
+          'Chiave Base32 (es. JBSWY3DPEHPK3PXP) o URI otpauth://totp/...',
+        type: 'totp',
+        mono: true,
+        secret: true,
         colSpan: 2,
       },
       {
@@ -756,6 +768,10 @@ export function serializeCredentialTags(tags: string[]): string {
   return unique.join(', ')
 }
 
+export function hasCredentialTotp(cred: Pick<Credential, 'fields'>): boolean {
+  return Boolean(cred.fields?.totp?.trim())
+}
+
 export function getSearchableMetadata(cred: Credential): string {
   const fields = cred.fields ?? {}
   return [
@@ -766,6 +782,7 @@ export function getSearchableMetadata(cred: Credential): string {
     fields.brand,
     fields.product,
     fields.tags,
+    hasCredentialTotp(cred) ? 'otp totp 2fa' : '',
   ]
     .filter(Boolean)
     .join(' ')

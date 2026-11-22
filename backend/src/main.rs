@@ -4,6 +4,7 @@ mod crypto;
 mod error;
 mod importers;
 mod models;
+mod otp;
 mod routes;
 
 use std::net::SocketAddr;
@@ -248,6 +249,10 @@ pub fn build_app(state: AppState) -> Router {
             get(routes::credentials::get_credential)
                 .patch(routes::credentials::update_credential)
                 .delete(routes::credentials::delete_credential),
+        )
+        .route(
+            "/api/credentials/{credential_id}/otp",
+            get(routes::credentials::get_credential_otp),
         )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
@@ -2749,21 +2754,21 @@ mod tests {
             json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
         )
         .await;
-        assert_eq!(ro_tools["result"]["tools"].as_array().unwrap().len(), 4);
+        assert_eq!(ro_tools["result"]["tools"].as_array().unwrap().len(), 5);
 
         let scoped_tools = mcp_call(
             scoped_rw_secret.clone(),
             json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/list" }),
         )
         .await;
-        assert_eq!(scoped_tools["result"]["tools"].as_array().unwrap().len(), 7);
+        assert_eq!(scoped_tools["result"]["tools"].as_array().unwrap().len(), 8);
 
         let bob_tools = mcp_call(
             bob_rw_secret.clone(),
             json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/list" }),
         )
         .await;
-        assert_eq!(bob_tools["result"]["tools"].as_array().unwrap().len(), 8);
+        assert_eq!(bob_tools["result"]["tools"].as_array().unwrap().len(), 9);
 
         // 6. whoami, list_vaults, metadata-only list_credentials, on-demand get_credential
         let whoami_res = mcp_call(

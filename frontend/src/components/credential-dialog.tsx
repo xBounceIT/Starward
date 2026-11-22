@@ -1,6 +1,17 @@
 import { useEffect, useState } from 'react'
-import { Eye, EyeOff, Sparkles, Star } from 'lucide-react'
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Plus,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
+import { OtpCodeCard } from '@/components/otp-code-card'
 import { PasswordGenerator } from '@/components/password-generator'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,6 +45,11 @@ import {
   getCategoryConfig,
   type CredentialFieldDef,
 } from '@/lib/credential-types'
+import {
+  buildTotpStorageValue,
+  parseTotpConfig,
+  type OtpAlgorithm,
+} from '@/lib/otp'
 import {
   evaluatePasswordStrength,
   type PasswordOptions,
@@ -90,6 +106,9 @@ export function CredentialDialog({
     {},
   )
   const [genOpen, setGenOpen] = useState(false)
+  const [otpAdvancedOpen, setOtpAdvancedOpen] = useState(false)
+  const [showOptionalOtp, setShowOptionalOtp] = useState(false)
+  const [otpPeriodDraft, setOtpPeriodDraft] = useState('30')
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -106,6 +125,16 @@ export function CredentialDialog({
       })
       setExtraValues({ ...(editingCredential.fields ?? {}) })
       setFavorite(editingCredential.favorite)
+      setShowOptionalOtp(Boolean(editingCredential.fields?.totp?.trim()))
+      const existingTotp = editingCredential.fields?.totp?.trim()
+      if (existingTotp) {
+        const parsedExisting = parseTotpConfig(existingTotp)
+        setOtpPeriodDraft(
+          parsedExisting.ok ? String(parsedExisting.config.period) : '30',
+        )
+      } else {
+        setOtpPeriodDraft('30')
+      }
     } else {
       const preferred =
         writableVaults.find((v) => v.id === defaultVaultId)?.id ??
@@ -117,12 +146,18 @@ export function CredentialDialog({
       setCoreValues(EMPTY_CORE_VALUES)
       setExtraValues({})
       setFavorite(false)
+      setShowOptionalOtp(false)
+      setOtpPeriodDraft('30')
     }
     setRevealedFields({})
     setGenOpen(false)
+    setOtpAdvancedOpen(false)
   }, [open, editingCredential, defaultVaultId])
 
   const categoryConfig = getCategoryConfig(category)
+  const hasCategoryTotpField = categoryConfig.fields.some(
+    (f) => f.type === 'totp',
+  )
   const strength = evaluatePasswordStrength(coreValues.password)
 
   const getFieldValue = (field: CredentialFieldDef): string => {
@@ -213,13 +248,38 @@ export function CredentialDialog({
 
     const payloadFields: Record<string, string> = {}
     for (const field of categoryConfig.fields) {
-      if (field.storage === 'extra') {
+      if (field.storage === 'extra' && field.type !== 'totp') {
         const val = extraValues[field.key]?.trim()
         if (val) {
           payloadFields[field.key] = val
         }
       }
     }
+
+    const rawTotp = extraValues.totp?.trim() ?? ''
+    if (rawTotp) {
+      if (otpAdvancedOpen) {
+        const periodRaw = otpPeriodDraft.trim()
+        if (!/^\d+$/.test(periodRaw)) {
+          toast.error('Il periodo OTP deve essere compreso tra 10 e 300 secondi')
+          return
+        }
+        const periodNum = Number.parseInt(periodRaw, 10)
+        if (periodNum < 10 || periodNum > 300) {
+          toast.error('Il periodo OTP deve essere compreso tra 10 e 300 secondi')
+          return
+        }
+      }
+      const parsedTotp = parseTotpConfig(rawTotp)
+      if (!parsedTotp.ok) {
+        toast.error(parsedTotp.error)
+        return
+      }
+      payloadFields.totp = rawTotp.toLowerCase().startsWith('otpauth://')
+        ? rawTotp
+        : parsedTotp.config.secretBase32
+    }
+
     if (extraValues.tags?.trim()) {
       payloadFields.tags = extraValues.tags.trim()
     }
@@ -262,7 +322,228 @@ export function CredentialDialog({
     }
   }
 
+  const renderTotpEditor = (options?: { allowCollapse?: boolean }) => {
+    const totpRaw = extraValues.totp ?? ''
+    const trimmedTotp = totpRaw.trim()
+    const parsedTotp = trimmedTotp ? parseTotpConfig(trimmedTotp) : null
+    const isRevealed = Boolean(revealedFields.totp)
+    const activeAlgorithm: OtpAlgorithm = parsedTotp?.ok
+      ? parsedTotp.config.algorithm
+      : 'SHA1'
+    const activeDigits = parsedTotp?.ok ? parsedTotp.config.digits : 6
+    const activePeriod = parsedTotp?.ok ? parsedTotp.config.period : 30
+
+    const applyAdvancedParams = (next: {
+      algorithm?: OtpAlgorithm
+      digits?: number
+      period?: number
+    }) => {
+      if (!parsedTotp?.ok) return
+      const nextAlg = next.algorithm ?? parsedTotp.config.algorithm
+      const nextDigits = next.digits ?? parsedTotp.config.digits
+      const nextPeriod = next.period ?? parsedTotp.config.period
+      const nextStorage = buildTotpStorageValue({
+        secretBase32: parsedTotp.config.secretBase32,
+        algorithm: nextAlg,
+        digits: nextDigits,
+        period: nextPeriod,
+        issuer: parsedTotp.config.issuer,
+        label: parsedTotp.config.label ?? (title.trim() || undefined),
+      })
+      setExtraValues((prev) => ({ ...prev, totp: nextStorage }))
+      setOtpPeriodDraft(String(nextPeriod))
+    }
+
+    return (
+      <div key="totp" className="space-y-2 sm:col-span-2">
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="cred-field-totp" className="flex items-center gap-1.5">
+            <ShieldCheck className="size-3.5 text-primary sync-security:text-[#ff9c00]" />
+            <span>Codice OTP (2FA / TOTP)</span>
+          </Label>
+
+          <div className="flex items-center gap-1">
+            {parsedTotp?.ok && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => setOtpAdvancedOpen((prev) => !prev)}
+              >
+                {otpAdvancedOpen ? (
+                  <ChevronUp className="size-3" />
+                ) : (
+                  <ChevronDown className="size-3" />
+                )}
+                Parametri avanzati
+              </Button>
+            )}
+            {options?.allowCollapse && !trimmedTotp && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => setShowOptionalOtp(false)}
+              >
+                Rimuovi
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="relative">
+          <Input
+            id="cred-field-totp"
+            type={isRevealed ? 'text' : 'password'}
+            value={totpRaw}
+            onChange={(e) => {
+              const nextVal = e.target.value
+              setExtraValues((prev) => ({ ...prev, totp: nextVal }))
+              const nextParsed = nextVal.trim()
+                ? parseTotpConfig(nextVal.trim())
+                : null
+              if (nextParsed?.ok) {
+                setOtpPeriodDraft(String(nextParsed.config.period))
+              }
+            }}
+            placeholder="Chiave Base32 (es. JBSWY3DPEHPK3PXP) o URI otpauth://totp/..."
+            className={totpRaw ? 'pr-16' : 'pr-10'}
+          />
+          <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-0.5">
+            {totpRaw && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                onClick={() => {
+                  setExtraValues((prev) => {
+                    const next = { ...prev }
+                    delete next.totp
+                    return next
+                  })
+                  setOtpAdvancedOpen(false)
+                  setOtpPeriodDraft('30')
+                }}
+                className="text-muted-foreground"
+                tabIndex={-1}
+                aria-label="Rimuovi segreto OTP"
+                title="Rimuovi segreto OTP"
+              >
+                <X className="size-3.5" />
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => toggleReveal('totp')}
+              className="text-muted-foreground"
+              tabIndex={-1}
+              aria-label={
+                isRevealed ? 'Nascondi segreto OTP' : 'Mostra segreto OTP'
+              }
+            >
+              {isRevealed ? (
+                <EyeOff className="size-3.5" />
+              ) : (
+                <Eye className="size-3.5" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {otpAdvancedOpen && parsedTotp?.ok && (
+          <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-muted/30 p-2.5">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">
+                Algoritmo
+              </Label>
+              <Select
+                value={activeAlgorithm}
+                onValueChange={(val) =>
+                  applyAdvancedParams({ algorithm: val as OtpAlgorithm })
+                }
+              >
+                <SelectTrigger className="h-8 w-full text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="SHA1">SHA1</SelectItem>
+                  <SelectItem value="SHA256">SHA256</SelectItem>
+                  <SelectItem value="SHA512">SHA512</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Cifre</Label>
+              <Select
+                value={String(activeDigits)}
+                onValueChange={(val) =>
+                  applyAdvancedParams({ digits: Number.parseInt(val, 10) })
+                }
+              >
+                <SelectTrigger className="h-8 w-full text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6 cifre</SelectItem>
+                  <SelectItem value="7">7 cifre</SelectItem>
+                  <SelectItem value="8">8 cifre</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label
+                htmlFor="cred-field-totp-period"
+                className="text-[11px] text-muted-foreground"
+              >
+                Periodo (s)
+              </Label>
+              <Input
+                id="cred-field-totp-period"
+                type="number"
+                min={10}
+                max={300}
+                value={otpPeriodDraft}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setOtpPeriodDraft(val)
+                  if (/^\d+$/.test(val)) {
+                    const num = Number.parseInt(val, 10)
+                    if (num >= 10 && num <= 300) {
+                      applyAdvancedParams({ period: num })
+                    }
+                  }
+                }}
+                onBlur={() => setOtpPeriodDraft(String(activePeriod))}
+                className="h-8 font-mono text-xs"
+              />
+            </div>
+          </div>
+        )}
+
+        {trimmedTotp &&
+          parsedTotp &&
+          (parsedTotp.ok ? (
+            <OtpCodeCard
+              totpValue={trimmedTotp}
+              label="Anteprima codice OTP"
+              compact
+              showSecretToggle={false}
+            />
+          ) : (
+            <p className="text-xs text-destructive">{parsedTotp.error}</p>
+          ))}
+      </div>
+    )
+  }
+
   const renderField = (field: CredentialFieldDef) => {
+    if (field.type === 'totp') {
+      return renderTotpEditor()
+    }
     const fieldId = `cred-field-${field.key}`
     const value = getFieldValue(field)
     const isRevealed = Boolean(revealedFields[field.key])
@@ -508,6 +789,24 @@ export function CredentialDialog({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {categoryConfig.fields.map(renderField)}
             </div>
+
+            {!hasCategoryTotpField &&
+              (showOptionalOtp || Boolean(extraValues.totp?.trim()) ? (
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-3">
+                  {renderTotpEditor({ allowCollapse: true })}
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start gap-2 border-dashed text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowOptionalOtp(true)}
+                >
+                  <Plus className="size-3.5" />
+                  Aggiungi codice OTP (2FA / TOTP)
+                </Button>
+              ))}
 
             <div className="space-y-1.5">
               <Label htmlFor="cred-tags">Tag (separati da virgola)</Label>

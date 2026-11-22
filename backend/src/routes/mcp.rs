@@ -16,7 +16,8 @@ use crate::{
     routes::{
         credentials::{
             create_credential_for_user, delete_credential_for_user, get_credential_for_user,
-            list_credential_metadata_for_user, update_credential_for_user, ListCredentialsQuery,
+            get_credential_otp_for_user, list_credential_metadata_for_user,
+            update_credential_for_user, ListCredentialsQuery,
         },
         vaults::{create_vault_for_user, list_vaults_for_user},
     },
@@ -258,13 +259,34 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
         }),
         json!({
             "name": "get_credential",
-            "description": "Recupera e decifra on-demand tutti i dettagli di una singola credenziale (inclusi password, note e campi extra), registrando l'accesso nel registro attività.",
+            "description": "Recupera e decifra on-demand tutti i dettagli di una singola credenziale (inclusi password, note, campi extra ed eventuale codice OTP corrente), registrando l'accesso nel registro attività.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "credential_id": {
                         "type": "string",
                         "description": "ID univoco della credenziale da leggere"
+                    }
+                },
+                "required": ["credential_id"],
+                "additionalProperties": false
+            },
+            "annotations": {
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+            }
+        }),
+        json!({
+            "name": "get_credential_otp",
+            "description": "Genera il codice OTP (TOTP RFC 6238) corrente per una credenziale che ha un segreto 2FA configurato, restituendo il codice e i secondi rimanenti alla scadenza.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "credential_id": {
+                        "type": "string",
+                        "description": "ID univoco della credenziale per cui generare il codice OTP"
                     }
                 },
                 "required": ["credential_id"],
@@ -301,7 +323,7 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                     "fields": {
                         "type": "object",
                         "additionalProperties": { "type": "string" },
-                        "description": "Campi extra opzionali (es. provider, environment, db_type, port, private_key)"
+                        "description": "Campi extra opzionali (es. totp [segreto Base32 o URI otpauth://totp/...], provider, environment, db_type, port, private_key)"
                     },
                     "favorite": { "type": "boolean", "default": false }
                 },
@@ -333,7 +355,7 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                     "fields": {
                         "type": "object",
                         "additionalProperties": { "type": "string" },
-                        "description": "Campi extra opzionali (se fornito, sostituisce i campi extra esistenti; ometti per lasciarli invariati)"
+                        "description": "Campi extra opzionali (es. totp; se fornito, sostituisce i campi extra esistenti; ometti per lasciarli invariati)"
                     },
                     "favorite": { "type": "boolean" }
                 },
@@ -602,7 +624,49 @@ async fn handle_tools_call(
             match get_credential_for_user(state, &mcp_user.user, &credential_id, Some(&audit_tag))
                 .await
             {
-                Ok(dto) => Ok(tool_success(json!(dto))),
+                Ok(dto) => {
+                    let mut val = json!(dto);
+                    if let Some(raw_totp) = dto
+                        .fields
+                        .get("totp")
+                        .map(String::as_str)
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                    {
+                        if let Ok(config) = crate::otp::parse_totp_config(raw_totp) {
+                            let otp = crate::otp::generate_totp_now(&dto.id, &config);
+                            if let Some(obj) = val.as_object_mut() {
+                                obj.insert(
+                                    "otp".to_string(),
+                                    json!({
+                                        "code": otp.code,
+                                        "remaining_seconds": otp.remaining_seconds,
+                                        "period": otp.period,
+                                        "digits": otp.digits,
+                                        "algorithm": otp.algorithm,
+                                        "expires_at": otp.expires_at,
+                                    }),
+                                );
+                            }
+                        }
+                    }
+                    Ok(tool_success(val))
+                }
+                Err(err) => Ok(tool_error(err)),
+            }
+        }
+
+        "get_credential_otp" => {
+            let credential_id = require_non_empty_string(args, "credential_id")?;
+            match get_credential_otp_for_user(
+                state,
+                &mcp_user.user,
+                &credential_id,
+                Some(&audit_tag),
+            )
+            .await
+            {
+                Ok(otp) => Ok(tool_success(json!(otp))),
                 Err(err) => Ok(tool_error(err)),
             }
         }
@@ -1170,7 +1234,13 @@ mod tests {
             .collect();
         assert_eq!(
             ro_names,
-            vec!["whoami", "list_vaults", "list_credentials", "get_credential"]
+            vec![
+                "whoami",
+                "list_vaults",
+                "list_credentials",
+                "get_credential",
+                "get_credential_otp"
+            ]
         );
 
         let scoped_rw = make_mcp_user("read_write", vec!["vault-1"]);
@@ -1186,6 +1256,7 @@ mod tests {
                 "list_vaults",
                 "list_credentials",
                 "get_credential",
+                "get_credential_otp",
                 "create_credential",
                 "update_credential",
                 "delete_credential"
@@ -1205,6 +1276,7 @@ mod tests {
                 "list_vaults",
                 "list_credentials",
                 "get_credential",
+                "get_credential_otp",
                 "create_credential",
                 "update_credential",
                 "delete_credential",

@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use crate::{
     error::{AppError, AppResult},
     importers::{
-        append_note_section, clean_password,
+        append_note_section, apply_imported_totp, clean_password,
         csv_parser::{CsvRow, CsvTable},
         detect_provider_hint_from_headers, host_from_url, parse_bool_flag,
         parse_import_timestamp, RawImportItem,
@@ -107,10 +107,9 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
         let favorite = parse_bool_flag(row.get_any_trimmed(&["favorite", "fav"]));
         let extra_tags = split_tags(row.get_any_trimmed(&["tags", "tag"]));
         let mut notes = row.get_any_trimmed(&["notes", "note"]).to_string();
+        let mut fields = BTreeMap::new();
 
-        if !totp.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {totp}"));
-        }
+        apply_imported_totp(totp, &mut fields, &mut notes);
 
         let raw_type = row.get_any_trimmed(&["type", "category"]).to_lowercase();
         let category = match raw_type.as_str() {
@@ -130,7 +129,7 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
             url,
             category: category.to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite,
             source_folder: None,
             folder_tags: Vec::new(),
@@ -285,9 +284,7 @@ pub(super) fn parse_lastpass(content: &str) -> AppResult<Vec<RawImportItem>> {
             notes = extra.to_string();
         }
 
-        if !totp.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {totp}"));
-        }
+        apply_imported_totp(totp, &mut fields, &mut notes);
 
         items.push(RawImportItem {
             title,
@@ -396,10 +393,9 @@ pub(super) fn parse_keepass(content: &str) -> AppResult<Vec<RawImportItem>> {
         let url = row.get_any_trimmed(&["url", "web site", "website"]).to_string();
         let mut notes = row.get_any_trimmed(&["notes", "comments", "note"]).to_string();
         let totp = row.get_any_trimmed(&["totp", "otp"]);
+        let mut fields = BTreeMap::new();
 
-        if !totp.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {totp}"));
-        }
+        apply_imported_totp(totp, &mut fields, &mut notes);
 
         items.push(RawImportItem {
             title,
@@ -408,7 +404,7 @@ pub(super) fn parse_keepass(content: &str) -> AppResult<Vec<RawImportItem>> {
             url,
             category: "login".to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite: false,
             source_folder,
             folder_tags,
@@ -556,10 +552,9 @@ pub(super) fn parse_safari(content: &str) -> AppResult<Vec<RawImportItem>> {
         let password = clean_password(row.get("password"));
         let mut notes = row.get_any_trimmed(&["notes", "note"]).to_string();
         let otpauth = row.get_any_trimmed(&["otpauth", "totp"]);
+        let mut fields = BTreeMap::new();
 
-        if !otpauth.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {otpauth}"));
-        }
+        apply_imported_totp(otpauth, &mut fields, &mut notes);
 
         items.push(RawImportItem {
             title,
@@ -568,7 +563,7 @@ pub(super) fn parse_safari(content: &str) -> AppResult<Vec<RawImportItem>> {
             url,
             category: "login".to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite: false,
             source_folder: None,
             folder_tags: Vec::new(),
@@ -607,6 +602,7 @@ pub(super) fn parse_dashlane(content: &str) -> AppResult<Vec<RawImportItem>> {
 
         let password = clean_password(row.get("password"));
         let mut notes = row.get_any_trimmed(&["note", "notes"]).to_string();
+        let mut fields = BTreeMap::new();
 
         for alt in [u2, u3] {
             if !alt.is_empty() && alt != username {
@@ -615,9 +611,7 @@ pub(super) fn parse_dashlane(content: &str) -> AppResult<Vec<RawImportItem>> {
         }
 
         let otp = row.get_any_trimmed(&["otpsecret", "otp_secret", "totp"]);
-        if !otp.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {otp}"));
-        }
+        apply_imported_totp(otp, &mut fields, &mut notes);
 
         let cat_folder = row.get_trimmed("category");
         let source_folder = if cat_folder.is_empty() {
@@ -634,7 +628,7 @@ pub(super) fn parse_dashlane(content: &str) -> AppResult<Vec<RawImportItem>> {
             url,
             category: "login".to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite: false,
             source_folder,
             folder_tags,
@@ -672,15 +666,14 @@ pub(super) fn parse_protonpass(content: &str) -> AppResult<Vec<RawImportItem>> {
 
         let password = clean_password(row.get("password"));
         let mut notes = row.get_any_trimmed(&["note", "notes"]).to_string();
+        let mut fields = BTreeMap::new();
 
         if !raw_username.is_empty() && !raw_email.is_empty() && raw_email != raw_username {
             append_note_section(&mut notes, None, &format!("Email: {raw_email}"));
         }
 
         let totp = row.get_trimmed("totp");
-        if !totp.is_empty() {
-            append_note_section(&mut notes, None, &format!("TOTP: {totp}"));
-        }
+        apply_imported_totp(totp, &mut fields, &mut notes);
 
         let vault = row.get_trimmed("vault");
         let source_folder = if vault.is_empty() {
@@ -704,7 +697,7 @@ pub(super) fn parse_protonpass(content: &str) -> AppResult<Vec<RawImportItem>> {
             url,
             category: category.to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite: false,
             source_folder,
             folder_tags,
@@ -877,7 +870,7 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
         let url = row
             .get_any_trimmed(&["url", "website", "uri", "sito", "web site", "host", "login_uri"])
             .to_string();
-        let notes = row
+        let notes_raw = row
             .get_any_trimmed(&[
                 "notes",
                 "note",
@@ -888,6 +881,17 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
                 "descrizione",
             ])
             .to_string();
+        let mut notes = notes_raw;
+        let mut fields = BTreeMap::new();
+        let totp = row.get_any_trimmed(&[
+            "totp",
+            "otp",
+            "otpauth",
+            "otp_secret",
+            "otpsecret",
+            "2fa",
+        ]);
+        apply_imported_totp(totp, &mut fields, &mut notes);
 
         let raw_cat = row
             .get_any_trimmed(&["category", "categoria", "type", "tipo"])
@@ -929,7 +933,7 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
             url,
             category: category.to_string(),
             notes,
-            fields: BTreeMap::new(),
+            fields,
             favorite,
             source_folder,
             folder_tags,
