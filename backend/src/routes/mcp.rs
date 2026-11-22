@@ -1069,7 +1069,9 @@ pub async fn handle_mcp_post(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    let parsed: Value = match serde_json::from_slice(&body) {
+    // The body is size-capped by DefaultBodyLimit on the /api/mcp route and the parsed value
+    // is structurally validated right after (object/array only, batch size, JSON-RPC fields).
+    let parsed: Value = match serde_json::from_slice(&body) { // codeql[trust/unsafe-deserialization]
         Ok(val) => val,
         Err(_) => {
             return json_http_response(

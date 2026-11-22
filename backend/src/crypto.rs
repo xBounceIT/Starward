@@ -9,8 +9,11 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{AppError, AppResult};
 
+// API keys are 192-bit random values (see generate_prefixed_api_key), so a fast hash is
+// appropriate: brute-forcing SHA-256 over 2^192 keys is infeasible and a computationally
+// expensive KDF would not add security here (it would only break existing stored hashes).
 pub fn hash_api_key(raw_key: &str) -> String {
-    let digest = Sha256::digest(raw_key.trim().as_bytes());
+    let digest = Sha256::digest(raw_key.trim().as_bytes()); // codeql[trust/weak-sensitive-data-hashing]
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
