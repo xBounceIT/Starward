@@ -533,15 +533,23 @@ export function AppSidebar({
           )}
         >
           {/* mt-1 allinea il centro del toggle (p-3.5 + mt-1 + size-8/2 = 34px)
-              al centro dell'icona del titolo pagina (pt-5 + 28/2 = 34px);
-              stessa posizione in modalità espansa e collassata, così il
-              pulsante non si sposta durante l'animazione */}
-          <div className="mt-1 flex items-center justify-start">
+              al centro dell'icona del titolo pagina (pt-5 + 28/2 = 34px).
+              Il titolo brand sta a sinistra del toggle; quando la sidebar
+              collassa il titolo sparisce e il toggle torna a sinistra nella
+              striscia da 3rem. */}
+          <div className="mt-1 flex items-center justify-between gap-2 group-data-[collapsible=strip]:justify-start">
+            <span
+              inert={sidebarCollapsed}
+              aria-hidden={sidebarCollapsed || undefined}
+              className="min-w-0 truncate text-xl leading-none font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=strip]:hidden"
+            >
+              Starward
+            </span>
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="-ml-1.5 text-muted-foreground hover:text-foreground"
+              className="-mr-1.5 shrink-0 text-muted-foreground hover:text-foreground group-data-[collapsible=strip]:mr-0 group-data-[collapsible=strip]:-ml-1.5"
               onClick={toggleSidebar}
               title={toggleLabel}
               aria-label={toggleLabel}
@@ -991,7 +999,7 @@ export function AppSidebar({
             'shrink-0 whitespace-nowrap px-3 py-2 text-left text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90',
           )}
         >
-          Starward v{APP_VERSION}
+          v{APP_VERSION}
         </div>
 
         <SidebarFooter
