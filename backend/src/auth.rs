@@ -114,13 +114,12 @@ impl AuthenticatedUser {
             }
             return Ok(());
         }
-        if let Some(ref key) = self.api_key {
-            if key.permission != "read_write" {
+        if let Some(ref key) = self.api_key
+            && key.permission != "read_write" {
                 return Err(AppError::Forbidden(
                     "Questa API Key ha permessi di sola lettura".to_string(),
                 ));
             }
-        }
         Ok(())
     }
 
@@ -283,13 +282,12 @@ async fn authenticate_service_account_key(
     }
 
     let now = Utc::now();
-    if let Some(expires_at) = row.expires_at {
-        if expires_at <= now {
+    if let Some(expires_at) = row.expires_at
+        && expires_at <= now {
             return Err(AppError::Unauthorized(
                 "API Key del Service Account scaduta".to_string(),
             ));
         }
-    }
 
     let is_first_use = row.last_used_at.is_none();
 
@@ -390,11 +388,10 @@ async fn authenticate_api_key(
         row.ok_or_else(|| AppError::Unauthorized("API Key non valida o revocata".to_string()))?;
     let now = Utc::now();
 
-    if let Some(expires_at) = row.expires_at {
-        if expires_at <= now {
+    if let Some(expires_at) = row.expires_at
+        && expires_at <= now {
             return Err(AppError::Unauthorized("API Key scaduta".to_string()));
         }
-    }
 
     let is_first_use = row.last_used_at.is_none();
 
@@ -719,16 +716,13 @@ fn extract_mcp_raw_key(parts: &Parts) -> Result<String, AppError> {
         .and_then(|v| v.to_str().ok())
         .map(str::trim)
         .filter(|s| !s.is_empty())
-    {
-        if let Some((scheme, rest)) = auth_header.split_once(char::is_whitespace) {
-            if scheme.eq_ignore_ascii_case("bearer") {
+        && let Some((scheme, rest)) = auth_header.split_once(char::is_whitespace)
+            && scheme.eq_ignore_ascii_case("bearer") {
                 let token = rest.trim();
                 if !token.is_empty() {
                     return Ok(token.to_string());
                 }
             }
-        }
-    }
 
     Err(AppError::Unauthorized(
         "Chiave MCP mancante o non valida. Usa una chiave MCP personale (sw_mcp_...) tramite Authorization: Bearer o X-API-Key."
@@ -771,11 +765,10 @@ async fn authenticate_mcp_key(
         row.ok_or_else(|| AppError::Unauthorized("Chiave MCP non valida o revocata".to_string()))?;
     let now = Utc::now();
 
-    if let Some(expires_at) = row.expires_at {
-        if expires_at <= now {
+    if let Some(expires_at) = row.expires_at
+        && expires_at <= now {
             return Err(AppError::Unauthorized("Chiave MCP scaduta".to_string()));
         }
-    }
 
     let is_first_use = row.last_used_at.is_none();
 

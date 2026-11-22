@@ -132,11 +132,10 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
             _ => "login",
         };
 
-        if category == "passkey" {
-            if let Some(host) = host_from_url(&url) {
+        if category == "passkey"
+            && let Some(host) = host_from_url(&url) {
                 fields.insert("rp_id".to_string(), host);
             }
-        }
 
         items.push(RawImportItem {
             title,
@@ -163,11 +162,10 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
 pub(super) fn parse_lastpass(content: &str) -> AppResult<Vec<RawImportItem>> {
     let table = parse_csv_checking_json(content, "LastPass")?;
 
-    if !table.has_any_header(&["grouping", "extra", "fav"]) {
-        if let Some(hint) = detect_provider_hint_from_headers(&table.headers, "lastpass") {
+    if !table.has_any_header(&["grouping", "extra", "fav"])
+        && let Some(hint) = detect_provider_hint_from_headers(&table.headers, "lastpass") {
             return Err(AppError::BadRequest(hint));
         }
-    }
 
     ensure_headers_or_hint(
         &table,
@@ -376,11 +374,10 @@ pub(super) fn parse_lastpass(content: &str) -> AppResult<Vec<RawImportItem>> {
                 if let Some(host) = kv.get("hostname").filter(|s| !s.is_empty()) {
                     url = host.clone();
                 }
-                if !fields.contains_key("rp_id") {
-                    if let Some(host) = host_from_url(&url) {
+                if !fields.contains_key("rp_id")
+                    && let Some(host) = host_from_url(&url) {
                         fields.insert("rp_id".to_string(), host);
                     }
-                }
                 if let Some(u) = kv.get("username").filter(|s| !s.is_empty()) {
                     username = u.clone();
                 }
@@ -812,11 +809,10 @@ pub(super) fn parse_protonpass(content: &str) -> AppResult<Vec<RawImportItem>> {
         };
         let folder_tags = source_folder.iter().cloned().collect();
 
-        if category == "passkey" && !fields.contains_key("rp_id") {
-            if let Some(host) = host_from_url(&url) {
+        if category == "passkey" && !fields.contains_key("rp_id")
+            && let Some(host) = host_from_url(&url) {
                 fields.insert("rp_id".to_string(), host);
             }
-        }
 
         items.push(RawImportItem {
             title,
@@ -1169,11 +1165,10 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
                     }
                 }
             }
-            if !fields.contains_key("rp_id") {
-                if let Some(host) = host_from_url(&url) {
+            if !fields.contains_key("rp_id")
+                && let Some(host) = host_from_url(&url) {
                     fields.insert("rp_id".to_string(), host);
                 }
-            }
         }
 
         let favorite = parse_bool_flag(row.get_any_trimmed(&["favorite", "preferito", "fav"]));

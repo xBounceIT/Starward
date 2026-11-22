@@ -104,8 +104,8 @@ mod tests {
 
     #[test]
     fn roundtrip_encryption_and_unique_nonces() {
-        let crypto = VaultCrypto::from_master_key("super-secret-master-key");
-        let secret = "P@ssw0rd!Str0ng#2026";
+        let crypto = VaultCrypto::from_master_key("super-secret-master-key"); // codeql[trust/hard-coded-cryptographic-value]
+        let secret = "P@ssw0rd!Str0ng#2026"; // codeql[trust/hard-coded-cryptographic-value]
 
         let enc1 = crypto.encrypt(secret).unwrap();
         let enc2 = crypto.encrypt(secret).unwrap();
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn hkdf_key_derivation_matches_rfc5869_vector() {
-        let crypto = VaultCrypto::from_master_key("super-secret-master-key");
+        let crypto = VaultCrypto::from_master_key("super-secret-master-key"); // codeql[trust/hard-coded-cryptographic-value]
         let derived_hex: String = crypto.key.iter().map(|b| format!("{b:02x}")).collect();
         assert_eq!(
             derived_hex,

@@ -1171,13 +1171,12 @@ pub async fn remove_vault_group(
             .fetch_optional(&state.db)
             .await?;
 
-    if let Some((Some(ref og_id),)) = vault_owner_group {
-        if og_id == &group_id {
+    if let Some((Some(ref og_id),)) = vault_owner_group
+        && og_id == &group_id {
             return Err(AppError::BadRequest(
                 "Non è possibile rimuovere il gruppo proprietario della cartella".to_string(),
             ));
         }
-    }
 
     let existing: Option<(String,)> = sqlx::query_as(
         r#"

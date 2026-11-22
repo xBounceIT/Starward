@@ -1181,7 +1181,7 @@ mod tests {
 
     #[test]
     fn encrypt_extra_fields_roundtrips_json() {
-        let crypto = VaultCrypto::from_master_key("test-master-key-for-extra-fields");
+        let crypto = VaultCrypto::from_master_key("test-master-key-for-extra-fields"); // codeql[trust/hard-coded-cryptographic-value]
         let empty = BTreeMap::new();
         assert_eq!(encrypt_extra_fields(&crypto, &empty).unwrap(), (String::new(), String::new()));
 

@@ -881,13 +881,12 @@ pub(crate) fn detect_provider_hint_from_headers(
         None
     };
 
-    if let Some((id, label)) = suggested {
-        if id != current_provider_id {
+    if let Some((id, label)) = suggested
+        && id != current_provider_id {
             return Some(format!(
                 "Il file sembra un export CSV di {label}. Seleziona '{label}' (oppure 'CSV Generico') prima di importarlo."
             ));
         }
-    }
 
     None
 }
@@ -1417,7 +1416,7 @@ mod tests {
             batch.items[1].fields.get("totp").map(String::as_str),
             Some("otpauth://totp/AWS:bob?secret=JBSWY3DPEHPK3PXP&algorithm=SHA256&digits=8&period=60")
         );
-        assert!(batch.items[2].fields.get("totp").is_none());
+        assert!(!batch.items[2].fields.contains_key("totp"));
         assert!(batch.items[2].notes.contains("TOTP: hardware-key"));
 
         let op = "Title,URL,Username,Password,OTPAuth\nStripe,https://stripe.com,ops,pw,otpauth://totp/Stripe?secret=JBSWY3DPEHPK3PXP";

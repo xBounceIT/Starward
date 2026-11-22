@@ -101,11 +101,10 @@ pub(crate) fn select_items_for_import<'a>(
             continue;
         }
 
-        if let Some(ref sel) = selected_set {
-            if !sel.contains(&item.index) {
+        if let Some(ref sel) = selected_set
+            && !sel.contains(&item.index) {
                 continue;
             }
-        }
 
         to_insert.push(item);
     }

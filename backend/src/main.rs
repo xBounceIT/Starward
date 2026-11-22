@@ -404,8 +404,8 @@ mod tests {
             host: "127.0.0.1".to_string(),
             port: 0,
             database_url,
-            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
-            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
             admin_emails: vec![alice_email.clone()],
         };
@@ -1389,8 +1389,8 @@ mod tests {
             host: "127.0.0.1".to_string(),
             port: 0,
             database_url,
-            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
-            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
             admin_emails: vec![admin_email.clone()],
         };
@@ -1984,8 +1984,8 @@ mod tests {
             host: "127.0.0.1".to_string(),
             port: 0,
             database_url,
-            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
-            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
             admin_emails: vec![owner_email.clone()],
         };
@@ -2380,8 +2380,8 @@ mod tests {
             host: "127.0.0.1".to_string(),
             port: 0,
             database_url,
-            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
-            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
             admin_emails: vec![alice_email.clone()],
         };

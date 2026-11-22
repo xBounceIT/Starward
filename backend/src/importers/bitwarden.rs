@@ -338,12 +338,11 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
         let mut source_folder: Option<String> = None;
         let mut folder_tags: Vec<String> = Vec::new();
 
-        if let Some(fid) = item.folder_id.as_deref() {
-            if let Some(fname) = folders_map.get(fid) {
+        if let Some(fid) = item.folder_id.as_deref()
+            && let Some(fname) = folders_map.get(fid) {
                 source_folder = Some(fname.clone());
                 folder_tags.push(fname.clone());
             }
-        }
 
         if let Some(cids) = item.collection_ids {
             for cid in cids {

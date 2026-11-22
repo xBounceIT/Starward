@@ -634,8 +634,7 @@ async fn handle_tools_call(
                         .map(String::as_str)
                         .map(str::trim)
                         .filter(|s| !s.is_empty())
-                    {
-                        if let Ok(config) = crate::otp::parse_totp_config(raw_totp) {
+                        && let Ok(config) = crate::otp::parse_totp_config(raw_totp) {
                             let otp = crate::otp::generate_totp_now(&dto.id, &config);
                             if let Some(obj) = val.as_object_mut() {
                                 obj.insert(
@@ -651,7 +650,6 @@ async fn handle_tools_call(
                                 );
                             }
                         }
-                    }
                     Ok(tool_success(val))
                 }
                 Err(err) => Ok(tool_error(err)),
