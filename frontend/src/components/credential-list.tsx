@@ -1132,7 +1132,7 @@ export const CredentialList = memo(function CredentialList({
           <div className="relative min-w-0 flex-1">
             <div
               ref={categoryScrollRef}
-              className="flex items-center gap-1.5 overflow-x-auto pb-0.5"
+              className="flex items-center gap-1.5 overflow-x-auto pb-2.5"
             >
               <button
                 type="button"

@@ -308,24 +308,21 @@ export function VaultDialog({
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Icona</Label>
-                <div className="grid grid-cols-4 gap-2">
-                  {VAULT_ICON_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setIcon(opt.value)}
-                      className={cn(
-                        'flex cursor-pointer flex-col items-center gap-1 rounded-md border p-2 text-xs transition-colors',
-                        icon === opt.value
-                          ? 'border-primary bg-accent font-medium text-accent-foreground'
-                          : 'text-muted-foreground hover:bg-muted',
-                      )}
-                    >
-                      <VaultIcon icon={opt.value} className="size-4" />
-                      <span className="truncate">{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
+                <Select value={icon} onValueChange={setIcon}>
+                  <SelectTrigger className="h-9 w-full text-xs">
+                    <SelectValue placeholder="Seleziona icona" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VAULT_ICON_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <span className="flex items-center gap-2">
+                          <VaultIcon icon={opt.value} className="size-4" />
+                          <span>{opt.label}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

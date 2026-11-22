@@ -626,7 +626,7 @@ export function ImportVaultDialog({
         onOpenChange(next)
       }}
     >
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-4xl">
+      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="size-5 text-primary sync-security:text-[#ff9c00]" />
@@ -709,7 +709,7 @@ export function ImportVaultDialog({
 
         {/* STEP 1: Select Provider & File */}
         {step === 'select' && (
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto pr-1 lg:grid-cols-[1.25fr_1fr]">
+          <div className="min-h-0 flex-1 space-y-3.5 overflow-y-auto pr-1">
             {/* Supported Providers Grid */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
@@ -820,7 +820,6 @@ export function ImportVaultDialog({
               )}
             </div>
 
-            <div className="space-y-3.5">
             {/* Contextual Export Guide */}
             <div className="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground sync-security:border-white/15 sync-security:bg-[#000c20]/65">
               <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/90 p-1 dark:border-white/10 dark:bg-white/[0.05] sync-security:border-white/15 sync-security:bg-[#000c20]/80">
@@ -941,7 +940,6 @@ export function ImportVaultDialog({
                   </div>
                 </div>
               )}
-            </div>
             </div>
           </div>
         )}
