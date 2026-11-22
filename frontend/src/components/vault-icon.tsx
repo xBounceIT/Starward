@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import {
   Building2,
   Code2,
@@ -45,27 +46,29 @@ export const VAULT_ICON_OPTIONS = [
 export function VaultIcon({
   icon,
   className = 'size-4',
+  style,
 }: {
   icon: string
   className?: string
+  style?: CSSProperties
 }) {
   switch (icon) {
     case 'lock':
-      return <Lock className={className} />
+      return <Lock className={className} style={style} />
     case 'users':
-      return <Users className={className} />
+      return <Users className={className} style={style} />
     case 'shield':
-      return <Shield className={className} />
+      return <Shield className={className} style={style} />
     case 'server':
-      return <Server className={className} />
+      return <Server className={className} style={style} />
     case 'globe':
-      return <Globe className={className} />
+      return <Globe className={className} style={style} />
     case 'key':
-      return <KeyRound className={className} />
+      return <KeyRound className={className} style={style} />
     case 'building':
-      return <Building2 className={className} />
+      return <Building2 className={className} style={style} />
     default:
-      return <Folder className={className} />
+      return <Folder className={className} style={style} />
   }
 }
 
@@ -409,6 +412,7 @@ export function CredentialBrandIcon({
             vaultPalette.text,
             className,
           )}
+          style={vaultPalette.style}
         >
           <Globe className={iconClassName} />
         </div>

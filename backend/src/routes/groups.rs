@@ -918,11 +918,20 @@ pub async fn remove_group_member(
     Ok(StatusCode::NO_CONTENT)
 }
 
+fn is_hex_color(value: &str) -> bool {
+    let Some(hex) = value.strip_prefix('#') else {
+        return false;
+    };
+    (hex.len() == 3 || hex.len() == 6) && hex.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 fn normalize_color(input: &str) -> String {
-    match input.trim().to_lowercase().as_str() {
-        "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" => {
-            input.trim().to_lowercase()
+    let value = input.trim().to_lowercase();
+    match value.as_str() {
+        "indigo" | "emerald" | "amber" | "rose" | "sky" | "violet" | "orange" | "lime" => {
+            value
         }
+        _ if is_hex_color(&value) => value,
         _ => "indigo".to_string(),
     }
 }
@@ -936,6 +945,17 @@ mod tests {
         assert_eq!(normalize_color("emerald"), "emerald");
         assert_eq!(normalize_color(" SKY "), "sky");
         assert_eq!(normalize_color("violet"), "violet");
+        assert_eq!(normalize_color("orange"), "orange");
+        assert_eq!(normalize_color("lime"), "lime");
         assert_eq!(normalize_color("neon-pink"), "indigo");
+    }
+
+    #[test]
+    fn normalize_color_accepts_hex_colors() {
+        assert_eq!(normalize_color("#FF8800"), "#ff8800");
+        assert_eq!(normalize_color(" #0af "), "#0af");
+        assert_eq!(normalize_color("#12345"), "indigo");
+        assert_eq!(normalize_color("#gggggg"), "indigo");
+        assert_eq!(normalize_color("ff8800"), "indigo");
     }
 }

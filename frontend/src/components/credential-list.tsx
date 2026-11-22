@@ -829,6 +829,7 @@ export const CredentialList = memo(function CredentialList({
                     'size-5 shrink-0',
                     getVaultColor(activeVault.color).text,
                   )}
+                  style={getVaultColor(activeVault.color).style}
                 />
               ) : null}
               <h2 className="truncate font-bold text-lg tracking-normal">
@@ -843,6 +844,9 @@ export const CredentialList = memo(function CredentialList({
                     getVaultColor(activeVault.owner_group_color ?? 'indigo')
                       .text,
                   )}
+                  style={
+                    getVaultColor(activeVault.owner_group_color ?? 'indigo').style
+                  }
                 >
                   <Users className="size-3" />
                   {activeVault.owner_group_name}

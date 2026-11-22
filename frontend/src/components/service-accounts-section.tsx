@@ -763,6 +763,7 @@ export function ServiceAccountsSection({
                                 <VaultIcon
                                   icon={getVaultDisplayIcon(v)}
                                   className={cn('size-3', palette.text)}
+                                  style={palette.style}
                                 />
                                 <span>Cartella: {v.name}</span>
                                 <span className="text-[10px] text-muted-foreground">

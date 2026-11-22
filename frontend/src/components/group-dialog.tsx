@@ -14,9 +14,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { VaultColorPicker } from '@/components/vault-color-picker'
 import { vaultApi, type Group, type UserSummary } from '@/lib/api'
-import { cn } from '@/lib/utils'
-import { VAULT_COLORS } from '@/lib/vault-utils'
 
 interface GroupDialogProps {
   open: boolean
@@ -150,24 +149,7 @@ export function GroupDialog({
 
             <div className="space-y-2">
               <Label>Colore</Label>
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(VAULT_COLORS).map(([key, palette]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setColor(key)}
-                  className={cn(
-                    'flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-colors',
-                    color === key
-                      ? 'border-primary bg-accent font-medium text-accent-foreground'
-                      : 'hover:bg-muted',
-                  )}
-                >
-                  <span className={cn('size-2.5 rounded-full', palette.dot)} />
-                  {palette.label}
-                </button>
-              ))}
-            </div>
+              <VaultColorPicker value={color} onChange={setColor} />
             </div>
           </div>
 
