@@ -283,7 +283,9 @@ fn format_card_expiry(exp_month: Option<&Value>, exp_year: Option<&Value>) -> St
 }
 
 fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
-    let export: BitwardenExport = serde_json::from_str(content).map_err(|e| {
+    // content is size-capped upstream (validate_import_content / MAX_IMPORT_BYTES) and parsed
+    // into a typed struct that is validated below (encrypted flag, presence of "items").
+    let export: BitwardenExport = serde_json::from_str(content).map_err(|e| { // codeql[trust/unsafe-deserialization]
         AppError::BadRequest(format!(
             "Impossibile leggere il file JSON Bitwarden: {e}"
         ))

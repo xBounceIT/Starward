@@ -1125,57 +1125,58 @@ mod tests {
     }
 
     #[test]
+    // Test fixtures only: the literals below are dummy values, not real credentials.
     fn validate_credential_fields_enforces_category_rules() {
         let empty_fields = BTreeMap::new();
 
         // login & database require password
-        assert!(validate_credential_fields("login", "", "", "n", &empty_fields).is_err());
-        assert!(validate_credential_fields("login", "", "pw", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("database", "", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("database", "", "dbpw", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("login", "", "", "n", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("login", "", "pw", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("database", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("database", "", "dbpw", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
 
         // api_key, card, license require secret
-        assert!(validate_credential_fields("api_key", "", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("api_key", "", "sk_live_123", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("card", "", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("card", "", "4242", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("license", "", "", "", &empty_fields).is_err());
-        assert!(validate_credential_fields("license", "", "XXXX-YYYY", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("api_key", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("api_key", "", "sk_live_123", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("card", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("card", "", "4242", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("license", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("license", "", "XXXX-YYYY", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
 
         // note allows empty password when notes is non-empty
-        assert!(validate_credential_fields("note", "", "", "   ", &empty_fields).is_err());
-        assert!(validate_credential_fields("note", "", "", "Codice Wi-Fi: 1234", &empty_fields).is_ok());
-        assert!(validate_credential_fields("note", "", "legacy-pw", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("note", "", "", "   ", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("note", "", "", "Codice Wi-Fi: 1234", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("note", "", "legacy-pw", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
 
         // ssh allows empty password if private_key is provided
-        assert!(validate_credential_fields("ssh", "", "", "", &empty_fields).is_err());
+        assert!(validate_credential_fields("ssh", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
         let mut ssh_fields = BTreeMap::new();
         ssh_fields.insert("private_key".to_string(), "-----BEGIN OPENSSH PRIVATE KEY-----".to_string());
-        assert!(validate_credential_fields("ssh", "", "", "", &ssh_fields).is_ok());
-        assert!(validate_credential_fields("ssh", "", "passphrase", "", &empty_fields).is_ok());
+        assert!(validate_credential_fields("ssh", "", "", "", &ssh_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("ssh", "", "passphrase", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
 
         // passkey requires rp_id, credential_id, private_key, or password
-        assert!(validate_credential_fields("passkey", "alice", "", "note", &empty_fields).is_err());
+        assert!(validate_credential_fields("passkey", "alice", "", "note", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
         let mut pk_rp = BTreeMap::new();
         pk_rp.insert("rp_id".to_string(), "github.com".to_string());
-        assert!(validate_credential_fields("passkey", "", "", "", &pk_rp).is_ok());
+        assert!(validate_credential_fields("passkey", "", "", "", &pk_rp).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
         let mut pk_cid = BTreeMap::new();
         pk_cid.insert("credential_id".to_string(), "cred-123".to_string());
-        assert!(validate_credential_fields("passkey", "", "", "", &pk_cid).is_ok());
+        assert!(validate_credential_fields("passkey", "", "", "", &pk_cid).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
         let mut pk_key = BTreeMap::new();
         pk_key.insert("private_key".to_string(), "MIGHAgEAMBMGByqGSM49AgEG".to_string());
-        assert!(validate_credential_fields("passkey", "", "", "", &pk_key).is_ok());
+        assert!(validate_credential_fields("passkey", "", "", "", &pk_key).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
 
         // identity requires username (email), notes, or any non-tag extra field
-        assert!(validate_credential_fields("identity", "  ", "", "   ", &empty_fields).is_err());
+        assert!(validate_credential_fields("identity", "  ", "", "   ", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
         let mut only_tags = BTreeMap::new();
         only_tags.insert("tags".to_string(), "personal".to_string());
-        assert!(validate_credential_fields("identity", "", "", "", &only_tags).is_err());
-        assert!(validate_credential_fields("identity", "mario@acme.it", "", "", &empty_fields).is_ok());
-        assert!(validate_credential_fields("identity", "", "", "Dettagli documento", &empty_fields).is_ok());
+        assert!(validate_credential_fields("identity", "", "", "", &only_tags).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("identity", "mario@acme.it", "", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("identity", "", "", "Dettagli documento", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
         let mut id_name = BTreeMap::new();
         id_name.insert("first_name".to_string(), "Mario".to_string());
-        assert!(validate_credential_fields("identity", "", "", "", &id_name).is_ok());
+        assert!(validate_credential_fields("identity", "", "", "", &id_name).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
     }
 
     #[test]
