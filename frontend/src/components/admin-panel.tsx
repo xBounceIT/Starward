@@ -1132,7 +1132,7 @@ export function AdminPanel({
         filterFn: auditActorFilter,
         header: ({ column }) => (
           <div className="flex items-center gap-0.5">
-            <AuditSortButton column={column} label="Chi (Attore & Ruolo)" />
+            <AuditSortButton column={column} label="Utente" />
             <ActorColumnFilter column={column} actors={availableActors} />
           </div>
         ),
@@ -1194,7 +1194,7 @@ export function AdminPanel({
           <div className="flex items-center gap-0.5">
             <AuditSortButton
               column={column}
-              label="Cosa (Azione & Dettagli)"
+              label="Azione"
             />
             <ActionColumnFilter column={column} actions={availableActions} />
           </div>
@@ -1242,7 +1242,7 @@ export function AdminPanel({
         header: ({ column }) => (
           <div className="flex items-center justify-end gap-0.5">
             <PeriodColumnFilter column={column} />
-            <AuditSortButton column={column} label="Quando (Data e Ora)" />
+            <AuditSortButton column={column} label="Data" />
           </div>
         ),
         cell: ({ row }) => {
