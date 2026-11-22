@@ -366,3 +366,26 @@
 .vault-color-ring {
   --tw-ring-color: color-mix(in oklab, var(--vc) 30%, transparent);
 }
+
+/* Preset color picker popup: top hairline tinted with the selected vault
+   color (--vc), echoing the 2px top border of dialogs. */
+[data-slot='popover-content'].vault-color-picker-popover {
+  border-top: 2px solid var(--vc, var(--border));
+}
+
+.vault-swatch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vault-swatch {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .vault-swatch:hover {
+    transform: scale(1.12);
+  }
+}
