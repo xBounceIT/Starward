@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS credentials (
     notes_nonce TEXT NOT NULL,
     extra_fields_ciphertext TEXT NOT NULL DEFAULT '',
     extra_fields_nonce TEXT NOT NULL DEFAULT '',
+    custom_fields_ciphertext TEXT NOT NULL DEFAULT '',
+    custom_fields_nonce TEXT NOT NULL DEFAULT '',
     favorite BOOLEAN NOT NULL DEFAULT FALSE,
     created_by TEXT NOT NULL REFERENCES users(id),
     updated_by TEXT NOT NULL REFERENCES users(id),

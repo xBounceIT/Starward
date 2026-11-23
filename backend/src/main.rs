@@ -660,7 +660,13 @@ mod tests {
                                 "db_type": "postgresql",
                                 "port": "5432",
                                 "database_name": "starward_prod"
-                            }
+                            },
+                            "custom_fields": [
+                                { "field_type": "text", "label": "Domanda di sicurezza", "value": "Colore preferito?" },
+                                { "field_type": "hidden", "label": "PIN admin", "value": "9876" },
+                                { "field_type": "checkbox", "label": "Ricorda dispositivo", "value": true },
+                                { "field_type": "linked", "label": "Username DB", "linked_id": 100 }
+                            ]
                         })
                         .to_string(),
                     ))
@@ -673,6 +679,15 @@ mod tests {
         let db_cred_id = db_cred["id"].as_str().unwrap().to_string();
         assert_eq!(db_cred["fields"]["port"], "5432");
         assert_eq!(db_cred["fields"]["db_type"], "postgresql");
+        assert_eq!(db_cred["custom_fields"].as_array().unwrap().len(), 4);
+        assert_eq!(db_cred["custom_fields"][0]["field_type"], "text");
+        assert_eq!(db_cred["custom_fields"][0]["label"], "Domanda di sicurezza");
+        assert_eq!(db_cred["custom_fields"][1]["field_type"], "hidden");
+        assert_eq!(db_cred["custom_fields"][1]["value"], "9876");
+        assert_eq!(db_cred["custom_fields"][2]["field_type"], "checkbox");
+        assert_eq!(db_cred["custom_fields"][2]["value"], "true");
+        assert_eq!(db_cred["custom_fields"][3]["field_type"], "linked");
+        assert_eq!(db_cred["custom_fields"][3]["linked_id"], 100);
 
         let raw_extra: (String,) =
             sqlx::query_as("SELECT extra_fields_ciphertext FROM credentials WHERE id = $1")
@@ -682,6 +697,62 @@ mod tests {
                 .unwrap();
         assert!(!raw_extra.0.is_empty());
         assert!(!raw_extra.0.contains("starward_prod"));
+
+        // custom fields are encrypted at rest too
+        let raw_custom: (String,) =
+            sqlx::query_as("SELECT custom_fields_ciphertext FROM credentials WHERE id = $1")
+                .bind(&db_cred_id)
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert!(!raw_custom.0.is_empty());
+        assert!(!raw_custom.0.contains("9876"));
+        assert!(!raw_custom.0.contains("Domanda di sicurezza"));
+
+        // PATCH updates custom fields (and rejects invalid ones)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{db_cred_id}"))
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "custom_fields": [
+                                { "field_type": "hidden", "label": "PIN admin", "value": "1111" }
+                            ]
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let patched = read_json(res).await;
+        assert_eq!(patched["custom_fields"].as_array().unwrap().len(), 1);
+        assert_eq!(patched["custom_fields"][0]["value"], "1111");
+        assert_eq!(patched["fields"]["port"], "5432");
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{db_cred_id}"))
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "custom_fields": [{ "field_type": "linked", "label": "X" }] })
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         // 9. Secure note allows empty password and supports PATCH favorite toggle
         let res = app

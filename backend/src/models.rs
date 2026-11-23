@@ -428,6 +428,55 @@ pub struct UpdateMemberRoleRequest {
     pub role: String,
 }
 
+/// Tipo di campo personalizzato (compatibile con Bitwarden: 0=text, 1=hidden, 2=checkbox, 3=linked).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomFieldType {
+    Text,
+    Hidden,
+    Checkbox,
+    Linked,
+}
+
+/// ID di collegamento per i campi personalizzati di tipo "linked"
+/// (compatibili con Bitwarden LinkedIdType).
+pub const LINKED_ID_USERNAME: u32 = 100;
+pub const LINKED_ID_PASSWORD: u32 = 101;
+pub const LINKED_ID_URI: u32 = 102;
+
+pub fn is_valid_linked_id(linked_id: u32) -> bool {
+    matches!(
+        linked_id,
+        LINKED_ID_USERNAME | LINKED_ID_PASSWORD | LINKED_ID_URI
+    )
+}
+
+/// Accetta stringhe, booleani e numeri (in Bitwarden i campi checkbox hanno valore booleano).
+fn stringify_scalar_value<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(match value {
+        serde_json::Value::String(s) => s,
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Null => String::new(),
+        other => other.to_string(),
+    })
+}
+
+/// Campo personalizzato tipizzato di una credenziale (stile Bitwarden).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomField {
+    pub field_type: CustomFieldType,
+    pub label: String,
+    #[serde(default, deserialize_with = "stringify_scalar_value")]
+    pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linked_id: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CredentialDto {
     pub id: String,
@@ -442,6 +491,8 @@ pub struct CredentialDto {
     pub category: String,
     pub notes: String,
     pub fields: BTreeMap<String, String>,
+    #[serde(default)]
+    pub custom_fields: Vec<CustomField>,
     pub favorite: bool,
     pub created_by: String,
     pub created_by_name: String,
@@ -499,6 +550,8 @@ pub struct CreateCredentialRequest {
     #[serde(default)]
     pub fields: BTreeMap<String, String>,
     #[serde(default)]
+    pub custom_fields: Vec<CustomField>,
+    #[serde(default)]
     pub favorite: bool,
 }
 
@@ -512,6 +565,7 @@ pub struct UpdateCredentialRequest {
     pub category: Option<String>,
     pub notes: Option<String>,
     pub fields: Option<BTreeMap<String, String>>,
+    pub custom_fields: Option<Vec<CustomField>>,
     pub favorite: Option<bool>,
 }
 

@@ -137,6 +137,15 @@ export interface Vault {
   updated_at: string
 }
 
+export type CustomFieldType = 'text' | 'hidden' | 'checkbox' | 'linked'
+
+export interface CustomField {
+  field_type: CustomFieldType
+  label: string
+  value: string
+  linked_id?: number
+}
+
 export interface Credential {
   id: string
   vault_id: string
@@ -150,6 +159,7 @@ export interface Credential {
   category: string
   notes: string
   fields: Record<string, string>
+  custom_fields: CustomField[]
   favorite: boolean
   created_by: string
   created_by_name: string
@@ -761,6 +771,7 @@ export const vaultApi = {
     category?: string
     notes?: string
     fields?: Record<string, string>
+    custom_fields?: CustomField[]
     favorite?: boolean
   }) =>
     request<Credential>('/credentials', {
@@ -779,6 +790,7 @@ export const vaultApi = {
       category?: string
       notes?: string
       fields?: Record<string, string>
+      custom_fields?: CustomField[]
       favorite?: boolean
     },
   ) =>

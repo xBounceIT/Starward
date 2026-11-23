@@ -1,4 +1,4 @@
-import type { Credential } from '@/lib/api'
+import type { Credential, CustomField, CustomFieldType } from '@/lib/api'
 
 export type CredentialCategory =
   | 'login'
@@ -1190,6 +1190,97 @@ export function hasCredentialTotp(cred: Pick<Credential, 'fields'>): boolean {
   return Boolean(cred.fields?.totp?.trim())
 }
 
+export interface CustomFieldTypeOption {
+  value: CustomFieldType
+  label: string
+  description: string
+}
+
+export const CUSTOM_FIELD_TYPE_OPTIONS: readonly CustomFieldTypeOption[] = [
+  {
+    value: 'text',
+    label: 'Testo',
+    description: 'Usa i campi di testo per dati come domande di sicurezza',
+  },
+  {
+    value: 'hidden',
+    label: 'Nascosto',
+    description: 'Usa i campi nascosti per dati sensibili come una password',
+  },
+  {
+    value: 'checkbox',
+    label: 'Casella di controllo',
+    description:
+      'Usa le caselle di controllo se vuoi riempire automaticamente la casella di controllo di un modulo, come una email da ricordare',
+  },
+  {
+    value: 'linked',
+    label: 'Collegato',
+    description:
+      'Usa i campi collegati per riutilizzare il valore di un altro campo della credenziale, come username, password o URL',
+  },
+] as const
+
+// ID di collegamento compatibili con Bitwarden LinkedIdType
+export const LINKED_ID_USERNAME = 100
+export const LINKED_ID_PASSWORD = 101
+export const LINKED_ID_URI = 102
+
+export const LINKED_FIELD_OPTIONS: readonly { value: number; label: string }[] = [
+  { value: LINKED_ID_USERNAME, label: 'Username' },
+  { value: LINKED_ID_PASSWORD, label: 'Password' },
+  { value: LINKED_ID_URI, label: 'URL' },
+] as const
+
+export function getCustomFieldTypeOption(
+  type: CustomFieldType,
+): CustomFieldTypeOption {
+  return (
+    CUSTOM_FIELD_TYPE_OPTIONS.find((opt) => opt.value === type) ??
+    CUSTOM_FIELD_TYPE_OPTIONS[0]
+  )
+}
+
+export function getLinkedFieldLabel(linkedId: number | undefined): string {
+  return (
+    LINKED_FIELD_OPTIONS.find((opt) => opt.value === linkedId)?.label ?? 'Campo'
+  )
+}
+
+/// Resolves the current value of a "linked" custom field from the credential core fields.
+export function resolveLinkedFieldValue(
+  cred: Pick<Credential, 'username' | 'password' | 'url'>,
+  linkedId: number | undefined,
+): string {
+  switch (linkedId) {
+    case LINKED_ID_USERNAME:
+      return cred.username
+    case LINKED_ID_PASSWORD:
+      return cred.password
+    case LINKED_ID_URI:
+      return cred.url
+    default:
+      return ''
+  }
+}
+
+export function isLinkedFieldSecret(linkedId: number | undefined): boolean {
+  return linkedId === LINKED_ID_PASSWORD
+}
+
+export function getCustomFieldDisplayValue(
+  cred: Pick<Credential, 'username' | 'password' | 'url'>,
+  field: CustomField,
+): string {
+  if (field.field_type === 'linked') {
+    return resolveLinkedFieldValue(cred, field.linked_id)
+  }
+  if (field.field_type === 'checkbox') {
+    return field.value === 'true' ? 'Sì' : 'No'
+  }
+  return field.value
+}
+
 export function getSearchableMetadata(cred: Credential): string {
   const fields = cred.fields ?? {}
   return [
@@ -1218,6 +1309,12 @@ export function getSearchableMetadata(cred: Credential): string {
     fields.country,
     fields.tags,
     hasCredentialTotp(cred) ? 'otp totp 2fa' : '',
+    ...(cred.custom_fields ?? []).flatMap((cf) => [
+      cf.label,
+      cf.field_type === 'hidden' || cf.field_type === 'linked'
+        ? ''
+        : cf.value,
+    ]),
   ]
     .filter(Boolean)
     .join(' ')
