@@ -539,7 +539,7 @@ export function AppSidebar({
               Il toggle sta a sinistra del titolo brand: quando la sidebar
               collassa il titolo sparisce e il toggle resta dov'è, a sinistra
               nella striscia da 3rem. */}
-          <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="mt-1 flex items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -558,6 +558,13 @@ export function AppSidebar({
               className="min-w-0 truncate text-xl leading-none font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=strip]:hidden"
             >
               Starward
+            </span>
+            <span
+              inert={sidebarCollapsed}
+              aria-hidden={sidebarCollapsed || undefined}
+              className="shrink-0 text-[11px] leading-none text-muted-foreground sync-security:text-[#ff9c00]/90 group-data-[collapsible=strip]:hidden"
+            >
+              v{APP_VERSION}
             </span>
           </div>
 
@@ -992,17 +999,6 @@ export function AppSidebar({
           </>
         )}
         </SidebarContent>
-
-        <div
-          aria-hidden={sidebarCollapsed || undefined}
-          className={cn(
-            sidebarInnerWidthClass,
-            collapsibleFadeClass,
-            'shrink-0 whitespace-nowrap px-3 py-2 text-left text-[11px] text-muted-foreground sync-security:text-[#ff9c00]/90',
-          )}
-        >
-          v{APP_VERSION}
-        </div>
 
         <SidebarFooter
           inert={sidebarCollapsed}
