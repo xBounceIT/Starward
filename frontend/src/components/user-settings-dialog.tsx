@@ -869,7 +869,7 @@ export function UserSettingsDialog({
             }}
             className="flex min-h-0 min-w-0 flex-1 max-sm:flex-col"
           >
-            <TabsList className="grid w-full shrink-0 grid-cols-5 sm:h-full sm:w-56 sm:grid-cols-1 sm:auto-rows-fr">
+            <TabsList className="grid w-full shrink-0 grid-cols-5 sm:h-full! sm:w-56 sm:grid-cols-1 sm:auto-rows-fr">
               <TabsTrigger
                 value="profile"
                 className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
@@ -907,10 +907,11 @@ export function UserSettingsDialog({
               </TabsTrigger>
             </TabsList>
 
-            <div
-              ref={scrollContainerRef}
-              className="mt-4 min-h-0 min-w-0 flex-1 overflow-y-auto pr-1 pb-1 [scrollbar-gutter:stable] sm:mt-0 sm:pl-3"
-            >
+            <div className="relative mt-4 min-h-0 min-w-0 flex-1 sm:mt-0">
+              <div
+                ref={scrollContainerRef}
+                className="h-full min-w-0 overflow-y-auto pr-1 pb-1 [scrollbar-gutter:stable] sm:pl-3"
+              >
               {/* TAB 1: PROFILE */}
               <TabsContent value="profile" className="mt-0 min-w-0 space-y-5">
                 <div className="flex flex-col gap-4 rounded-xl border bg-muted/25 p-4 sm:flex-row sm:items-center">
@@ -1904,6 +1905,11 @@ export function UserSettingsDialog({
                   </p>
                 </div>
               </TabsContent>
+              </div>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background via-background/60 to-transparent backdrop-blur-[4px]"
+              />
             </div>
           </Tabs>
         </DialogContent>
