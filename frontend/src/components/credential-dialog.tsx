@@ -55,6 +55,7 @@ import {
   type PasswordOptions,
 } from '@/lib/vault-utils'
 import { cn } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 interface CredentialDialogProps {
   open: boolean
@@ -194,7 +195,7 @@ export function CredentialDialog({
           !extraValues.private_key?.trim()
         ) {
           toast.error(
-            'Inserisci almeno il Relying Party ID (RP ID), il Credential ID o la chiave privata della passkey',
+            t('credential-dialog.inserisci-almeno-il-relying-party-id-rp-id-il-cr'),
           )
           return false
         }
@@ -209,7 +210,7 @@ export function CredentialDialog({
           !hasAnyExtra
         ) {
           toast.error(
-            "Inserisci almeno un dato dell'identità (es. nome, email, telefono, indirizzo o documento)",
+            t('credential-dialog.inserisci-almeno-un-dato-dell-identita-es-nome-e'),
           )
           return false
         }
@@ -217,37 +218,37 @@ export function CredentialDialog({
       }
       case 'note':
         if (!coreValues.notes.trim()) {
-          toast.error('Inserisci il contenuto della nota sicura')
+          toast.error(t('credential-dialog.inserisci-il-contenuto-della-nota-sicura'))
           return false
         }
         return true
       case 'ssh':
         if (!coreValues.password && !extraValues.private_key?.trim()) {
-          toast.error('Inserisci una password o una chiave privata SSH')
+          toast.error(t('credential-dialog.inserisci-una-password-o-una-chiave-privata-ssh'))
           return false
         }
         return true
       case 'api_key':
         if (!coreValues.password) {
-          toast.error('Inserisci la chiave API / token')
+          toast.error(t('credential-dialog.inserisci-la-chiave-api-token'))
           return false
         }
         return true
       case 'card':
         if (!coreValues.password) {
-          toast.error('Inserisci il numero della carta')
+          toast.error(t('credential-dialog.inserisci-il-numero-della-carta'))
           return false
         }
         return true
       case 'license':
         if (!coreValues.password) {
-          toast.error('Inserisci la chiave di licenza')
+          toast.error(t('credential-dialog.inserisci-la-chiave-di-licenza'))
           return false
         }
         return true
       default:
         if (!coreValues.password) {
-          toast.error('Inserisci o genera una password')
+          toast.error(t('credential-dialog.inserisci-o-genera-una-password'))
           return false
         }
         return true
@@ -257,11 +258,11 @@ export function CredentialDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!vaultId) {
-      toast.error('Seleziona una cartella di destinazione')
+      toast.error(t('credential-dialog.seleziona-una-cartella-di-destinazione'))
       return
     }
     if (!title.trim()) {
-      toast.error('Inserisci un titolo')
+      toast.error(t('credential-dialog.inserisci-un-titolo'))
       return
     }
     if (!validateForCategory()) {
@@ -289,12 +290,12 @@ export function CredentialDialog({
       if (otpAdvancedOpen) {
         const periodRaw = otpPeriodDraft.trim()
         if (!/^\d+$/.test(periodRaw)) {
-          toast.error('Il periodo OTP deve essere compreso tra 10 e 300 secondi')
+          toast.error(t('credential-dialog.il-periodo-otp-deve-essere-compreso-tra-10-e-300'))
           return
         }
         const periodNum = Number.parseInt(periodRaw, 10)
         if (periodNum < 10 || periodNum > 300) {
-          toast.error('Il periodo OTP deve essere compreso tra 10 e 300 secondi')
+          toast.error(t('credential-dialog.il-periodo-otp-deve-essere-compreso-tra-10-e-300'))
           return
         }
       }
@@ -318,7 +319,7 @@ export function CredentialDialog({
       username: activeCoreKeys.has('username')
         ? coreValues.username.trim()
         : '',
-      password: activeCoreKeys.has('password') ? coreValues.password : '',
+      password: activeCoreKeys.has(t('credential-dialog.password')) ? coreValues.password : '',
       url: activeCoreKeys.has('url') ? coreValues.url.trim() : '',
       category: categoryConfig.value,
       notes: activeCoreKeys.has('notes') ? coreValues.notes.trim() : '',
@@ -334,8 +335,8 @@ export function CredentialDialog({
 
       toast.success(
         editingCredential
-          ? `Credenziale "${saved.title}" aggiornata`
-          : `Credenziale "${saved.title}" salvata`,
+          ? t('credential-dialog.credenziale-v0-aggiornata', { v0: saved.title })
+          : t('credential-dialog.credenziale-v0-salvata', { v0: saved.title }),
       )
       onSaved(saved)
       onOpenChange(false)
@@ -343,7 +344,7 @@ export function CredentialDialog({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nel salvataggio credenziale',
+          : t('credential-dialog.errore-nel-salvataggio-credenziale'),
       )
     } finally {
       setSubmitting(false)
@@ -387,7 +388,7 @@ export function CredentialDialog({
         <div className="flex items-center justify-between gap-2">
           <Label htmlFor="cred-field-totp" className="flex items-center gap-1.5">
             <ShieldCheck className="size-3.5 text-primary sync-security:text-[#ff9c00]" />
-            <span>Codice OTP (2FA / TOTP)</span>
+            <span>{t('credential-dialog.codice-otp-2fa-totp')}</span>
           </Label>
 
           <div className="flex items-center gap-1">
@@ -403,8 +404,7 @@ export function CredentialDialog({
                 ) : (
                   <ChevronDown className="size-3" />
                 )}
-                Parametri avanzati
-              </Button>
+                {t('credential-dialog.parametri-avanzati')}</Button>
             )}
             {options?.allowCollapse && !trimmedTotp && (
               <Button
@@ -413,8 +413,7 @@ export function CredentialDialog({
                 size="xs"
                 onClick={() => setShowOptionalOtp(false)}
               >
-                Rimuovi
-              </Button>
+                {t('credential-dialog.rimuovi')}</Button>
             )}
           </div>
         </div>
@@ -422,7 +421,7 @@ export function CredentialDialog({
         <div className="relative">
           <Input
             id="cred-field-totp"
-            type={isRevealed ? 'text' : 'password'}
+            type={isRevealed ? 'text' : t('credential-dialog.password')}
             value={totpRaw}
             onChange={(e) => {
               const nextVal = e.target.value
@@ -434,7 +433,7 @@ export function CredentialDialog({
                 setOtpPeriodDraft(String(nextParsed.config.period))
               }
             }}
-            placeholder="Chiave Base32 (es. JBSWY3DPEHPK3PXP) o URI otpauth://totp/..."
+            placeholder={t('credential-dialog.chiave-base32-es-jbswy3dpehpk3pxp-o-uri-otpauth-')}
             className={totpRaw ? 'pr-16' : 'pr-10'}
           />
           <div className="absolute top-1/2 right-1.5 flex -translate-y-1/2 items-center gap-0.5">
@@ -454,8 +453,8 @@ export function CredentialDialog({
                 }}
                 className="text-muted-foreground"
                 tabIndex={-1}
-                aria-label="Rimuovi segreto OTP"
-                title="Rimuovi segreto OTP"
+                aria-label={t('credential-dialog.rimuovi-segreto-otp')}
+                title={t('credential-dialog.rimuovi-segreto-otp')}
               >
                 <X className="size-3.5" />
               </Button>
@@ -468,7 +467,7 @@ export function CredentialDialog({
               className="text-muted-foreground"
               tabIndex={-1}
               aria-label={
-                isRevealed ? 'Nascondi segreto OTP' : 'Mostra segreto OTP'
+                isRevealed ? t('credential-dialog.nascondi-segreto-otp') : t('credential-dialog.mostra-segreto-otp')
               }
             >
               {isRevealed ? (
@@ -484,8 +483,7 @@ export function CredentialDialog({
           <div className="grid grid-cols-3 gap-2 rounded-lg border border-border/70 bg-muted/30 p-2.5">
             <div className="space-y-1">
               <Label className="text-[11px] text-muted-foreground">
-                Algoritmo
-              </Label>
+                {t('credential-dialog.algoritmo')}</Label>
               <Select
                 value={activeAlgorithm}
                 onValueChange={(val) =>
@@ -504,7 +502,7 @@ export function CredentialDialog({
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[11px] text-muted-foreground">Cifre</Label>
+              <Label className="text-[11px] text-muted-foreground">{t('credential-dialog.cifre')}</Label>
               <Select
                 value={String(activeDigits)}
                 onValueChange={(val) =>
@@ -515,9 +513,9 @@ export function CredentialDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="6">6 cifre</SelectItem>
-                  <SelectItem value="7">7 cifre</SelectItem>
-                  <SelectItem value="8">8 cifre</SelectItem>
+                  <SelectItem value="6">{t('credential-dialog.6-cifre')}</SelectItem>
+                  <SelectItem value="7">{t('credential-dialog.7-cifre')}</SelectItem>
+                  <SelectItem value="8">{t('credential-dialog.8-cifre')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -527,8 +525,7 @@ export function CredentialDialog({
                 htmlFor="cred-field-totp-period"
                 className="text-[11px] text-muted-foreground"
               >
-                Periodo (s)
-              </Label>
+                {t('credential-dialog.periodo-s')}</Label>
               <Input
                 id="cred-field-totp-period"
                 type="number"
@@ -557,7 +554,7 @@ export function CredentialDialog({
           (parsedTotp.ok ? (
             <OtpCodeCard
               totpValue={trimmedTotp}
-              label="Anteprima codice OTP"
+              label={t('credential-dialog.anteprima-codice-otp')}
               compact
               showSecretToggle={false}
             />
@@ -595,24 +592,21 @@ export function CredentialDialog({
                   {isRevealed ? (
                     <>
                       <EyeOff className="size-3" />
-                      Nascondi
-                    </>
+                      {t('credential-dialog.nascondi')}</>
                   ) : (
                     <>
                       <Eye className="size-3" />
-                      Mostra
-                    </>
+                      {t('credential-dialog.mostra')}</>
                   )}
                 </Button>
               )}
 
-            {field.showGenerator && field.key === 'password' && (
+            {field.showGenerator && field.key === t('credential-dialog.password') && (
               <Popover open={genOpen} onOpenChange={setGenOpen}>
                 <PopoverTrigger asChild>
                   <Button type="button" variant="ghost" size="xs">
                     <Sparkles className="size-3.5" />
-                    Genera
-                  </Button>
+                    {t('credential-dialog.genera')}</Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80">
                   <PasswordGenerator
@@ -646,7 +640,7 @@ export function CredentialDialog({
               <SelectValue placeholder={field.placeholder} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={EMPTY_SELECT_VALUE}>Nessuno</SelectItem>
+              <SelectItem value={EMPTY_SELECT_VALUE}>{t('credential-dialog.nessuno')}</SelectItem>
               {field.options.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
@@ -676,8 +670,7 @@ export function CredentialDialog({
                 onClick={() => toggleReveal(field.key)}
               >
                 <Eye className="size-3" />
-                Mostra / Modifica
-              </Button>
+                {t('credential-dialog.mostra-modifica')}</Button>
             </div>
           ) : (
             <Textarea
@@ -697,7 +690,7 @@ export function CredentialDialog({
           <div className="relative">
             <Input
               id={fieldId}
-              type={isRevealed ? 'text' : 'password'}
+              type={isRevealed ? 'text' : t('credential-dialog.password')}
               value={value}
               onChange={(e) => setFieldValue(field, e.target.value)}
               placeholder={field.placeholder}
@@ -711,7 +704,7 @@ export function CredentialDialog({
               onClick={() => toggleReveal(field.key)}
               className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
               tabIndex={-1}
-              aria-label={isRevealed ? 'Nascondi valore' : 'Mostra valore'}
+              aria-label={isRevealed ? t('credential-dialog.nascondi-valore') : t('credential-dialog.mostra-valore')}
             >
               {isRevealed ? (
                 <EyeOff className="size-3.5" />
@@ -737,7 +730,7 @@ export function CredentialDialog({
           />
         )}
 
-        {field.showStrength && field.key === 'password' && value && (
+        {field.showStrength && field.key === t('credential-dialog.password') && value && (
           <div className="flex items-center gap-2 pt-0.5">
             <Progress value={strength.percent} className="h-1.5 flex-1" />
             <span className="text-[11px] font-medium text-muted-foreground">
@@ -754,12 +747,10 @@ export function CredentialDialog({
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            {editingCredential ? 'Modifica credenziale' : 'Nuova credenziale'}
+            {editingCredential ? t('credential-dialog.modifica-credenziale') : t('credential-dialog.nuova-credenziale')}
           </DialogTitle>
           <DialogDescription>
-            Tutti i campi sensibili vengono cifrati con AES-256-GCM nel vault
-            centralizzato.
-          </DialogDescription>
+            {t('credential-dialog.tutti-i-campi-sensibili-vengono-cifrati-con-aes-')}</DialogDescription>
         </DialogHeader>
 
         <form
@@ -769,10 +760,10 @@ export function CredentialDialog({
           <div className="flex-1 space-y-4 overflow-y-auto pr-1">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>Cartella</Label>
+                <Label>{t('credential-dialog.cartella')}</Label>
                 <Select value={vaultId} onValueChange={setVaultId}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleziona cartella" />
+                    <SelectValue placeholder={t('credential-dialog.seleziona-cartella')} />
                   </SelectTrigger>
                   <SelectContent>
                     {writableVaults.map((v) => (
@@ -781,7 +772,7 @@ export function CredentialDialog({
                         {v.owner_group_name
                           ? ` (${v.owner_group_name})`
                           : v.is_shared_with_me
-                            ? ' (Condivisa)'
+                            ? t('credential-dialog.condivisa')
                             : ''}
                       </SelectItem>
                     ))}
@@ -790,7 +781,7 @@ export function CredentialDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label>Tipologia</Label>
+                <Label>{t('credential-dialog.tipologia')}</Label>
                 <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
@@ -807,10 +798,10 @@ export function CredentialDialog({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="cred-title">Titolo</Label>
+              <Label htmlFor="cred-title">{t('credential-dialog.titolo')}</Label>
               <Input
                 id="cred-title"
-                placeholder="es. AWS Console, GitHub Passkey, Identità Mario Rossi..."
+                placeholder={t('credential-dialog.es-aws-console-github-passkey-identita-mario-ros')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
@@ -837,16 +828,15 @@ export function CredentialDialog({
                     onClick={() => setShowOptionalOtp(true)}
                   >
                     <Plus className="size-3.5" />
-                    Aggiungi codice OTP (2FA / TOTP)
-                  </Button>
+                    {t('credential-dialog.aggiungi-codice-otp-2fa-totp')}</Button>
                 ))}
 
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="cred-tags">Tag (separati da virgola)</Label>
+                  <Label htmlFor="cred-tags">{t('credential-dialog.tag-separati-da-virgola')}</Label>
                   <Input
                     id="cred-tags"
-                    placeholder="es. personale, produttività, cloud..."
+                    placeholder={t('credential-dialog.es-personale-produttivita-cloud')}
                     value={extraValues.tags ?? ''}
                     onChange={(e) =>
                       setExtraValues((prev) => ({
@@ -860,8 +850,7 @@ export function CredentialDialog({
                 <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
                   <span className="flex items-center gap-2 text-sm font-medium">
                     <Star className="size-4 text-amber-500" />
-                    Aggiungi ai preferiti
-                  </span>
+                    {t('credential-dialog.aggiungi-ai-preferiti')}</span>
                   <Switch checked={favorite} onCheckedChange={setFavorite} />
                 </label>
               </div>
@@ -874,14 +863,13 @@ export function CredentialDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Annulla
-            </Button>
+              {t('credential-dialog.annulla')}</Button>
             <Button type="submit" disabled={submitting}>
               {submitting
                 ? 'Salvataggio...'
                 : editingCredential
-                  ? 'Salva modifiche'
-                  : 'Salva credenziale'}
+                  ? t('credential-dialog.salva-modifiche')
+                  : t('credential-dialog.salva-credenziale')}
             </Button>
           </DialogFooter>
         </form>

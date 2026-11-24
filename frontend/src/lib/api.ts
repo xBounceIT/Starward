@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 export type UserRole = 'admin' | 'user'
 
 export interface UserSummary {
@@ -390,7 +391,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     let code = 'HTTP_ERROR'
-    let message = `Errore richiesta (${res.status})`
+    let message = t('api.request-error', { status: res.status })
     try {
       const data = await res.json()
       if (data?.error?.message) {

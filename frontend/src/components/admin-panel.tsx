@@ -103,6 +103,7 @@ import {
   getInitials,
   getVaultColor,
 } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 export type AdminPanelTab = 'users' | 'groups' | 'service-accounts' | 'audit'
 type AuditPeriodFilter = 'all' | '24h' | '7d' | '30d'
@@ -115,201 +116,201 @@ interface AuditActionMeta {
 
 const AUDIT_ACTION_META: Record<string, AuditActionMeta> = {
   'auth.login': {
-    label: 'Accesso utente',
+    get label() { return t('admin-panel.accesso-utente') },
     tone: 'emerald',
     icon: Lock,
   },
   'auth.api_key_used': {
-    label: 'Accesso API Key',
+    get label() { return t('admin-panel.accesso-api-key') },
     tone: 'violet',
     icon: KeyRound,
   },
   'rbac.role_changed': {
-    label: 'Cambio ruolo RBAC',
+    get label() { return t('admin-panel.cambio-ruolo-rbac') },
     tone: 'amber',
     icon: ShieldCheck,
   },
   'user.deleted': {
-    label: 'Utente eliminato',
+    get label() { return t('admin-panel.utente-eliminato') },
     tone: 'rose',
     icon: Trash2,
   },
   'user.profile_updated': {
-    label: 'Profilo aggiornato',
+    get label() { return t('admin-panel.profilo-aggiornato') },
     tone: 'sky',
     icon: User,
   },
   'user.settings_updated': {
-    label: 'Impostazioni modificate',
+    get label() { return t('admin-panel.impostazioni-modificate') },
     tone: 'sky',
     icon: Settings,
   },
   'api_key.created': {
-    label: 'API Key generata',
+    get label() { return t('admin-panel.api-key-generata') },
     tone: 'emerald',
     icon: KeyRound,
   },
   'api_key.revoked': {
-    label: 'API Key revocata',
+    get label() { return t('admin-panel.api-key-revocata') },
     tone: 'rose',
     icon: Trash2,
   },
   'vault.created': {
-    label: 'Cartella creata',
+    get label() { return t('admin-panel.cartella-creata') },
     tone: 'emerald',
     icon: Folder,
   },
   'vault.updated': {
-    label: 'Cartella aggiornata',
+    get label() { return t('admin-panel.cartella-aggiornata') },
     tone: 'sky',
     icon: Folder,
   },
   'vault.deleted': {
-    label: 'Cartella eliminata',
+    get label() { return t('admin-panel.cartella-eliminata') },
     tone: 'rose',
     icon: Trash2,
   },
   'vault.imported': {
-    label: 'Credenziali importate',
+    get label() { return t('admin-panel.credenziali-importate') },
     tone: 'emerald',
     icon: Upload,
   },
   'vault.shared': {
-    label: 'Cartella condivisa',
+    get label() { return t('admin-panel.cartella-condivisa') },
     tone: 'violet',
     icon: Share2,
   },
   'vault.member_updated': {
-    label: 'Permessi membro modificati',
+    get label() { return t('admin-panel.permessi-membro-modificati') },
     tone: 'amber',
     icon: Users,
   },
   'vault.member_removed': {
-    label: 'Accesso membro revocato',
+    get label() { return t('admin-panel.accesso-membro-revocato') },
     tone: 'rose',
     icon: Users,
   },
   'vault.group_shared': {
-    label: 'Cartella condivisa con gruppo',
+    get label() { return t('admin-panel.cartella-condivisa-con-gruppo') },
     tone: 'violet',
     icon: Share2,
   },
   'vault.group_updated': {
-    label: 'Permessi gruppo modificati',
+    get label() { return t('admin-panel.permessi-gruppo-modificati') },
     tone: 'amber',
     icon: Users,
   },
   'vault.group_removed': {
-    label: 'Accesso gruppo revocato',
+    get label() { return t('admin-panel.accesso-gruppo-revocato') },
     tone: 'rose',
     icon: Users,
   },
   'group.created': {
-    label: 'Gruppo creato',
+    get label() { return t('admin-panel.gruppo-creato') },
     tone: 'emerald',
     icon: Users,
   },
   'group.updated': {
-    label: 'Gruppo aggiornato',
+    get label() { return t('admin-panel.gruppo-aggiornato') },
     tone: 'sky',
     icon: Users,
   },
   'group.deleted': {
-    label: 'Gruppo eliminato',
+    get label() { return t('admin-panel.gruppo-eliminato') },
     tone: 'rose',
     icon: Trash2,
   },
   'group.member_added': {
-    label: 'Membro aggiunto al gruppo',
+    get label() { return t('admin-panel.membro-aggiunto-al-gruppo') },
     tone: 'emerald',
     icon: Users,
   },
   'group.member_updated': {
-    label: 'Ruolo membro gruppo modificato',
+    get label() { return t('admin-panel.ruolo-membro-gruppo-modificato') },
     tone: 'amber',
     icon: Users,
   },
   'group.member_removed': {
-    label: 'Membro rimosso dal gruppo',
+    get label() { return t('admin-panel.membro-rimosso-dal-gruppo') },
     tone: 'rose',
     icon: Users,
   },
   'credential.created': {
-    label: 'Credenziale creata',
+    get label() { return t('admin-panel.credenziale-creata') },
     tone: 'emerald',
     icon: KeyRound,
   },
   'credential.updated': {
-    label: 'Credenziale aggiornata',
+    get label() { return t('admin-panel.credenziale-aggiornata') },
     tone: 'sky',
     icon: KeyRound,
   },
   'credential.deleted': {
-    label: 'Credenziale eliminata',
+    get label() { return t('admin-panel.credenziale-eliminata') },
     tone: 'rose',
     icon: Trash2,
   },
   'credential.accessed': {
-    label: 'Credenziale consultata',
+    get label() { return t('admin-panel.credenziale-consultata') },
     tone: 'violet',
     icon: KeyRound,
   },
   'service_account.created': {
-    label: 'Service Account creato',
+    get label() { return t('admin-panel.service-account-creato') },
     tone: 'emerald',
     icon: Bot,
   },
   'service_account.updated': {
-    label: 'Service Account aggiornato',
+    get label() { return t('admin-panel.service-account-aggiornato') },
     tone: 'sky',
     icon: Bot,
   },
   'service_account.deleted': {
-    label: 'Service Account eliminato',
+    get label() { return t('admin-panel.service-account-eliminato') },
     tone: 'rose',
     icon: Trash2,
   },
   'service_account.key_created': {
-    label: 'Chiave Service Account generata',
+    get label() { return t('admin-panel.chiave-service-account-generata') },
     tone: 'emerald',
     icon: KeyRound,
   },
   'service_account.key_revoked': {
-    label: 'Chiave Service Account revocata',
+    get label() { return t('admin-panel.chiave-service-account-revocata') },
     tone: 'rose',
     icon: Trash2,
   },
   'auth.service_account_key_used': {
-    label: 'Accesso Service Account',
+    get label() { return t('admin-panel.accesso-service-account') },
     tone: 'violet',
     icon: Bot,
   },
   'mcp_key.created': {
-    label: 'Chiave MCP generata',
+    get label() { return t('admin-panel.chiave-mcp-generata') },
     tone: 'emerald',
     icon: Plug,
   },
   'mcp_key.revoked': {
-    label: 'Chiave MCP revocata',
+    get label() { return t('admin-panel.chiave-mcp-revocata') },
     tone: 'rose',
     icon: Trash2,
   },
   'auth.mcp_key_used': {
-    label: 'Accesso Server MCP',
+    get label() { return t('admin-panel.accesso-server-mcp') },
     tone: 'violet',
     icon: Plug,
   },
 }
 
 const TARGET_TYPE_LABELS: Record<string, string> = {
-  auth: 'Autenticazione',
-  user: 'Utente & RBAC',
-  group: 'Gruppo',
-  vault: 'Cartella',
-  credential: 'Credenziale',
-  api_key: 'API Key',
-  mcp_key: 'Chiave MCP',
-  service_account: 'Service Account',
+  get auth() { return t('admin-panel.autenticazione') },
+  get user() { return t('admin-panel.utente-rbac') },
+  get group() { return t('admin-panel.gruppo') },
+  get vault() { return t('admin-panel.cartella-1') },
+  get credential() { return t('admin-panel.credenziale') },
+  get api_key() { return t('admin-panel.api-key') },
+  get mcp_key() { return t('admin-panel.chiave-mcp') },
+  get service_account() { return t('admin-panel.service-account') },
 }
 
 function getAuditActionMeta(action: string): AuditActionMeta {
@@ -369,24 +370,24 @@ interface AuditActionFilterValue {
   action: string
 }
 const AUDIT_ROLE_OPTIONS: { value: '' | UserRole; label: string }[] = [
-  { value: '', label: 'Tutti' },
-  { value: 'admin', label: 'Admin' },
-  { value: 'user', label: 'User' },
+  { value: '', get label() { return t('admin-panel.tutti') } },
+  { value: 'admin', get label() { return t('admin-panel.admin') } },
+  { value: 'user', get label() { return t('admin-panel.user') } },
 ]
 const AUDIT_TARGET_OPTIONS: { value: string; label: string }[] = [
-  { value: 'auth', label: 'Autenticazione' },
-  { value: 'user', label: 'Utenti & RBAC' },
-  { value: 'vault', label: 'Cartelle' },
-  { value: 'credential', label: 'Credenziali' },
-  { value: 'api_key', label: 'API Key' },
-  { value: 'mcp_key', label: 'Chiave MCP' },
-  { value: 'service_account', label: 'Service Account' },
+  { value: 'auth', get label() { return t('admin-panel.autenticazione') } },
+  { value: 'user', get label() { return t('admin-panel.utenti-rbac') } },
+  { value: 'vault', get label() { return t('admin-panel.cartelle-1') } },
+  { value: 'credential', get label() { return t('admin-panel.credenziali-1') } },
+  { value: 'api_key', get label() { return t('admin-panel.api-key') } },
+  { value: 'mcp_key', get label() { return t('admin-panel.chiave-mcp') } },
+  { value: 'service_account', get label() { return t('admin-panel.service-account') } },
 ]
 const AUDIT_PERIOD_OPTIONS: { value: AuditPeriodFilter; label: string }[] = [
-  { value: 'all', label: 'Tutto' },
-  { value: '24h', label: '24 ore' },
-  { value: '7d', label: '7 giorni' },
-  { value: '30d', label: '30 giorni' },
+  { value: 'all', get label() { return t('admin-panel.tutto') } },
+  { value: '24h', get label() { return t('admin-panel.24-ore') } },
+  { value: '7d', get label() { return t('admin-panel.7-giorni') } },
+  { value: '30d', get label() { return t('admin-panel.30-giorni') } },
 ]
 const auditGlobalFilter: FilterFn<SystemAuditEvent> = (
   row,
@@ -466,7 +467,7 @@ function AuditSortButton({
     <button
       type="button"
       onClick={column.getToggleSortingHandler()}
-      title="Ordina colonna"
+      title={t('admin-panel.ordina-colonna')}
       className="inline-flex items-center gap-1 transition-colors hover:text-foreground"
     >
       <span>{label}</span>
@@ -529,13 +530,12 @@ function ActorColumnFilter({
   const active = value.actorId !== 'all' || value.role !== ''
   return (
     <Popover>
-      <HeaderFilterTrigger active={active} title="Filtra per attore o ruolo">
+      <HeaderFilterTrigger active={active} title={t('admin-panel.filtra-per-attore-o-ruolo')}>
         <ListFilter className="size-3.5" />
       </HeaderFilterTrigger>
       <PopoverContent align="start" className="w-64 p-2">
         <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Ruolo
-        </p>
+          {t('admin-panel.ruolo')}</p>
         <div className="mb-2.5 flex gap-1 rounded-lg border border-border/60 bg-background/50 p-0.5 sync-security:border-white/15 sync-security:bg-[#000c20]">
           {AUDIT_ROLE_OPTIONS.map((pill) => (
             <button
@@ -554,8 +554,7 @@ function ActorColumnFilter({
           ))}
         </div>
         <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Attore
-        </p>
+          {t('admin-panel.attore')}</p>
         <div className="max-h-56 overflow-y-auto">
           <button
             type="button"
@@ -568,8 +567,7 @@ function ActorColumnFilter({
                 value.actorId === 'all' ? 'opacity-100' : 'opacity-0',
               )}
             />
-            Tutti gli utenti
-          </button>
+            {t('admin-panel.tutti-gli-utenti')}</button>
           {actors.map((actor) => (
             <button
               key={actor.id}
@@ -613,13 +611,12 @@ function ActionColumnFilter({
   const active = value.targetType !== 'all' || value.action !== 'all'
   return (
     <Popover>
-      <HeaderFilterTrigger active={active} title="Filtra per azione o risorsa">
+      <HeaderFilterTrigger active={active} title={t('admin-panel.filtra-per-azione-o-risorsa')}>
         <ListFilter className="size-3.5" />
       </HeaderFilterTrigger>
       <PopoverContent align="start" className="w-64 p-2">
         <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Risorsa
-        </p>
+          {t('admin-panel.risorsa')}</p>
         <div className="mb-2.5 max-h-40 overflow-y-auto">
           <button
             type="button"
@@ -632,8 +629,7 @@ function ActionColumnFilter({
                 value.targetType === 'all' ? 'opacity-100' : 'opacity-0',
               )}
             />
-            Tutte le risorse
-          </button>
+            {t('admin-panel.tutte-le-risorse')}</button>
           {AUDIT_TARGET_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -652,8 +648,7 @@ function ActionColumnFilter({
           ))}
         </div>
         <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Azione
-        </p>
+          {t('admin-panel.azione')}</p>
         <div className="max-h-56 overflow-y-auto">
           <button
             type="button"
@@ -666,8 +661,7 @@ function ActionColumnFilter({
                 value.action === 'all' ? 'opacity-100' : 'opacity-0',
               )}
             />
-            Tutte le azioni
-          </button>
+            {t('admin-panel.tutte-le-azioni')}</button>
           {actions.map((act) => {
             const meta = getAuditActionMeta(act)
             return (
@@ -708,7 +702,7 @@ function PeriodColumnFilter({
     <Popover>
       <HeaderFilterTrigger
         active={value !== 'all'}
-        title="Filtra per intervallo temporale"
+        title={t('admin-panel.filtra-per-intervallo-temporale')}
       >
         <ListFilter className="size-3.5" />
       </HeaderFilterTrigger>
@@ -804,7 +798,7 @@ export function AdminPanel({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nel caricamento dei dati di amministrazione',
+          : t('admin-panel.errore-nel-caricamento-dei-dati-di-amministrazio'),
       )
     } finally {
       setLoading(false)
@@ -825,7 +819,7 @@ export function AdminPanel({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nel caricamento del registro Audit di Sistema',
+          : t('admin-panel.errore-nel-caricamento-del-registro-audit-di-sis'),
       )
     } finally {
       setAuditLoading(false)
@@ -920,11 +914,11 @@ export function AdminPanel({
         prev.map((g) => (g.id === updated.id ? updated : g)),
       )
       setMemberSearch('')
-      toast.success(`${user.name} aggiunto al gruppo "${group.name}"`)
+      toast.success(t('admin-panel.v0-aggiunto-al-gruppo-v1', { v0: user.name, v1: group.name }))
       onUsersChanged?.()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore aggiunta membro',
+        err instanceof Error ? err.message : t('admin-panel.errore-aggiunta-membro'),
       )
     } finally {
       setBusyGroupKey(null)
@@ -946,11 +940,11 @@ export function AdminPanel({
       setAdminGroups((prev) =>
         prev.map((g) => (g.id === updated.id ? updated : g)),
       )
-      toast.success('Ruolo aggiornato')
+      toast.success(t('admin-panel.ruolo-aggiornato'))
       onUsersChanged?.()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore aggiornamento ruolo',
+        err instanceof Error ? err.message : t('admin-panel.errore-aggiornamento-ruolo'),
       )
     } finally {
       setBusyGroupKey(null)
@@ -976,11 +970,11 @@ export function AdminPanel({
           }
         }),
       )
-      toast.success(`${email} rimosso dal gruppo "${group.name}"`)
+      toast.success(t('admin-panel.v0-rimosso-dal-gruppo-v1', { v0: email, v1: group.name }))
       onUsersChanged?.()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore rimozione membro',
+        err instanceof Error ? err.message : t('admin-panel.errore-rimozione-membro'),
       )
     } finally {
       setBusyGroupKey(null)
@@ -996,11 +990,11 @@ export function AdminPanel({
       await vaultApi.deleteGroup(target.id)
       setAdminGroups((prev) => prev.filter((g) => g.id !== target.id))
       if (expandedGroupId === target.id) setExpandedGroupId(null)
-      toast.success(`Gruppo "${target.name}" eliminato`)
+      toast.success(t('admin-panel.gruppo-v0-eliminato', { v0: target.name }))
       onUsersChanged?.()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore eliminazione gruppo',
+        err instanceof Error ? err.message : t('admin-panel.errore-eliminazione-gruppo'),
       )
     } finally {
       setBusyGroupKey(null)
@@ -1016,9 +1010,7 @@ export function AdminPanel({
         prev.map((u) => (u.id === updated.id ? updated : u)),
       )
       toast.success(
-        `Ruolo di ${updated.name} aggiornato a ${
-          nextRole === 'admin' ? 'Admin' : 'User'
-        }`,
+        t('admin-panel.ruolo-di-v0-aggiornato-a-v1', { v0: updated.name, v1: nextRole === 'admin' ? 'Admin' : 'User' }),
       )
       onUsersChanged?.()
       loadAudit(true)
@@ -1026,7 +1018,7 @@ export function AdminPanel({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante la modifica del ruolo',
+          : t('admin-panel.errore-durante-la-modifica-del-ruolo'),
       )
     } finally {
       setBusyUserId(null)
@@ -1041,14 +1033,14 @@ export function AdminPanel({
     try {
       await vaultApi.deleteUser(target.id)
       setUsers((prev) => prev.filter((u) => u.id !== target.id))
-      toast.success(`Utente "${target.name}" (${target.email}) eliminato`)
+      toast.success(t('admin-panel.utente-v0-v1-eliminato', { v0: target.name, v1: target.email }))
       onUsersChanged?.()
       loadAudit(true)
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Errore durante l'eliminazione dell'utente",
+          : t('admin-panel.errore-durante-l-eliminazione-dell-utente'),
       )
     } finally {
       setBusyUserId(null)
@@ -1132,7 +1124,7 @@ export function AdminPanel({
         filterFn: auditActorFilter,
         header: ({ column }) => (
           <div className="flex items-center gap-0.5">
-            <AuditSortButton column={column} label="Utente" />
+            <AuditSortButton column={column} label={t('admin-panel.utente')} />
             <ActorColumnFilter column={column} actors={availableActors} />
           </div>
         ),
@@ -1157,8 +1149,7 @@ export function AdminPanel({
                       variant="secondary"
                       className="px-1.5 py-0 text-[10px] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                     >
-                      Tu
-                    </Badge>
+                      {t('admin-panel.tu')}</Badge>
                   )}
                   {isAdmin ? (
                     <Badge
@@ -1166,16 +1157,14 @@ export function AdminPanel({
                       className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
                     >
                       <ShieldCheck className="size-2.5" />
-                      Admin
-                    </Badge>
+                      {t('admin-panel.admin')}</Badge>
                   ) : (
                     <Badge
                       variant="outline"
                       className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
                     >
                       <User className="size-2.5" />
-                      User
-                    </Badge>
+                      {t('admin-panel.user')}</Badge>
                   )}
                 </div>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -1194,7 +1183,7 @@ export function AdminPanel({
           <div className="flex items-center gap-0.5">
             <AuditSortButton
               column={column}
-              label="Azione"
+              label={t('admin-panel.azione')}
             />
             <ActionColumnFilter column={column} actions={availableActions} />
           </div>
@@ -1242,7 +1231,7 @@ export function AdminPanel({
         header: ({ column }) => (
           <div className="flex items-center justify-end gap-0.5">
             <PeriodColumnFilter column={column} />
-            <AuditSortButton column={column} label="Data" />
+            <AuditSortButton column={column} label={t('admin-panel.data')} />
           </div>
         ),
         cell: ({ row }) => {
@@ -1293,13 +1282,10 @@ export function AdminPanel({
                 <ShieldCheck className="size-4.5" />
               </div>
               <h2 className="truncate font-bold text-lg tracking-normal">
-                Pannello Admin
-              </h2>
+                {t('admin-panel.pannello-admin')}</h2>
             </div>
             <p className="mt-1 truncate pl-10 text-xs text-muted-foreground">
-              Gestione centralizzata degli utenti, Service Account di sistema
-              con API Key granulari e audit.
-            </p>
+              {t('admin-panel.gestione-centralizzata-degli-utenti-service-acco')}</p>
           </div>
         </div>
 
@@ -1314,8 +1300,7 @@ export function AdminPanel({
                 {stats.total}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Utenti registrati
-              </p>
+                {t('admin-panel.utenti-registrati')}</p>
             </div>
           </div>
 
@@ -1328,8 +1313,7 @@ export function AdminPanel({
                 {stats.admins}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Amministratori (Admin)
-              </p>
+                {t('admin-panel.amministratori-admin')}</p>
             </div>
           </div>
 
@@ -1342,8 +1326,7 @@ export function AdminPanel({
                 {stats.totalGroups}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Gruppi attivi
-              </p>
+                {t('admin-panel.gruppi-attivi')}</p>
             </div>
           </div>
 
@@ -1356,8 +1339,7 @@ export function AdminPanel({
                 {serviceAccountsCount}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Service Account
-              </p>
+                {t('admin-panel.service-account')}</p>
             </div>
           </div>
 
@@ -1370,8 +1352,7 @@ export function AdminPanel({
                 {stats.totalVaults}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Cartelle create
-              </p>
+                {t('admin-panel.cartelle-create')}</p>
             </div>
           </div>
         </div>
@@ -1385,7 +1366,7 @@ export function AdminPanel({
             <div className="relative min-w-[220px] flex-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Cerca utente per nome o email..."
+                placeholder={t('admin-panel.cerca-utente-per-nome-o-email')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-10 rounded-xl border-border/70 bg-card/50 pr-10 pl-10 text-sm"
@@ -1397,7 +1378,7 @@ export function AdminPanel({
                   size="icon-xs"
                   onClick={() => setSearchQuery('')}
                   className="absolute top-1/2 right-2.5 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Cancella ricerca"
+                  aria-label={t('admin-panel.cancella-ricerca')}
                 >
                   <X className="size-3.5" />
                 </Button>
@@ -1408,9 +1389,9 @@ export function AdminPanel({
               <div className="flex items-center gap-1 border border-border/70 bg-card/50 p-1 rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]">
                 {(
                   [
-                    { value: '', label: 'Tutti' },
-                    { value: 'admin', label: 'Admin' },
-                    { value: 'user', label: 'User' },
+                    { value: '', label: t('admin-panel.tutti') },
+                    { value: 'admin', label: t('admin-panel.admin') },
+                    { value: 'user', label: t('admin-panel.user') },
                   ] as const
                 ).map((pill) => {
                   const active = roleFilter === pill.value
@@ -1443,7 +1424,7 @@ export function AdminPanel({
                 <RefreshCw
                   className={cn('size-3.5', refreshing && 'animate-spin')}
                 />
-                <span className="hidden sm:inline">Aggiorna</span>
+                <span className="hidden sm:inline">{t('admin-panel.aggiorna')}</span>
               </Button>
             </div>
           </div>
@@ -1473,11 +1454,9 @@ export function AdminPanel({
                   <Users className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
-                  Nessun utente trovato
-                </p>
+                  {t('admin-panel.nessun-utente-trovato')}</p>
                 <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                  Prova a modificare i termini di ricerca o il filtro per ruolo.
-                </p>
+                  {t('admin-panel.prova-a-modificare-i-termini-di-ricerca-o-il-fil')}</p>
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -1514,8 +1493,7 @@ export function AdminPanel({
                                 variant="secondary"
                                 className="px-1.5 py-0 text-[10px] sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]"
                               >
-                                Tu
-                              </Badge>
+                                {t('admin-panel.tu')}</Badge>
                             )}
                             {isAdmin ? (
                               <Badge
@@ -1523,16 +1501,14 @@ export function AdminPanel({
                                 className="gap-1 border-amber-500/30 bg-amber-500/15 px-2 py-0 text-[10px] font-semibold text-amber-300"
                               >
                                 <ShieldCheck className="size-3" />
-                                Admin
-                              </Badge>
+                                {t('admin-panel.admin')}</Badge>
                             ) : (
                               <Badge
                                 variant="outline"
                                 className="gap-1 px-2 py-0 text-[10px] text-muted-foreground"
                               >
                                 <User className="size-3" />
-                                User
-                              </Badge>
+                                {t('admin-panel.user')}</Badge>
                             )}
                           </div>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -1546,18 +1522,18 @@ export function AdminPanel({
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <div
                             className="flex items-center gap-1.5"
-                            title="Cartelle di proprietà e credenziali"
+                            title={t('admin-panel.cartelle-di-proprieta-e-credenziali')}
                           >
                             <Folder className="size-3.5 text-sky-400" />
-                            <span>{u.vault_count} cartelle</span>
+                            <span>{u.vault_count} {t('admin-panel.cartelle-2')}</span>
                             <span className="text-border">·</span>
                             <KeyRound className="size-3.5 text-muted-foreground sync-security:text-[#ff9c00]" />
-                            <span>{u.credential_count} credenziali</span>
+                            <span>{u.credential_count} {t('admin-panel.credenziali-2')}</span>
                           </div>
 
                           <div
                             className="hidden items-center gap-1.5 lg:flex"
-                            title={`Registrato il ${formatShortDate(u.created_at)}`}
+                            title={t('admin-panel.registrato-il-v0', { v0: formatShortDate(u.created_at) })}
                           >
                             <Calendar className="size-3.5" />
                             <span>{formatShortDate(u.created_at)}</span>
@@ -1565,7 +1541,7 @@ export function AdminPanel({
 
                           <div
                             className="hidden items-center gap-1.5 md:flex"
-                            title="Ultimo accesso rilevato"
+                            title={t('admin-panel.ultimo-accesso-rilevato')}
                           >
                             <Clock className="size-3.5 text-emerald-400" />
                             <span>{formatRelativeDate(u.last_seen_at)}</span>
@@ -1584,15 +1560,15 @@ export function AdminPanel({
                               className="h-8 w-28 rounded-lg text-xs"
                               title={
                                 isSelf
-                                  ? 'Non puoi modificare il tuo stesso ruolo'
-                                  : 'Cambia ruolo utente'
+                                  ? t('admin-panel.non-puoi-modificare-il-tuo-stesso-ruolo')
+                                  : t('admin-panel.cambia-ruolo-utente')
                               }
                             >
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="admin">{t('admin-panel.admin')}</SelectItem>
+                              <SelectItem value="user">{t('admin-panel.user')}</SelectItem>
                             </SelectContent>
                           </Select>
 
@@ -1605,10 +1581,10 @@ export function AdminPanel({
                             className="size-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive disabled:opacity-40"
                             title={
                               isSelf
-                                ? 'Non puoi eliminare il tuo stesso account'
-                                : `Elimina utente ${u.name}`
+                                ? t('admin-panel.non-puoi-eliminare-il-tuo-stesso-account')
+                                : t('admin-panel.elimina-utente-v0', { v0: u.name })
                             }
-                            aria-label={`Elimina utente ${u.name}`}
+                            aria-label={t('admin-panel.elimina-utente-v0', { v0: u.name })}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -1628,7 +1604,7 @@ export function AdminPanel({
             <div className="relative min-w-[220px] flex-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Cerca gruppo per nome, descrizione o membro..."
+                placeholder={t('admin-panel.cerca-gruppo-per-nome-descrizione-o-membro')}
                 value={groupSearchQuery}
                 onChange={(e) => setGroupSearchQuery(e.target.value)}
                 className="h-10 rounded-xl border-border/70 bg-card/50 pr-10 pl-10 text-sm"
@@ -1640,7 +1616,7 @@ export function AdminPanel({
                   size="icon-xs"
                   onClick={() => setGroupSearchQuery('')}
                   className="absolute top-1/2 right-2.5 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Cancella ricerca"
+                  aria-label={t('admin-panel.cancella-ricerca')}
                 >
                   <X className="size-3.5" />
                 </Button>
@@ -1658,8 +1634,7 @@ export function AdminPanel({
                 className="h-10 gap-1.5 px-3.5 text-xs"
               >
                 <Plus className="size-4" />
-                Nuovo gruppo
-              </Button>
+                {t('admin-panel.nuovo-gruppo')}</Button>
               <Button
                 type="button"
                 variant="outline"
@@ -1671,7 +1646,7 @@ export function AdminPanel({
                 <RefreshCw
                   className={cn('size-3.5', refreshing && 'animate-spin')}
                 />
-                <span className="hidden sm:inline">Aggiorna</span>
+                <span className="hidden sm:inline">{t('admin-panel.aggiorna')}</span>
               </Button>
             </div>
           </div>
@@ -1701,12 +1676,11 @@ export function AdminPanel({
                   <Users className="size-6" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
-                  Nessun gruppo trovato
-                </p>
+                  {t('admin-panel.nessun-gruppo-trovato')}</p>
                 <p className="mt-1 max-w-xs text-xs text-muted-foreground">
                   {groupSearchQuery
-                    ? 'Prova a modificare i termini di ricerca.'
-                    : 'Crea il primo gruppo per organizzare gli utenti e condividere cartelle in blocco.'}
+                    ? t('admin-panel.prova-a-modificare-i-termini-di-ricerca')
+                    : t('admin-panel.crea-il-primo-gruppo-per-organizzare-gli-utenti-')}
                 </p>
                 {!groupSearchQuery && (
                   <Button
@@ -1719,8 +1693,7 @@ export function AdminPanel({
                     }}
                   >
                     <Plus className="size-4" />
-                    Crea gruppo
-                  </Button>
+                    {t('admin-panel.crea-gruppo')}</Button>
                 )}
               </div>
             ) : (
@@ -1755,18 +1728,18 @@ export function AdminPanel({
                                 className="px-1.5 py-0 text-[10px]"
                               >
                                 {g.member_count}{' '}
-                                {g.member_count === 1 ? 'membro' : 'membri'}
+                                {g.member_count === 1 ? t('admin-panel.membro-1') : t('admin-panel.membri-1')}
                               </Badge>
                               <Badge
                                 variant="outline"
                                 className="px-1.5 py-0 text-[10px]"
                               >
                                 {g.vault_count}{' '}
-                                {g.vault_count === 1 ? 'cartella' : 'cartelle'}
+                                {g.vault_count === 1 ? t('admin-panel.cartella-2') : t('admin-panel.cartelle-2')}
                               </Badge>
                             </div>
                             <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                              {g.description || `Creato da ${g.created_by_name}`}
+                              {g.description || t('admin-panel.creato-da-v0', { v0: g.created_by_name })}
                             </p>
                           </div>
                         </div>
@@ -1784,8 +1757,7 @@ export function AdminPanel({
                             }}
                           >
                             <Users className="size-3.5" />
-                            Membri
-                            {isExpanded ? (
+                            {t('admin-panel.membri-2')} {isExpanded ? (
                               <ChevronUp className="size-3.5" />
                             ) : (
                               <ChevronDown className="size-3.5" />
@@ -1800,7 +1772,7 @@ export function AdminPanel({
                               setEditingGroup(g)
                               setGroupDialogOpen(true)
                             }}
-                            title="Modifica gruppo"
+                            title={t('admin-panel.modifica-gruppo')}
                           >
                             <Pencil className="size-4" />
                           </Button>
@@ -1811,7 +1783,7 @@ export function AdminPanel({
                             disabled={busyGroupKey === `del:${g.id}`}
                             className="size-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
                             onClick={() => setPendingDeleteGroup(g)}
-                            title="Elimina gruppo"
+                            title={t('admin-panel.elimina-gruppo')}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -1823,7 +1795,7 @@ export function AdminPanel({
                           <div className="flex flex-wrap gap-2">
                             <Input
                               type="text"
-                              placeholder="Cerca utente per nome o email..."
+                              placeholder={t('admin-panel.cerca-utente-per-nome-o-email')}
                               value={memberSearch}
                               onChange={(e) =>
                                 setMemberSearch(e.target.value)
@@ -1851,8 +1823,8 @@ export function AdminPanel({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="member">Membro</SelectItem>
-                                <SelectItem value="owner">Gestore</SelectItem>
+                                <SelectItem value="member">{t('admin-panel.membro-2')}</SelectItem>
+                                <SelectItem value="owner">{t('admin-panel.gestore')}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1860,8 +1832,7 @@ export function AdminPanel({
                           {memberSuggestions.length > 0 && (
                             <div className="rounded-lg border border-border/60 bg-background/80 p-2">
                               <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                                Utenti della piattaforma
-                              </p>
+                                {t('admin-panel.utenti-della-piattaforma')}</p>
                               <div className="flex flex-col gap-1">
                                 {memberSuggestions.slice(0, 8).map((u) => (
                                   <button
@@ -1911,8 +1882,7 @@ export function AdminPanel({
                                           variant="outline"
                                           className="py-0 text-[9px]"
                                         >
-                                          In attesa
-                                        </Badge>
+                                          {t('admin-panel.in-attesa')}</Badge>
                                       )}
                                     </div>
                                     <p className="truncate text-[11px] text-muted-foreground">
@@ -1938,11 +1908,9 @@ export function AdminPanel({
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="owner">
-                                        Gestore
-                                      </SelectItem>
+                                        {t('admin-panel.gestore')}</SelectItem>
                                       <SelectItem value="member">
-                                        Membro
-                                      </SelectItem>
+                                        {t('admin-panel.membro-2')}</SelectItem>
                                     </SelectContent>
                                   </Select>
                                   <Button
@@ -1958,7 +1926,7 @@ export function AdminPanel({
                                         m.email,
                                       )
                                     }
-                                    title="Rimuovi dal gruppo"
+                                    title={t('admin-panel.rimuovi-dal-gruppo')}
                                   >
                                     <Trash2 className="size-3.5" />
                                   </Button>
@@ -1987,7 +1955,7 @@ export function AdminPanel({
             <div className="relative min-w-[220px] flex-1">
               <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Cerca evento per utente, email, codice azione o dettagli..."
+                placeholder={t('admin-panel.cerca-evento-per-utente-email-codice-azione-o-de')}
                 value={auditSearchQuery}
                 onChange={(e) => setAuditSearchQuery(e.target.value)}
                 className="h-10 border-border/70 bg-card/50 pr-10 pl-10 text-sm rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
@@ -1999,7 +1967,7 @@ export function AdminPanel({
                   size="icon-xs"
                   onClick={() => setAuditSearchQuery('')}
                   className="absolute top-1/2 right-2.5 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Cancella ricerca audit"
+                  aria-label={t('admin-panel.cancella-ricerca-audit')}
                 >
                   <X className="size-3.5" />
                 </Button>
@@ -2008,8 +1976,7 @@ export function AdminPanel({
 
             <div className="flex items-center gap-2">
               <span className="hidden text-[11px] text-muted-foreground sm:inline">
-                {filteredAuditCount} di {auditEvents.length} eventi
-              </span>
+                {filteredAuditCount} {t('admin-panel.di')} {auditEvents.length} {t('admin-panel.eventi')}</span>
               {hasActiveAuditFilters && (
                 <Button
                   type="button"
@@ -2019,7 +1986,7 @@ export function AdminPanel({
                   className="h-10 gap-1.5 px-3 text-xs text-muted-foreground hover:text-foreground"
                 >
                   <FilterX className="size-3.5" />
-                  <span>Reset filtri</span>
+                  <span>{t('admin-panel.reset-filtri')}</span>
                 </Button>
               )}
 
@@ -2034,7 +2001,7 @@ export function AdminPanel({
                 <RefreshCw
                   className={cn('size-3.5', auditRefreshing && 'animate-spin')}
                 />
-                <span className="hidden sm:inline">Aggiorna</span>
+                <span className="hidden sm:inline">{t('admin-panel.aggiorna')}</span>
               </Button>
             </div>
           </div>
@@ -2105,13 +2072,13 @@ export function AdminPanel({
                           </div>
                           <p className="mt-3 text-sm font-semibold">
                             {hasActiveAuditFilters
-                              ? 'Nessun evento trovato con i filtri selezionati'
-                              : 'Nessun evento di audit registrato'}
+                              ? t('admin-panel.nessun-evento-trovato-con-i-filtri-selezionati')
+                              : t('admin-panel.nessun-evento-di-audit-registrato')}
                           </p>
                           <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
                             {hasActiveAuditFilters
-                              ? 'Prova a modificare i filtri nelle intestazioni delle colonne (Chi / Cosa / Quando) o a svuotare la ricerca.'
-                              : 'Tutte le operazioni di autenticazione, modifica ruoli RBAC, gestione cartelle, credenziali e API Key appariranno qui in tempo reale.'}
+                              ? t('admin-panel.prova-a-modificare-i-filtri-nelle-intestazioni-d')
+                              : t('admin-panel.tutte-le-operazioni-di-autenticazione-modifica-r')}
                           </p>
                           {hasActiveAuditFilters && (
                             <Button
@@ -2122,8 +2089,7 @@ export function AdminPanel({
                               className="mt-4 h-8 gap-1.5 text-xs"
                             >
                               <FilterX className="size-3.5" />
-                              Reimposta filtri
-                            </Button>
+                              {t('admin-panel.reimposta-filtri')}</Button>
                           )}
                         </div>
                       </TableCell>
@@ -2182,26 +2148,21 @@ export function AdminPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare questo gruppo?</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin-panel.eliminare-questo-gruppo')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Il gruppo{' '}
+              {t('admin-panel.il-gruppo')}{' '}
               <strong className="text-foreground">
                 "{pendingDeleteGroup?.name}"
               </strong>{' '}
-              verrà eliminato. Le condivisioni delle cartelle verso questo
-              gruppo saranno revocate, mentre eventuali cartelle create a nome
-              del gruppo torneranno di proprietà del loro creatore senza
-              perdita di credenziali.
-            </AlertDialogDescription>
+              {t('admin-panel.verra-eliminato-le-condivisioni-delle-cartelle-v')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin-panel.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmDeleteGroup}
             >
-              Elimina gruppo
-            </AlertDialogAction>
+              {t('admin-panel.elimina-gruppo')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -2215,25 +2176,21 @@ export function AdminPanel({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare questo utente?</AlertDialogTitle>
+            <AlertDialogTitle>{t('admin-panel.eliminare-questo-utente')}</AlertDialogTitle>
             <AlertDialogDescription>
-              L&apos;utente{' '}
+              {t('admin-panel.l-apos-utente')}{' '}
               <strong className="text-foreground">
                 {pendingDeleteUser?.name} ({pendingDeleteUser?.email})
               </strong>{' '}
-              e tutte le cartelle di sua proprietà verranno eliminati
-              definitivamente dal sistema. Questa operazione non può essere
-              annullata.
-            </AlertDialogDescription>
+              {t('admin-panel.e-tutte-le-cartelle-di-sua-proprieta-verranno-el')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('admin-panel.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmDeleteUser}
             >
-              Elimina utente
-            </AlertDialogAction>
+              {t('admin-panel.elimina-utente')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

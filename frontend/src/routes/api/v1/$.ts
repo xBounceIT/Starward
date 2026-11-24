@@ -1,4 +1,5 @@
 import { requireProdEnv } from '@/lib/env'
+import { getRequestT } from '@/lib/i18n'
 import { createFileRoute } from '@tanstack/react-router'
 import { SignJWT } from 'jose'
 import { auth, ensureAuthMigrated } from '@/lib/auth'
@@ -47,7 +48,7 @@ async function resolveUpstreamAuthHeader(
         error: {
           code: 'UNAUTHORIZED',
           message:
-            'Sessione non valida o API Key mancante. Effettua il login o fornisci una API Key valida.',
+            getRequestT(request)('api-routes.session-invalid'),
         },
       },
       { status: 401 },
@@ -121,7 +122,7 @@ async function proxyToRust(request: Request, splat: string) {
         error: {
           code: 'BACKEND_UNAVAILABLE',
           message:
-            'Backend Rust non raggiungibile. Assicurati che sia avviato sulla porta 8080.',
+            getRequestT(request)('api-routes.backend-unreachable'),
         },
       },
       { status: 502 },

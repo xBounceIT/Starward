@@ -57,6 +57,7 @@ import type { Group, UserRole, Vault } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
 import { APP_VERSION } from '@/lib/version'
+import { t } from '@/lib/i18n'
 
 // Geometria condivisa per gli elementi in coda alle righe della sidebar:
 // badge e pulsante "..." occupano la stessa area (right-1, 24px di lato) così
@@ -171,7 +172,7 @@ function VaultSidebarMenuItem({
         {showGroupBadge && vault.owner_group_name && (
           <span
             className="ml-auto shrink-0 truncate text-[10px] text-muted-foreground"
-            title={`Cartella del gruppo ${vault.owner_group_name}`}
+            title={t('app-sidebar.cartella-del-gruppo-v0', { v0: vault.owner_group_name })}
           >
             {vault.owner_group_name}
           </span>
@@ -179,7 +180,7 @@ function VaultSidebarMenuItem({
         {!indented && vault.is_shared && (
           <Users
             className="ml-auto size-3 shrink-0 text-muted-foreground"
-            aria-label={`Condivisa con ${vault.member_count - 1} utenti`}
+            aria-label={t('app-sidebar.condivisa-con-v0-utenti', { v0: vault.member_count - 1 })}
           />
         )}
       </SidebarMenuButton>
@@ -198,8 +199,8 @@ function VaultSidebarMenuItem({
           <SidebarMenuAction
             className="top-1/2! right-1 size-6 -translate-y-1/2 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-foreground"
             onClick={(e) => e.stopPropagation()}
-            aria-label={`Opzioni per ${vault.name}`}
-            title="Opzioni cartella"
+            aria-label={t('app-sidebar.opzioni-per-v0', { v0: vault.name })}
+            title={t('app-sidebar.opzioni-cartella')}
           >
             <MoreHorizontal className="size-4" />
           </SidebarMenuAction>
@@ -219,37 +220,32 @@ function VaultSidebarMenuItem({
             <>
               <DropdownMenuItem onClick={onNewCredential}>
                 <Plus className="size-4" />
-                Nuova credenziale
-              </DropdownMenuItem>
+                {t('app-sidebar.nuova-credenziale')}</DropdownMenuItem>
               <DropdownMenuItem onClick={onImportVault}>
                 <Upload className="size-4" />
-                Importa credenziali
-              </DropdownMenuItem>
+                {t('app-sidebar.importa-credenziali')}</DropdownMenuItem>
             </>
           )}
           {isOwner && (
             <DropdownMenuItem onClick={onEditVault}>
               <Pencil className="size-4" />
-              Rinomina
-            </DropdownMenuItem>
+              {t('app-sidebar.rinomina')}</DropdownMenuItem>
           )}
           <DropdownMenuItem onClick={onShareVault}>
             {isOwner ? (
               <>
                 <Share2 className="size-4" />
-                Condividi
-              </>
+                {t('app-sidebar.condividi')}</>
             ) : (
               <>
                 <Users className="size-4" />
-                Membri ({vault.member_count})
+                {t('app-sidebar.membri-1')}{vault.member_count})
               </>
             )}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenAudit}>
             <History className="size-4" />
-            Registro attività
-          </DropdownMenuItem>
+            {t('app-sidebar.registro-attivita')}</DropdownMenuItem>
           {isOwner && (
             <>
               <DropdownMenuSeparator />
@@ -261,8 +257,7 @@ function VaultSidebarMenuItem({
                 }}
               >
                 <Trash2 className="size-4" />
-                Cancella
-              </DropdownMenuItem>
+                {t('app-sidebar.cancella')}</DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
@@ -312,13 +307,13 @@ function GroupSidebarMenuItem({
         aria-expanded={!collapsed}
         aria-label={
           collapsed
-            ? `Espandi le cartelle del gruppo ${group.name}`
-            : `Comprimi le cartelle del gruppo ${group.name}`
+            ? t('app-sidebar.espandi-le-cartelle-del-gruppo-v0', { v0: group.name })
+            : t('app-sidebar.comprimi-le-cartelle-del-gruppo-v0', { v0: group.name })
         }
         title={
           collapsed
-            ? 'Espandi cartelle del gruppo'
-            : 'Comprimi cartelle del gruppo'
+            ? t('app-sidebar.espandi-cartelle-del-gruppo')
+            : t('app-sidebar.comprimi-cartelle-del-gruppo')
         }
         className="absolute left-1 top-1/2 z-10 flex size-5 -translate-y-1/2 cursor-pointer items-center justify-center rounded-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
       >
@@ -351,7 +346,7 @@ function GroupSidebarMenuItem({
           'top-1/2! right-7 -translate-y-1/2 text-xs',
           active ? 'text-foreground' : 'text-muted-foreground',
         )}
-        title={`${group.member_count} ${group.member_count === 1 ? 'membro' : 'membri'}`}
+        title={`${group.member_count} ${group.member_count === 1 ? t('app-sidebar.membro') : t('app-sidebar.membri-2')}`}
       >
         {group.member_count}
       </SidebarMenuBadge>
@@ -361,8 +356,8 @@ function GroupSidebarMenuItem({
           <SidebarMenuAction
             className="top-1/2! right-1 size-6 -translate-y-1/2 rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-[state=open]:bg-sidebar-accent data-[state=open]:text-foreground"
             onClick={(e) => e.stopPropagation()}
-            aria-label={`Opzioni per il gruppo ${group.name}`}
-            title="Opzioni gruppo"
+            aria-label={t('app-sidebar.opzioni-per-il-gruppo-v0', { v0: group.name })}
+            title={t('app-sidebar.opzioni-gruppo')}
           >
             <MoreHorizontal className="size-4" />
           </SidebarMenuAction>
@@ -375,28 +370,25 @@ function GroupSidebarMenuItem({
           onClick={(e) => e.stopPropagation()}
         >
           <DropdownMenuLabel className="truncate text-xs text-muted-foreground">
-            Gruppo · {group.name}
+            {t('app-sidebar.gruppo')} {group.name}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onNewGroupVault}>
             <FolderPlus className="size-4" />
-            Nuova cartella del gruppo
-          </DropdownMenuItem>
+            {t('app-sidebar.nuova-cartella-del-gruppo')}</DropdownMenuItem>
           <DropdownMenuItem onClick={onSelect}>
             <Users className="size-4" />
-            Membri e cartelle ({group.member_count})
+            {t('app-sidebar.membri-e-cartelle')}{group.member_count})
           </DropdownMenuItem>
           {group.can_manage && (
             <>
               <DropdownMenuItem onClick={onEditGroup}>
                 <Pencil className="size-4" />
-                Modifica gruppo
-              </DropdownMenuItem>
+                {t('app-sidebar.modifica-gruppo')}</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={onDeleteGroup}>
                 <Trash2 className="size-4" />
-                Elimina gruppo
-              </DropdownMenuItem>
+                {t('app-sidebar.elimina-gruppo')}</DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
@@ -520,7 +512,7 @@ export function AppSidebar({
     <PanelLeftFilled className="size-4" />
   )
 
-  const toggleLabel = sidebarCollapsed ? 'Espandi sidebar' : 'Comprimi sidebar'
+  const toggleLabel = sidebarCollapsed ? t('app-sidebar.espandi-sidebar') : t('app-sidebar.comprimi-sidebar')
 
   return (
     // collapsible="strip": quando la sidebar collassa resta una striscia
@@ -557,8 +549,7 @@ export function AppSidebar({
               aria-hidden={sidebarCollapsed || undefined}
               className="min-w-0 truncate text-xl leading-none font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=strip]:hidden"
             >
-              Starward
-            </span>
+              {t('app-sidebar.starward')}</span>
           </div>
 
           <div
@@ -575,8 +566,7 @@ export function AppSidebar({
               }}
             >
               <Plus className="size-4" />
-              Nuova credenziale
-            </Button>
+              {t('app-sidebar.nuova-credenziale')}</Button>
           </div>
         </SidebarHeader>
 
@@ -602,7 +592,7 @@ export function AppSidebar({
                         : 'text-muted-foreground',
                     )}
                   />
-                  <span>Tutte le credenziali</span>
+                  <span>{t('app-sidebar.tutte-le-credenziali')}</span>
                 </SidebarMenuButton>
                 <SidebarMenuBadge
                   className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
@@ -618,7 +608,7 @@ export function AppSidebar({
                   className="h-9 pr-8 rounded-md sync-security:data-[active=true]:bg-[#0e1b33] data-[active=true]:font-semibold sync-security:data-[active=true]:text-[#ff9c00]"
                 >
                   <Star className="size-4 text-amber-400 sync-security:text-[#ff9c00]" />
-                  <span>Preferiti</span>
+                  <span>{t('app-sidebar.preferiti')}</span>
                 </SidebarMenuButton>
                 <SidebarMenuBadge
                   className={cn(menuTrailingBadgeClass, 'text-muted-foreground')}
@@ -634,18 +624,17 @@ export function AppSidebar({
 
         <SidebarGroup className="py-1">
           <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
-            Le mie cartelle
-          </SidebarGroupLabel>
+            {t('app-sidebar.le-mie-cartelle')}</SidebarGroupLabel>
           <SidebarGroupAction
             className={groupActionClass}
-            title="Nuova cartella"
+            title={t('app-sidebar.nuova-cartella')}
             onClick={() => {
               setOpenMobile(false)
               onNewVault()
             }}
           >
             <FolderPlus className="size-4 text-muted-foreground" />
-            <span className="sr-only">Nuova cartella</span>
+            <span className="sr-only">{t('app-sidebar.nuova-cartella')}</span>
           </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
@@ -695,18 +684,17 @@ export function AppSidebar({
 
         <SidebarGroup className="py-1">
           <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
-            Gruppi
-          </SidebarGroupLabel>
+            {t('app-sidebar.gruppi')}</SidebarGroupLabel>
           <SidebarGroupAction
             className={groupActionClass}
-            title="Nuovo gruppo"
+            title={t('app-sidebar.nuovo-gruppo')}
             onClick={() => {
               setOpenMobile(false)
               onNewGroup()
             }}
           >
             <Plus className="size-4 text-muted-foreground" />
-            <span className="sr-only">Nuovo gruppo</span>
+            <span className="sr-only">{t('app-sidebar.nuovo-gruppo')}</span>
           </SidebarGroupAction>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
@@ -720,7 +708,7 @@ export function AppSidebar({
                     }}
                   >
                     <Plus className="size-3.5" />
-                    <span>Crea un gruppo</span>
+                    <span>{t('app-sidebar.crea-un-gruppo')}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ) : (
@@ -821,8 +809,7 @@ export function AppSidebar({
                 <div className="flex h-9 items-center gap-2 px-2 pr-8 text-sm text-muted-foreground sync-security:text-[#ff9c00]">
                   <Share2 className="size-4 shrink-0" />
                   <span className="truncate text-[11px] font-bold tracking-[0.14em] uppercase">
-                    Condivise con me
-                  </span>
+                    {t('app-sidebar.condivise-con-me')}</span>
                 </div>
                 <SidebarMenuBadge
                   className={cn(
@@ -830,7 +817,7 @@ export function AppSidebar({
                     'text-muted-foreground sync-security:text-white/75',
                   )}
                   title={`${sharedWithMe.length} ${
-                    sharedWithMe.length === 1 ? 'cartella condivisa' : 'cartelle condivise'
+                    sharedWithMe.length === 1 ? t('app-sidebar.cartella-condivisa') : t('app-sidebar.cartelle-condivise')
                   }`}
                 >
                   {sharedWithMe.length}
@@ -887,7 +874,7 @@ export function AppSidebar({
 
             <SidebarGroup className="py-1">
               <SidebarGroupLabel className="flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span>Pannello Admin</span>
+                <span>{t('app-sidebar.pannello-admin')}</span>
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="gap-1">
@@ -910,7 +897,7 @@ export function AppSidebar({
                             : 'text-muted-foreground',
                         )}
                       />
-                      <span>Utenti</span>
+                      <span>{t('app-sidebar.utenti')}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
@@ -933,7 +920,7 @@ export function AppSidebar({
                             : 'text-muted-foreground',
                         )}
                       />
-                      <span>Gruppi</span>
+                      <span>{t('app-sidebar.gruppi')}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
@@ -960,7 +947,7 @@ export function AppSidebar({
                             : 'text-muted-foreground',
                         )}
                       />
-                      <span>Service Account</span>
+                      <span>{t('app-sidebar.service-account')}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
@@ -983,7 +970,7 @@ export function AppSidebar({
                             : 'text-muted-foreground',
                         )}
                       />
-                      <span>Audit di sistema</span>
+                      <span>{t('app-sidebar.audit-di-sistema')}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -1036,15 +1023,13 @@ export function AppSidebar({
                           variant="secondary"
                           className="h-4 shrink-0 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[9px] font-semibold text-amber-300"
                         >
-                          Admin
-                        </Badge>
+                          {t('app-sidebar.admin')}</Badge>
                       ) : (
                         <Badge
                           variant="outline"
                           className="h-4 shrink-0 px-1.5 py-0 text-[9px] text-muted-foreground"
                         >
-                          User
-                        </Badge>
+                          {t('app-sidebar.user')}</Badge>
                       )}
                     </div>
                     <span className="truncate text-[11px] text-muted-foreground">
@@ -1067,16 +1052,14 @@ export function AppSidebar({
                           className="gap-1 border-amber-500/30 bg-amber-500/15 px-1.5 py-0 text-[10px] font-semibold text-amber-300"
                         >
                           <ShieldCheck className="size-3" />
-                          Admin
-                        </Badge>
+                          {t('app-sidebar.admin')}</Badge>
                       ) : (
                         <Badge
                           variant="outline"
                           className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
                         >
                           <User className="size-3" />
-                          User
-                        </Badge>
+                          {t('app-sidebar.user')}</Badge>
                       )}
                     </div>
                     <span className="truncate text-xs text-muted-foreground">
@@ -1092,13 +1075,11 @@ export function AppSidebar({
                   }}
                 >
                   <Settings className="size-4" />
-                  Impostazioni account
-                </DropdownMenuItem>
+                  {t('app-sidebar.impostazioni-account')}</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={onSignOut}>
                   <LogOut className="size-4" />
-                  Disconnetti
-                </DropdownMenuItem>
+                  {t('app-sidebar.disconnetti')}</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

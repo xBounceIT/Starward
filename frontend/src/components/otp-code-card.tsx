@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Copy, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { generateTotp, parseTotpConfig } from '@/lib/otp'
 import { cn, copyToClipboard } from '@/lib/utils'
+import { t } from '@/lib/i18n'
 
 interface OtpCodeCardProps {
   totpValue: string
@@ -14,7 +15,7 @@ interface OtpCodeCardProps {
 
 export function OtpCodeCard({
   totpValue,
-  label = 'Codice OTP (2FA)',
+  label = t('otp-code-card.codice-otp-2fa'),
   compact = false,
   showSecretToggle = true,
   className,
@@ -66,7 +67,7 @@ export function OtpCodeCard({
     const fresh = generateTotp(parsed.config, Date.now())
     if (await copyToClipboard(fresh.code)) {
       setCopiedCode(true)
-      toast.success('Codice OTP copiato negli appunti')
+      toast.success(t('otp-code-card.codice-otp-copiato-negli-appunti'))
       if (copyCodeTimerRef.current !== null) {
         window.clearTimeout(copyCodeTimerRef.current)
       }
@@ -74,7 +75,7 @@ export function OtpCodeCard({
         setCopiedCode(false)
       }, 1800)
     } else {
-      toast.error('Impossibile copiare negli appunti')
+      toast.error(t('otp-code-card.impossibile-copiare-negli-appunti'))
     }
   }
 
@@ -83,7 +84,7 @@ export function OtpCodeCard({
     if (!clean) return
     if (await copyToClipboard(clean)) {
       setCopiedSecret(true)
-      toast.success('Segreto OTP copiato negli appunti')
+      toast.success(t('otp-code-card.segreto-otp-copiato-negli-appunti'))
       if (copySecretTimerRef.current !== null) {
         window.clearTimeout(copySecretTimerRef.current)
       }
@@ -91,7 +92,7 @@ export function OtpCodeCard({
         setCopiedSecret(false)
       }, 1800)
     } else {
-      toast.error('Impossibile copiare negli appunti')
+      toast.error(t('otp-code-card.impossibile-copiare-negli-appunti'))
     }
   }
 
@@ -107,9 +108,9 @@ export function OtpCodeCard({
           <div className="flex min-w-0 items-center gap-2">
             <AlertTriangle className="size-4 shrink-0" />
             <div className="min-w-0">
-              <p className="font-semibold">Configurazione OTP non valida</p>
+              <p className="font-semibold">{t('otp-code-card.configurazione-otp-non-valida')}</p>
               <p className="truncate text-[11px] text-destructive/85">
-                {parsed.ok ? 'Segreto non valido' : parsed.error}
+                {parsed.ok ? t('otp-code-card.segreto-non-valido') : parsed.error}
               </p>
             </div>
           </div>
@@ -118,7 +119,7 @@ export function OtpCodeCard({
               type="button"
               onClick={handleCopySecret}
               className="flex size-7 shrink-0 items-center justify-center rounded-md text-destructive transition-colors hover:bg-destructive/15"
-              title="Copia valore grezzo"
+              title={t('otp-code-card.copia-valore-grezzo')}
             >
               {copiedSecret ? (
                 <Check className="size-3.5" />
@@ -155,7 +156,7 @@ export function OtpCodeCard({
           </p>
           {hasCustomParams && (
             <span className="shrink-0 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground sync-security:border-white/15 sync-security:bg-[#000c20]/60">
-              {otp.algorithm} · {otp.digits} cifre · {otp.period}s
+              {otp.algorithm} · {otp.digits} {t('otp-code-card.cifre')} {otp.period}s
             </span>
           )}
         </div>
@@ -167,12 +168,12 @@ export function OtpCodeCard({
             className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
             title={
               secretExpanded
-                ? 'Nascondi segreto OTP'
-                : 'Mostra segreto OTP configurato'
+                ? t('otp-code-card.nascondi-segreto-otp')
+                : t('otp-code-card.mostra-segreto-otp-configurato')
             }
           >
             <KeyRound className="size-3" />
-            <span>{secretExpanded ? 'Nascondi chiave' : 'Chiave'}</span>
+            <span>{secretExpanded ? t('otp-code-card.nascondi-chiave') : 'Chiave'}</span>
           </button>
         )}
       </div>
@@ -189,7 +190,7 @@ export function OtpCodeCard({
             <div
               className="relative flex shrink-0 items-center justify-center"
               style={{ width: viewBoxSize, height: viewBoxSize }}
-              title={`Valido per altri ${otp.remainingSeconds}s`}
+              title={t('otp-code-card.valido-per-altri-v0-s', { v0: otp.remainingSeconds })}
             >
               <svg
                 width={viewBoxSize}
@@ -244,7 +245,7 @@ export function OtpCodeCard({
               type="button"
               onClick={handleCopyCode}
               className="group min-w-0 cursor-pointer text-left focus-visible:outline-none"
-              title="Clicca per copiare il codice OTP"
+              title={t('otp-code-card.clicca-per-copiare-il-codice-otp')}
             >
               <span
                 data-testid="otp-live-code"
@@ -275,21 +276,20 @@ export function OtpCodeCard({
           <button
             type="button"
             onClick={handleCopyCode}
-            aria-label="Copia codice OTP"
-            title="Copia codice OTP"
+            aria-label={t('otp-code-card.copia-codice-otp')}
+            title={t('otp-code-card.copia-codice-otp')}
             className="flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border border-border/70 bg-background/70 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground sync-security:border-white/15 sync-security:bg-[#000c20]/70 sync-security:hover:border-[#ff9c00]/60 sync-security:hover:text-[#ff9c00]"
           >
             {copiedCode ? (
               <>
                 <Check className="size-3.5 text-emerald-400" />
                 <span className="text-emerald-500 dark:text-emerald-400">
-                  Copiato
-                </span>
+                  {t('otp-code-card.copiato')}</span>
               </>
             ) : (
               <>
                 <Copy className="size-3.5" />
-                <span>Copia</span>
+                <span>{t('otp-code-card.copia')}</span>
               </>
             )}
           </button>
@@ -316,8 +316,7 @@ export function OtpCodeCard({
         <div className="flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 sync-security:border-white/10 sync-security:bg-[#000c20]/60">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-medium text-muted-foreground uppercase">
-              Segreto configurato
-            </p>
+              {t('otp-code-card.segreto-configurato')}</p>
             <span className="mt-0.5 block truncate font-mono text-xs text-foreground/90">
               {secretRevealed ? totpValue.trim() : '••••••••••••••••••••••••'}
             </span>
@@ -327,7 +326,7 @@ export function OtpCodeCard({
               type="button"
               onClick={() => setSecretRevealed((prev) => !prev)}
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-              title={secretRevealed ? 'Nascondi segreto' : 'Mostra segreto'}
+              title={secretRevealed ? t('otp-code-card.nascondi-segreto') : t('otp-code-card.mostra-segreto')}
             >
               {secretRevealed ? (
                 <EyeOff className="size-3.5" />
@@ -339,7 +338,7 @@ export function OtpCodeCard({
               type="button"
               onClick={handleCopySecret}
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-              title="Copia segreto OTP"
+              title={t('otp-code-card.copia-segreto-otp')}
             >
               {copiedSecret ? (
                 <Check className="size-3.5 text-emerald-400" />

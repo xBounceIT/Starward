@@ -1,3 +1,4 @@
+import { getRequestT } from '@/lib/i18n'
 import '@/lib/env'
 import { createFileRoute } from '@tanstack/react-router'
 
@@ -82,7 +83,7 @@ async function proxyMcpToRust(request: Request): Promise<Response> {
         error: {
           code: 'BACKEND_UNAVAILABLE',
           message:
-            'Backend Rust non raggiungibile. Assicurati che sia avviato sulla porta 8080.',
+            getRequestT(request)('api-routes.backend-unreachable'),
         },
       },
       { status: 502 },

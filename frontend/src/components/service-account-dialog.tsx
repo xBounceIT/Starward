@@ -44,6 +44,7 @@ import {
 import { getCategoryLabel } from '@/lib/credential-types'
 import { cn } from '@/lib/utils'
 import { getVaultColor } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface ServiceAccountDialogProps {
   open: boolean
@@ -80,7 +81,7 @@ export function ServiceAccountDialog({
 
   // Initial key options (create mode only)
   const [generateInitialKey, setGenerateInitialKey] = useState(true)
-  const [initialKeyName, setInitialKeyName] = useState('Chiave primaria')
+  const [initialKeyName, setInitialKeyName] = useState(t('service-account-dialog.chiave-primaria'))
   const [initialKeyExpiry, setInitialKeyExpiry] = useState('90')
 
   // Picker filters
@@ -108,7 +109,7 @@ export function ServiceAccountDialog({
       setSelectedVaultIds([])
       setSelectedCredentialIds([])
       setGenerateInitialKey(true)
-      setInitialKeyName('Chiave primaria')
+      setInitialKeyName(t('service-account-dialog.chiave-primaria'))
       setInitialKeyExpiry('90')
     }
     setScopeTab('vaults')
@@ -171,11 +172,11 @@ export function ServiceAccountDialog({
     e.preventDefault()
     const cleanName = name.trim()
     if (!cleanName) {
-      toast.error('Inserisci un nome per il Service Account')
+      toast.error(t('service-account-dialog.inserisci-un-nome-per-il-service-account'))
       return
     }
     if (!isEditing && generateInitialKey && !initialKeyName.trim()) {
-      toast.error('Inserisci un nome per la chiave API iniziale')
+      toast.error(t('service-account-dialog.inserisci-un-nome-per-la-chiave-api-iniziale'))
       return
     }
 
@@ -190,7 +191,7 @@ export function ServiceAccountDialog({
           vault_ids: selectedVaultIds,
           credential_ids: selectedCredentialIds,
         })
-        toast.success(`Service Account "${updated.name}" aggiornato`)
+        toast.success(t('service-account-dialog.service-account-v0-aggiornato', { v0: updated.name }))
         onSaved(updated, null)
         onOpenChange(false)
       } else {
@@ -213,7 +214,7 @@ export function ServiceAccountDialog({
             : undefined,
         })
         toast.success(
-          `Service Account "${created.service_account.name}" creato`,
+          t('service-account-dialog.service-account-v0-creato', { v0: created.service_account.name }),
         )
         onSaved(created.service_account, created.initial_key)
         onOpenChange(false)
@@ -222,7 +223,7 @@ export function ServiceAccountDialog({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante il salvataggio del Service Account',
+          : t('service-account-dialog.errore-durante-il-salvataggio-del-service-accoun'),
       )
     } finally {
       setSubmitting(false)
@@ -239,14 +240,11 @@ export function ServiceAccountDialog({
           <DialogTitle className="flex items-center gap-2">
             <Bot className="size-5 text-primary sync-security:text-[#ff9c00]" />
             {isEditing
-              ? `Modifica Service Account "${editingAccount?.name}"`
-              : 'Nuovo Service Account'}
+              ? t('service-account-dialog.modifica-service-account-v0', { v0: editingAccount?.name })
+              : t('service-account-dialog.nuovo-service-account')}
           </DialogTitle>
           <DialogDescription>
-            Configura un utente di sistema autenticato tramite chiave API
-            dedicata e seleziona le cartelle e/o credenziali specifiche
-            accessibili.
-          </DialogDescription>
+            {t('service-account-dialog.configura-un-utente-di-sistema-autenticato-trami')}</DialogDescription>
         </DialogHeader>
 
         <form
@@ -260,13 +258,12 @@ export function ServiceAccountDialog({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="sa-name" className="text-xs">
-                  Nome Service Account *
-                </Label>
+                  {t('service-account-dialog.nome-service-account')}</Label>
                 <Input
                   id="sa-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="es. CI/CD Produzione, Kubernetes Sync"
+                  placeholder={t('service-account-dialog.es-ci-cd-produzione-kubernetes-sync')}
                   maxLength={80}
                   required
                 />
@@ -274,8 +271,7 @@ export function ServiceAccountDialog({
 
               <div className="space-y-1.5">
                 <Label htmlFor="sa-permission" className="text-xs">
-                  Livello di permessi
-                </Label>
+                  {t('service-account-dialog.livello-di-permessi')}</Label>
                 <Select
                   value={permission}
                   onValueChange={(v) => setPermission(v as ApiKeyPermission)}
@@ -285,11 +281,9 @@ export function ServiceAccountDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="read">
-                      Sola lettura (Read) — recupero credenziali
-                    </SelectItem>
+                      {t('service-account-dialog.sola-lettura-read-recupero-credenziali')}</SelectItem>
                     <SelectItem value="read_write">
-                      Lettura e scrittura (Read/Write)
-                    </SelectItem>
+                      {t('service-account-dialog.lettura-e-scrittura-read-write')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -297,13 +291,12 @@ export function ServiceAccountDialog({
 
             <div className="space-y-1.5">
               <Label htmlFor="sa-description" className="text-xs">
-                Descrizione (opzionale)
-              </Label>
+                {t('service-account-dialog.descrizione-opzionale')}</Label>
               <Textarea
                 id="sa-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Indica quale servizio, pipeline o automazione utilizza questo account di sistema..."
+                placeholder={t('service-account-dialog.indica-quale-servizio-pipeline-o-automazione-uti')}
                 maxLength={300}
                 rows={2}
                 className="min-h-14 resize-none text-sm"
@@ -314,12 +307,9 @@ export function ServiceAccountDialog({
               <label className="flex cursor-pointer items-center justify-between rounded-xl border border-border/70 bg-muted/20 px-3.5 py-2.5 text-xs">
                 <div>
                   <span className="font-medium text-foreground">
-                    Service Account attivo
-                  </span>
+                    {t('service-account-dialog.service-account-attivo')}</span>
                   <p className="text-muted-foreground">
-                    Disattivandolo tutte le chiavi API associate vengono
-                    temporaneamente bloccate.
-                  </p>
+                    {t('service-account-dialog.disattivandolo-tutte-le-chiavi-api-associate-ven')}</p>
                 </div>
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
               </label>
@@ -334,13 +324,9 @@ export function ServiceAccountDialog({
                 <div>
                   <Label className="flex items-center gap-1.5 text-sm font-semibold">
                     <Shield className="size-4 text-primary sync-security:text-[#ff9c00]" />
-                    Ambito di accesso (Cartelle e Credenziali)
-                  </Label>
+                    {t('service-account-dialog.ambito-di-accesso-cartelle-e-credenziali')}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Seleziona intere cartelle e/o singole credenziali specifiche
-                    (accesso granulare secondo il principio del minimo
-                    privilegio).
-                  </p>
+                    {t('service-account-dialog.seleziona-intere-cartelle-e-o-singole-credenzial')}</p>
                 </div>
               </div>
 
@@ -353,7 +339,7 @@ export function ServiceAccountDialog({
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="vaults" className="gap-1.5 text-xs">
                     <Folder className="size-3.5" />
-                    <span>Cartelle specifiche</span>
+                    <span>{t('service-account-dialog.cartelle-specifiche')}</span>
                     <Badge
                       variant={
                         selectedVaultIds.length > 0 ? 'default' : 'secondary'
@@ -365,7 +351,7 @@ export function ServiceAccountDialog({
                   </TabsTrigger>
                   <TabsTrigger value="credentials" className="gap-1.5 text-xs">
                     <KeyRound className="size-3.5" />
-                    <span>Credenziali specifiche</span>
+                    <span>{t('service-account-dialog.credenziali-specifiche-1')}</span>
                     <Badge
                       variant={
                         selectedCredentialIds.length > 0
@@ -385,7 +371,7 @@ export function ServiceAccountDialog({
                     <div className="relative flex-1">
                       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                       <Input
-                        placeholder="Filtra cartelle per nome o proprietario..."
+                        placeholder={t('service-account-dialog.filtra-cartelle-per-nome-o-proprietario')}
                         value={vaultSearch}
                         onChange={(e) => setVaultSearch(e.target.value)}
                         className="h-8 pr-8 pl-8 text-xs"
@@ -407,7 +393,7 @@ export function ServiceAccountDialog({
                         size="xs"
                         onClick={() => setSelectedVaultIds([])}
                       >
-                        Deseleziona ({selectedVaultIds.length})
+                        {t('service-account-dialog.deseleziona')}{selectedVaultIds.length})
                       </Button>
                     )}
                   </div>
@@ -415,12 +401,10 @@ export function ServiceAccountDialog({
                   <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-border/70 bg-muted/15 p-2">
                     {loadingResources ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
-                        Caricamento cartelle...
-                      </p>
+                        {t('service-account-dialog.caricamento-cartelle')}</p>
                     ) : filteredVaults.length === 0 ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
-                        Nessuna cartella trovata.
-                      </p>
+                        {t('service-account-dialog.nessuna-cartella-trovata')}</p>
                     ) : (
                       filteredVaults.map((vault) => {
                         const checked = selectedVaultSet.has(vault.id)
@@ -463,16 +447,15 @@ export function ServiceAccountDialog({
                                       variant="outline"
                                       className="h-4 px-1 py-0 text-[9px]"
                                     >
-                                      Personale
-                                    </Badge>
+                                      {t('service-account-dialog.personale')}</Badge>
                                   )}
                                 </div>
                                 <p className="truncate text-[11px] text-muted-foreground">
-                                  Proprietario: {vault.owner_name} ·{' '}
+                                  {t('service-account-dialog.proprietario-colon')} {vault.owner_name} ·{' '}
                                   {vault.credential_count}{' '}
                                   {vault.credential_count === 1
-                                    ? 'credenziale'
-                                    : 'credenziali'}
+                                    ? t('service-account-dialog.credenziale')
+                                    : t('service-account-dialog.credenziali')}
                                 </p>
                               </div>
                             </div>
@@ -489,7 +472,7 @@ export function ServiceAccountDialog({
                     <div className="relative min-w-[180px] flex-1">
                       <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                       <Input
-                        placeholder="Cerca credenziale per titolo, username, cartella..."
+                        placeholder={t('service-account-dialog.cerca-credenziale-per-titolo-username-cartella')}
                         value={credSearch}
                         onChange={(e) => setCredSearch(e.target.value)}
                         className="h-8 pr-8 pl-8 text-xs"
@@ -510,12 +493,11 @@ export function ServiceAccountDialog({
                       onValueChange={setCredVaultFilter}
                     >
                       <SelectTrigger className="h-8 w-44 text-xs">
-                        <SelectValue placeholder="Tutte le cartelle" />
+                        <SelectValue placeholder={t('service-account-dialog.tutte-le-cartelle')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL_VAULTS_FILTER}>
-                          Tutte le cartelle
-                        </SelectItem>
+                          {t('service-account-dialog.tutte-le-cartelle')}</SelectItem>
                         {resources.vaults.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.name}
@@ -531,7 +513,7 @@ export function ServiceAccountDialog({
                         size="xs"
                         onClick={() => setSelectedCredentialIds([])}
                       >
-                        Deseleziona ({selectedCredentialIds.length})
+                        {t('service-account-dialog.deseleziona')}{selectedCredentialIds.length})
                       </Button>
                     )}
                   </div>
@@ -539,12 +521,10 @@ export function ServiceAccountDialog({
                   <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-border/70 bg-muted/15 p-2">
                     {loadingResources ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
-                        Caricamento credenziali...
-                      </p>
+                        {t('service-account-dialog.caricamento-credenziali')}</p>
                     ) : filteredCredentials.length === 0 ? (
                       <p className="py-6 text-center text-xs text-muted-foreground">
-                        Nessuna credenziale trovata.
-                      </p>
+                        {t('service-account-dialog.nessuna-credenziale-trovata')}</p>
                     ) : (
                       filteredCredentials.map((cred) => {
                         const checked = selectedCredSet.has(cred.id)
@@ -591,8 +571,7 @@ export function ServiceAccountDialog({
                                       variant="secondary"
                                       className="h-4 border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0 text-[9px] text-emerald-400"
                                     >
-                                      Inclusa nella cartella
-                                    </Badge>
+                                      {t('service-account-dialog.inclusa-nella-cartella')}</Badge>
                                   )}
                                 </div>
                                 <p className="mt-0.5 flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
@@ -625,13 +604,12 @@ export function ServiceAccountDialog({
               {hasAnyScope ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/70 bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
                   <span className="font-medium text-foreground">
-                    Riepilogo accesso:
-                  </span>
+                    {t('service-account-dialog.riepilogo-accesso')}</span>
                   <span>
                     <strong className="text-foreground">
                       {selectedVaultIds.length}
                     </strong>{' '}
-                    {selectedVaultIds.length === 1 ? 'cartella' : 'cartelle'}
+                    {selectedVaultIds.length === 1 ? t('service-account-dialog.cartella') : t('service-account-dialog.cartelle')}
                   </span>
                   <span>+</span>
                   <span>
@@ -639,18 +617,15 @@ export function ServiceAccountDialog({
                       {selectedCredentialIds.length}
                     </strong>{' '}
                     {selectedCredentialIds.length === 1
-                      ? 'credenziale specifica'
-                      : 'credenziali specifiche'}
+                      ? t('service-account-dialog.credenziale-specifica')
+                      : t('service-account-dialog.credenziali-specifiche-2')}
                   </span>
                 </div>
               ) : (
                 <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
                   <AlertCircle className="mt-0.5 size-3.5 shrink-0" />
                   <span>
-                    Nessuna cartella o credenziale selezionata: il Service
-                    Account non avrà accesso ad alcuna credenziale finché non
-                    assegni almeno una risorsa.
-                  </span>
+                    {t('service-account-dialog.nessuna-cartella-o-credenziale-selezionata-il-se')}</span>
                 </div>
               )}
             </div>
@@ -665,12 +640,9 @@ export function ServiceAccountDialog({
                     <div>
                       <span className="flex items-center gap-1.5 font-semibold text-foreground">
                         <KeyRound className="size-3.5 text-primary sync-security:text-[#ff9c00]" />
-                        Genera subito la chiave API iniziale
-                      </span>
+                        {t('service-account-dialog.genera-subito-la-chiave-api-iniziale')}</span>
                       <p className="mt-0.5 text-muted-foreground">
-                        Potrai comunque generare, ruotare o revocare altre
-                        chiavi in seguito.
-                      </p>
+                        {t('service-account-dialog.potrai-comunque-generare-ruotare-o-revocare-altr')}</p>
                     </div>
                     <Switch
                       checked={generateInitialKey}
@@ -682,13 +654,12 @@ export function ServiceAccountDialog({
                     <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
                       <div className="space-y-1.5">
                         <Label htmlFor="sa-init-key-name" className="text-xs">
-                          Nome chiave API
-                        </Label>
+                          {t('service-account-dialog.nome-chiave-api')}</Label>
                         <Input
                           id="sa-init-key-name"
                           value={initialKeyName}
                           onChange={(e) => setInitialKeyName(e.target.value)}
-                          placeholder="es. Chiave primaria"
+                          placeholder={t('service-account-dialog.es-chiave-primaria')}
                           maxLength={80}
                           required={generateInitialKey}
                         />
@@ -696,8 +667,7 @@ export function ServiceAccountDialog({
 
                       <div className="space-y-1.5">
                         <Label htmlFor="sa-init-key-exp" className="text-xs">
-                          Scadenza chiave
-                        </Label>
+                          {t('service-account-dialog.scadenza-chiave')}</Label>
                         <Select
                           value={initialKeyExpiry}
                           onValueChange={setInitialKeyExpiry}
@@ -709,12 +679,11 @@ export function ServiceAccountDialog({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="30">30 giorni</SelectItem>
-                            <SelectItem value="90">90 giorni</SelectItem>
-                            <SelectItem value="365">1 anno</SelectItem>
+                            <SelectItem value="30">{t('service-account-dialog.30-giorni')}</SelectItem>
+                            <SelectItem value="90">{t('service-account-dialog.90-giorni')}</SelectItem>
+                            <SelectItem value="365">{t('service-account-dialog.1-anno')}</SelectItem>
                             <SelectItem value="never">
-                              Nessuna scadenza
-                            </SelectItem>
+                              {t('service-account-dialog.nessuna-scadenza')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -732,14 +701,13 @@ export function ServiceAccountDialog({
               onClick={() => onOpenChange(false)}
               disabled={submitting}
             >
-              Annulla
-            </Button>
+              {t('service-account-dialog.annulla')}</Button>
             <Button type="submit" disabled={submitting}>
               {submitting
                 ? 'Salvataggio...'
                 : isEditing
-                  ? 'Salva modifiche'
-                  : 'Crea Service Account'}
+                  ? t('service-account-dialog.salva-modifiche')
+                  : t('service-account-dialog.crea-service-account')}
             </Button>
           </DialogFooter>
         </form>

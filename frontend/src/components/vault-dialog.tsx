@@ -30,6 +30,7 @@ import { VaultColorPicker } from '@/components/vault-color-picker'
 import { vaultApi, type Group, type Vault } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getVaultColor } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface VaultDialogProps {
   open: boolean
@@ -98,12 +99,12 @@ export function VaultDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      toast.error('Inserisci un nome per la cartella')
+      toast.error(t('vault-dialog.inserisci-un-nome-per-la-cartella'))
       return
     }
 
     if (!editingVault && ownerType === 'group' && !ownerGroupId) {
-      toast.error('Seleziona un gruppo proprietario')
+      toast.error(t('vault-dialog.seleziona-un-gruppo-proprietario'))
       return
     }
 
@@ -127,16 +128,16 @@ export function VaultDialog({
 
       toast.success(
         editingVault
-          ? `Cartella "${saved.name}" aggiornata`
+          ? t('vault-dialog.cartella-v0-aggiornata', { v0: saved.name })
           : saved.owner_group_name
-            ? `Cartella "${saved.name}" creata per il gruppo "${saved.owner_group_name}"`
-            : `Cartella "${saved.name}" creata`,
+            ? t('vault-dialog.cartella-v0-creata-per-il-gruppo-v1', { v0: saved.name, v1: saved.owner_group_name })
+            : t('vault-dialog.cartella-v0-creata', { v0: saved.name }),
       )
       onSaved(saved)
       onOpenChange(false)
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore nel salvataggio cartella',
+        err instanceof Error ? err.message : t('vault-dialog.errore-nel-salvataggio-cartella'),
       )
     } finally {
       setSubmitting(false)
@@ -148,12 +149,10 @@ export function VaultDialog({
       <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
-            {editingVault ? 'Modifica cartella' : 'Nuova cartella vault'}
+            {editingVault ? t('vault-dialog.modifica-cartella') : t('vault-dialog.nuova-cartella-vault')}
           </DialogTitle>
           <DialogDescription>
-            Organizza le credenziali in cartelle dedicate e condividile con
-            colleghi o gruppi specifici.
-          </DialogDescription>
+            {t('vault-dialog.organizza-le-credenziali-in-cartelle-dedicate-e-')}</DialogDescription>
         </DialogHeader>
 
         <form
@@ -176,8 +175,7 @@ export function VaultDialog({
                     }
                   />
                   <span className="text-muted-foreground">
-                    Cartella del gruppo
-                  </span>
+                    {t('vault-dialog.cartella-del-gruppo')}</span>
                   <Badge variant="secondary" className="font-medium">
                     {editingVault.owner_group_name}
                   </Badge>
@@ -186,7 +184,7 @@ export function VaultDialog({
 
               {!editingVault && eligibleGroups.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Proprietà cartella</Label>
+                  <Label>{t('vault-dialog.proprieta-cartella')}</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
@@ -198,8 +196,7 @@ export function VaultDialog({
                           : 'text-muted-foreground hover:bg-muted',
                       )}
                     >
-                      <User className="size-3.5" />A mio nome
-                    </button>
+                      <User className="size-3.5" />{t('vault-dialog.a-mio-nome')}</button>
                     <button
                       type="button"
                       onClick={() => {
@@ -215,21 +212,20 @@ export function VaultDialog({
                           : 'text-muted-foreground hover:bg-muted',
                       )}
                     >
-                      <Users className="size-3.5" />A nome di un gruppo
-                    </button>
+                      <Users className="size-3.5" />{t('vault-dialog.a-nome-di-un-gruppo')}</button>
                   </div>
 
                   {ownerType === 'group' && (
                     <div className="space-y-2.5 rounded-lg border border-border/70 bg-muted/30 p-3">
                       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-xs">Gruppo</Label>
+                          <Label className="text-xs">{t('vault-dialog.gruppo')}</Label>
                           <Select
                             value={ownerGroupId}
                             onValueChange={setOwnerGroupId}
                           >
                             <SelectTrigger className="h-9 w-full text-xs">
-                              <SelectValue placeholder="Seleziona gruppo" />
+                              <SelectValue placeholder={t('vault-dialog.seleziona-gruppo')} />
                             </SelectTrigger>
                             <SelectContent>
                               {eligibleGroups.map((g) => (
@@ -251,7 +247,7 @@ export function VaultDialog({
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-xs">Permessi membri</Label>
+                          <Label className="text-xs">{t('vault-dialog.permessi-membri')}</Label>
                           <Select
                             value={groupRole}
                             onValueChange={(v) =>
@@ -262,29 +258,28 @@ export function VaultDialog({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="editor">Editor</SelectItem>
-                              <SelectItem value="viewer">Sola lettura</SelectItem>
+                              <SelectItem value="editor">{t('vault-dialog.editor')}</SelectItem>
+                              <SelectItem value="viewer">{t('vault-dialog.sola-lettura')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
                       <p className="text-[11px] leading-relaxed text-muted-foreground">
-                        La cartella verrà condivisa automaticamente con tutti i{' '}
+                        {t('vault-dialog.la-cartella-verra-condivisa-automaticamente-con-')}{' '}
                         {selectedGroup
-                          ? `${selectedGroup.member_count} membri`
-                          : 'membri'}{' '}
-                        del gruppo (inclusi i futuri membri aggiunti).
-                      </p>
+                          ? t('vault-dialog.v0-membri', { v0: selectedGroup.member_count })
+                          : t('vault-dialog.membri')}{' '}
+                        {t('vault-dialog.del-gruppo-inclusi-i-futuri-membri-aggiunti')}</p>
                     </div>
                   )}
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <Label htmlFor="vault-name">Nome cartella</Label>
+                <Label htmlFor="vault-name">{t('vault-dialog.nome-cartella')}</Label>
                 <Input
                   id="vault-name"
-                  placeholder="es. Infrastruttura Prod, Team Marketing..."
+                  placeholder={t('vault-dialog.es-infrastruttura-prod-team-marketing')}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
@@ -293,10 +288,10 @@ export function VaultDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="vault-desc">Descrizione (opzionale)</Label>
+                <Label htmlFor="vault-desc">{t('vault-dialog.descrizione-opzionale')}</Label>
                 <Textarea
                   id="vault-desc"
-                  placeholder="A cosa serve questa cartella?"
+                  placeholder={t('vault-dialog.a-cosa-serve-questa-cartella')}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   className="min-h-16"
@@ -307,10 +302,10 @@ export function VaultDialog({
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Icona</Label>
+                <Label>{t('vault-dialog.icona')}</Label>
                 <Select value={icon} onValueChange={setIcon}>
                   <SelectTrigger className="h-9 w-full text-xs">
-                    <SelectValue placeholder="Seleziona icona" />
+                    <SelectValue placeholder={t('vault-dialog.seleziona-icona')} />
                   </SelectTrigger>
                   <SelectContent>
                     {VAULT_ICON_OPTIONS.map((opt) => (
@@ -326,7 +321,7 @@ export function VaultDialog({
               </div>
 
               <div className="space-y-2">
-                <Label>Colore</Label>
+                <Label>{t('vault-dialog.colore')}</Label>
                 <VaultColorPicker value={color} onChange={setColor} />
               </div>
             </div>
@@ -338,14 +333,13 @@ export function VaultDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Annulla
-            </Button>
+              {t('vault-dialog.annulla')}</Button>
             <Button type="submit" disabled={submitting}>
               {submitting
                 ? 'Salvataggio...'
                 : editingVault
-                  ? 'Salva modifiche'
-                  : 'Crea cartella'}
+                  ? t('vault-dialog.salva-modifiche')
+                  : t('vault-dialog.crea-cartella')}
             </Button>
           </DialogFooter>
         </form>

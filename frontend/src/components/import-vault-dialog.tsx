@@ -63,6 +63,7 @@ import {
 } from '@/lib/import-providers'
 import { cn } from '@/lib/utils'
 import { getVaultColor } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024
 const NO_FOLDER_FILTER = '__none__'
@@ -250,7 +251,7 @@ export function ImportVaultDialog({
         const msg =
           err instanceof Error
             ? err.message
-            : 'Impossibile analizzare il file selezionato'
+            : t('import-vault-dialog.impossibile-analizzare-il-file-selezionato')
         setPreviewError(msg)
         setPreview(null)
       } finally {
@@ -263,11 +264,11 @@ export function ImportVaultDialog({
   const handleFilePicked = async (file: File) => {
     setPreviewError(null)
     if (file.size === 0) {
-      setPreviewError('Il file selezionato è vuoto.')
+      setPreviewError(t('import-vault-dialog.il-file-selezionato-e-vuoto'))
       return
     }
     if (file.size > MAX_IMPORT_BYTES) {
-      const msg = 'Il file supera il limite massimo consentito di 10 MB.'
+      const msg = t('import-vault-dialog.il-file-supera-il-limite-massimo-consentito-di-1')
       setPreviewError(msg)
       toast.error(msg)
       return
@@ -277,12 +278,12 @@ export function ImportVaultDialog({
     try {
       text = await file.text()
     } catch {
-      setPreviewError('Impossibile leggere il file selezionato.')
+      setPreviewError(t('import-vault-dialog.impossibile-leggere-il-file-selezionato'))
       return
     }
 
     if (!text.trim()) {
-      setPreviewError('Il file selezionato non contiene dati leggibili.')
+      setPreviewError(t('import-vault-dialog.il-file-selezionato-non-contiene-dati-leggibili'))
       return
     }
 
@@ -494,17 +495,17 @@ export function ImportVaultDialog({
       setStep('result')
       if (result.imported_count > 0) {
         toast.success(
-          `Importate ${result.imported_count} credenziali da ${result.provider_label}`,
+          t('import-vault-dialog.importate-v0-credenziali-da-v1', { v0: result.imported_count, v1: result.provider_label }),
         )
       } else {
-        toast.info('Nessuna nuova credenziale importata')
+        toast.info(t('import-vault-dialog.nessuna-nuova-credenziale-importata'))
       }
       await onImported(targetVaultId)
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Errore durante l'importazione delle credenziali",
+          : t('import-vault-dialog.errore-durante-l-importazione-delle-credenziali'),
       )
     } finally {
       setImporting(false)
@@ -530,7 +531,7 @@ export function ImportVaultDialog({
   const statusCards = [
     {
       status: 'ready',
-      label: 'Pronte',
+      label: t('import-vault-dialog.pronte'),
       count: scopedStats.ready,
       icon: CheckCircle2,
       cardClass:
@@ -542,7 +543,7 @@ export function ImportVaultDialog({
     },
     {
       status: 'warning',
-      label: 'Con avvisi',
+      label: t('import-vault-dialog.con-avvisi'),
       count: scopedStats.warning,
       icon: AlertTriangle,
       cardClass:
@@ -554,7 +555,7 @@ export function ImportVaultDialog({
     },
     {
       status: 'duplicate',
-      label: 'Duplicati',
+      label: t('import-vault-dialog.duplicati'),
       count: scopedStats.duplicate,
       icon: Copy,
       cardClass: 'border-sky-500/25 bg-sky-500/10 hover:border-sky-500/50',
@@ -565,7 +566,7 @@ export function ImportVaultDialog({
     },
     {
       status: 'skipped',
-      label: 'Saltate',
+      label: t('import-vault-dialog.saltate'),
       count: scopedStats.skipped,
       icon: Ban,
       cardClass: 'border-border/70 bg-muted/40 hover:border-muted-foreground/40',
@@ -589,13 +590,13 @@ export function ImportVaultDialog({
         id={options?.id}
         className={cn('text-xs', options?.triggerClassName)}
       >
-        <SelectValue placeholder="Seleziona cartella" />
+        <SelectValue placeholder={t('import-vault-dialog.seleziona-cartella')} />
       </SelectTrigger>
       <SelectContent position="popper">
         {selectableVaults.map((v) => {
           const vp = getVaultColor(v.color)
           const contextLabel =
-            v.owner_group_name ?? (v.is_shared_with_me ? 'Condivisa' : null)
+            v.owner_group_name ?? (v.is_shared_with_me ? t('import-vault-dialog.condivisa') : null)
           return (
             <SelectItem key={v.id} value={v.id}>
               <span className="flex min-w-0 items-center gap-2">
@@ -630,15 +631,14 @@ export function ImportVaultDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="size-5 text-primary sync-security:text-[#ff9c00]" />
-            Importa credenziali nella cartella
-          </DialogTitle>
+            {t('import-vault-dialog.importa-credenziali-nella-cartella')}</DialogTitle>
           <DialogDescription>
             {step === 'select' &&
-              'Seleziona la cartella di destinazione, scegli il provider di origine e carica il file esportato.'}
+              t('import-vault-dialog.seleziona-la-cartella-di-destinazione-scegli-il-')}
             {step === 'preview' &&
-              'Controlla l’anteprima, gestisci eventuali duplicati e conferma le voci da cifrare e importare.'}
+              t('import-vault-dialog.controlla-l-anteprima-gestisci-eventuali-duplica')}
             {step === 'result' &&
-              'Riepilogo dell’importazione completata nella cartella selezionata.'}
+              t('import-vault-dialog.riepilogo-dell-importazione-completata-nella-car')}
           </DialogDescription>
         </DialogHeader>
 
@@ -650,8 +650,7 @@ export function ImportVaultDialog({
                 htmlFor="import-target-vault"
                 className="text-xs font-medium text-muted-foreground"
               >
-                Cartella di destinazione
-              </Label>
+                {t('import-vault-dialog.cartella-di-destinazione-1')}</Label>
               {renderTargetVaultSelect({
                 id: 'import-target-vault',
                 triggerClassName: 'h-9 w-full',
@@ -663,13 +662,12 @@ export function ImportVaultDialog({
                 htmlFor="import-provider-search"
                 className="text-xs font-medium text-muted-foreground"
               >
-                Cerca provider
-              </Label>
+                {t('import-vault-dialog.cerca-provider')}</Label>
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="import-provider-search"
-                  placeholder="Cerca provider, browser o formato..."
+                  placeholder={t('import-vault-dialog.cerca-provider-browser-o-formato')}
                   value={providerSearch}
                   onChange={(e) => setProviderSearch(e.target.value)}
                   className="h-9 pr-8 pl-8 text-xs"
@@ -678,7 +676,7 @@ export function ImportVaultDialog({
                   <button
                     type="button"
                     onClick={() => setProviderSearch('')}
-                    aria-label="Cancella ricerca provider"
+                    aria-label={t('import-vault-dialog.cancella-ricerca-provider')}
                     className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded-xs p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <X className="size-3.5" />
@@ -698,7 +696,7 @@ export function ImportVaultDialog({
                 className={cn('size-3.5 shrink-0', activePalette.text)}
                 style={activePalette.style}
               />
-              <span>Cartella di destinazione:</span>
+              <span>{t('import-vault-dialog.cartella-di-destinazione-2')}</span>
             </div>
 
             {renderTargetVaultSelect({
@@ -714,14 +712,13 @@ export function ImportVaultDialog({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs font-medium text-muted-foreground">
-                  Provider supportati
-                </Label>
+                  {t('import-vault-dialog.provider-supportati')}</Label>
                 <span className="text-[11px] text-muted-foreground">
                   {providerSearch.trim()
                     ? `${filteredProviders.length} di ${IMPORT_PROVIDERS.length}`
                     : `${IMPORT_PROVIDERS.length} provider`}
                   {providerSearch.trim() && !selectedProviderVisible
-                    ? ` · Selezionato: ${selectedProviderMeta.name}`
+                    ? t('import-vault-dialog.selezionato-v0', { v0: selectedProviderMeta.name })
                     : ''}
                 </span>
               </div>
@@ -729,12 +726,11 @@ export function ImportVaultDialog({
               {filteredProviders.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border/80 bg-muted/20 px-4 py-7 text-center">
                   <p className="text-xs font-medium text-foreground">
-                    Nessun provider trovato per &ldquo;{providerSearch.trim()}
+                    {t('import-vault-dialog.nessun-provider-trovato-per-ldquo')}{providerSearch.trim()}
                     &rdquo;.
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Prova un altro termine oppure importa tramite CSV Generico.
-                  </p>
+                    {t('import-vault-dialog.prova-un-altro-termine-oppure-importa-tramite-cs')}</p>
                   <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                     <Button
                       type="button"
@@ -742,8 +738,7 @@ export function ImportVaultDialog({
                       size="xs"
                       onClick={() => setProviderSearch('')}
                     >
-                      Cancella filtro
-                    </Button>
+                      {t('import-vault-dialog.cancella-filtro')}</Button>
                     <Button
                       type="button"
                       variant="secondary"
@@ -753,8 +748,7 @@ export function ImportVaultDialog({
                         setProviderSearch('')
                       }}
                     >
-                      Usa CSV Generico
-                    </Button>
+                      {t('import-vault-dialog.usa-csv-generico')}</Button>
                   </div>
                 </div>
               ) : (
@@ -830,7 +824,7 @@ export function ImportVaultDialog({
               </div>
               <div>
                 <span className="font-semibold text-foreground">
-                  Come esportare da {selectedProviderMeta.name}:{' '}
+                  {t('import-vault-dialog.come-esportare-da')} {selectedProviderMeta.name}:{' '}
                 </span>
                 {selectedProviderMeta.exportGuide}
               </div>
@@ -889,12 +883,9 @@ export function ImportVaultDialog({
                   <>
                     <Loader2 className="size-7 animate-spin text-primary sync-security:text-[#ff9c00]" />
                     <p className="mt-2.5 text-sm font-medium text-foreground">
-                      Analisi di {fileName || 'file'} in corso...
-                    </p>
+                      {t('import-vault-dialog.analisi-di')} {fileName || 'file'} {t('import-vault-dialog.in-corso')}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Verifica formato, categorie e controllo duplicati nella
-                      cartella.
-                    </p>
+                      {t('import-vault-dialog.verifica-formato-categorie-e-controllo-duplicati')}</p>
                   </>
                 ) : (
                   <>
@@ -902,14 +893,10 @@ export function ImportVaultDialog({
                       <FileUp className="size-5" />
                     </div>
                     <p className="mt-2.5 text-sm font-semibold text-foreground">
-                      Trascina qui il file {selectedProviderMeta.formatsLabel} o
-                      clicca per scegliere
-                    </p>
+                      {t('import-vault-dialog.trascina-qui-il-file')} {selectedProviderMeta.formatsLabel} {t('import-vault-dialog.o-clicca-per-scegliere')}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Formati accettati per {selectedProviderMeta.name}:{' '}
-                      {selectedProviderMeta.formatsLabel} · max 10 MB · cifratura
-                      AES-256-GCM immediata al salvataggio
-                    </p>
+                      {t('import-vault-dialog.formati-accettati-per')} {selectedProviderMeta.name}:{' '}
+                      {selectedProviderMeta.formatsLabel} {t('import-vault-dialog.max-10-mb-cifratura-aes-256-gcm-immediata-al-sal')}</p>
                     {fileName && !previewError && (
                       <Badge
                         variant="secondary"
@@ -931,8 +918,7 @@ export function ImportVaultDialog({
                   <AlertCircle className="mt-0.5 size-4 shrink-0" />
                   <div className="space-y-1">
                     <p className="font-semibold">
-                      Impossibile analizzare il file
-                      {fileName ? ` "${fileName}"` : ''}
+                      {t('import-vault-dialog.impossibile-analizzare-il-file')} {fileName ? ` "${fileName}"` : ''}
                     </p>
                     <p className="leading-relaxed text-destructive/90">
                       {previewError}
@@ -984,8 +970,7 @@ export function ImportVaultDialog({
                 disabled={importing}
               >
                 <ArrowLeft className="size-3" />
-                Cambia file
-              </Button>
+                {t('import-vault-dialog.cambia-file')}</Button>
             </div>
 
             {/* 4 Summary Badges: clicca un riquadro per filtrare la lista */}
@@ -997,7 +982,7 @@ export function ImportVaultDialog({
                     key={card.status}
                     type="button"
                     aria-pressed={statusFilter === card.status}
-                    title={`Mostra solo: ${card.label}`}
+                    title={t('import-vault-dialog.mostra-solo-v0', { v0: card.label })}
                     onClick={() => handleStatusFilter(card.status)}
                     className={cn(
                       'flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors',
@@ -1039,8 +1024,7 @@ export function ImportVaultDialog({
                     htmlFor="skip-duplicates"
                     className="cursor-pointer text-xs font-medium"
                   >
-                    Ignora duplicati già presenti nella cartella
-                  </Label>
+                    {t('import-vault-dialog.ignora-duplicati-gia-presenti-nella-cartella')}</Label>
                 </div>
 
                 {preview.source_folders.length > 0 && (
@@ -1056,8 +1040,7 @@ export function ImportVaultDialog({
                       htmlFor="folder-as-tag"
                       className="cursor-pointer text-xs font-medium"
                     >
-                      Aggiungi cartella di origine come tag
-                    </Label>
+                      {t('import-vault-dialog.aggiungi-cartella-di-origine-come-tag')}</Label>
                   </div>
                 )}
               </div>
@@ -1065,8 +1048,7 @@ export function ImportVaultDialog({
               {preview.source_folders.length > 0 && (
                 <div className="space-y-1.5 border-t border-border/50 pt-2">
                   <p className="text-[11px] font-medium text-muted-foreground">
-                    Filtra per cartella / collezione nel file esportato:
-                  </p>
+                    {t('import-vault-dialog.filtra-per-cartella-collezione-nel-file-esportat')}</p>
                   <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
@@ -1079,7 +1061,7 @@ export function ImportVaultDialog({
                       )}
                     >
                       <Layers className="size-3" />
-                      <span>Tutte ({preview.total_parsed})</span>
+                      <span>{t('import-vault-dialog.tutte')}{preview.total_parsed})</span>
                     </button>
 
                     {preview.has_items_without_folder && (
@@ -1098,7 +1080,7 @@ export function ImportVaultDialog({
                         )}
                       >
                         <FolderOpen className="size-3" />
-                        <span>Senza cartella ({folderCounts.withoutFolder})</span>
+                        <span>{t('import-vault-dialog.senza-cartella')}{folderCounts.withoutFolder})</span>
                       </button>
                     )}
 
@@ -1133,7 +1115,7 @@ export function ImportVaultDialog({
               <div className="relative min-w-44 flex-1">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Cerca nell'anteprima..."
+                  placeholder={t('import-vault-dialog.cerca-nell-anteprima')}
                   value={previewSearch}
                   onChange={(e) => setPreviewSearch(e.target.value)}
                   className="h-8 pl-8 text-xs"
@@ -1141,9 +1123,8 @@ export function ImportVaultDialog({
               </div>
 
               <span className="shrink-0 text-[11px] text-muted-foreground">
-                {effectiveSelectedIndices.length} di {selectableScopedCount}{' '}
-                selezionate
-              </span>
+                {effectiveSelectedIndices.length} {t('import-vault-dialog.di')} {selectableScopedCount}{' '}
+                {t('import-vault-dialog.selezionate')}</span>
 
               <Button
                 type="button"
@@ -1163,7 +1144,7 @@ export function ImportVaultDialog({
                 >
                   {allVisibleSelected && <Check className="size-2.5" />}
                 </span>
-                {allVisibleSelected ? 'Deseleziona tutte' : 'Seleziona tutte'}
+                {allVisibleSelected ? t('import-vault-dialog.deseleziona-tutte') : t('import-vault-dialog.seleziona-tutte')}
               </Button>
             </div>
 
@@ -1175,7 +1156,7 @@ export function ImportVaultDialog({
             >
               {visiblePreviewItems.length === 0 ? (
                 <div className="flex h-48 flex-col items-center justify-center gap-2 p-6 text-center text-xs text-muted-foreground">
-                  <span>Nessuna credenziale corrisponde ai filtri selezionati.</span>
+                  <span>{t('import-vault-dialog.nessuna-credenziale-corrisponde-ai-filtri-selezi')}</span>
                   {statusFilter !== 'all' && (
                     <Button
                       type="button"
@@ -1185,8 +1166,7 @@ export function ImportVaultDialog({
                       onClick={() => setStatusFilter('all')}
                     >
                       <X className="size-3" />
-                      Mostra tutti gli stati
-                    </Button>
+                      {t('import-vault-dialog.mostra-tutti-gli-stati')}</Button>
                   )}
                 </div>
               ) : (
@@ -1247,7 +1227,7 @@ export function ImportVaultDialog({
                               {item.favorite && (
                                 <Star
                                   className="size-3 shrink-0 fill-amber-400 text-amber-400"
-                                  aria-label="Preferita"
+                                  aria-label={t('import-vault-dialog.preferita')}
                                 />
                               )}
                               <Badge
@@ -1276,8 +1256,8 @@ export function ImportVaultDialog({
                                     ? '1 campo strutturato'
                                     : `${item.extra_field_count} campi strutturati`
                                   : item.has_notes
-                                    ? 'Contiene note cifrate'
-                                    : 'Nessun dettaglio aggiuntivo')}
+                                    ? t('import-vault-dialog.contiene-note-cifrate')
+                                    : t('import-vault-dialog.nessun-dettaglio-aggiuntivo'))}
                             </p>
 
                             {item.warning && (
@@ -1301,8 +1281,7 @@ export function ImportVaultDialog({
                               className="gap-1 border-emerald-500/35 bg-emerald-500/10 px-1.5 py-0 text-[10px] text-emerald-600 dark:text-emerald-400"
                             >
                               <CheckCircle2 className="size-2.5" />
-                              Pronta
-                            </Badge>
+                              {t('import-vault-dialog.pronta')}</Badge>
                           )}
                           {item.status === 'warning' && (
                             <Badge
@@ -1310,8 +1289,7 @@ export function ImportVaultDialog({
                               className="gap-1 border-amber-500/35 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-600 dark:text-amber-400"
                             >
                               <AlertTriangle className="size-2.5" />
-                              Avviso
-                            </Badge>
+                              {t('import-vault-dialog.avviso')}</Badge>
                           )}
                           {item.status === 'duplicate' && (
                             <Badge
@@ -1319,8 +1297,7 @@ export function ImportVaultDialog({
                               className="gap-1 border-sky-500/35 bg-sky-500/10 px-1.5 py-0 text-[10px] text-sky-600 dark:text-sky-400"
                             >
                               <Copy className="size-2.5" />
-                              Duplicato
-                            </Badge>
+                              {t('import-vault-dialog.duplicato')}</Badge>
                           )}
                           {item.status === 'skipped' && (
                             <Badge
@@ -1328,8 +1305,7 @@ export function ImportVaultDialog({
                               className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
                             >
                               <Ban className="size-2.5" />
-                              Saltata
-                            </Badge>
+                              {t('import-vault-dialog.saltata')}</Badge>
                           )}
                         </div>
                       </div>
@@ -1349,7 +1325,7 @@ export function ImportVaultDialog({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-bold text-foreground">
-                    Importazione completata da {importResult.provider_label} (
+                    {t('import-vault-dialog.importazione-completata-da')} {importResult.provider_label} (
                     {importResult.detected_format})
                   </p>
                   <span className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 p-1 text-foreground">
@@ -1360,8 +1336,7 @@ export function ImportVaultDialog({
                   </span>
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                  Tutte le credenziali importate sono state cifrate a riposo con
-                  AES-256-GCM nella cartella{' '}
+                  {t('import-vault-dialog.tutte-le-credenziali-importate-sono-state-cifrat')}{' '}
                   <strong className="text-foreground">
                     {activeTargetVault?.name ?? 'selezionata'}
                   </strong>
@@ -1379,8 +1354,7 @@ export function ImportVaultDialog({
                   </p>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Importate
-                </p>
+                  {t('import-vault-dialog.importate')}</p>
               </div>
               <div className="rounded-lg border border-sky-500/25 bg-sky-500/10 px-3.5 py-2.5 text-center">
                 <div className="flex items-center justify-center gap-1.5 text-sky-600 dark:text-sky-400">
@@ -1390,8 +1364,7 @@ export function ImportVaultDialog({
                   </p>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Duplicati ignorati
-                </p>
+                  {t('import-vault-dialog.duplicati-ignorati')}</p>
               </div>
               <div className="rounded-lg border border-border/70 bg-muted/40 px-3.5 py-2.5 text-center">
                 <div className="flex items-center justify-center gap-1.5 text-muted-foreground">
@@ -1401,16 +1374,14 @@ export function ImportVaultDialog({
                   </p>
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Voci saltate
-                </p>
+                  {t('import-vault-dialog.voci-saltate')}</p>
               </div>
             </div>
 
             {importResult.skipped_items.length > 0 && (
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">
-                  Dettaglio elementi non importati (
-                  {importResult.skipped_items.length})
+                  {t('import-vault-dialog.dettaglio-elementi-non-importati')} {importResult.skipped_items.length})
                 </Label>
                 <ScrollArea
                   className="h-40 rounded-lg border border-border/70 bg-card/30 p-2.5"
@@ -1446,8 +1417,7 @@ export function ImportVaultDialog({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Annulla
-              </Button>
+                {t('import-vault-dialog.annulla')}</Button>
               {preview && !previewError ? (
                 <>
                   <Button
@@ -1457,15 +1427,13 @@ export function ImportVaultDialog({
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Upload className="size-4" />
-                    Cambia file
-                  </Button>
+                    {t('import-vault-dialog.cambia-file')}</Button>
                   <Button
                     type="button"
                     disabled={previewLoading}
                     onClick={() => setStep('preview')}
                   >
-                    Torna all&apos;anteprima
-                    <ArrowRight className="size-4" />
+                    {t('import-vault-dialog.torna-all-apos-anteprima')} <ArrowRight className="size-4" />
                   </Button>
                 </>
               ) : (
@@ -1475,8 +1443,7 @@ export function ImportVaultDialog({
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Upload className="size-4" />
-                  Seleziona file…
-                </Button>
+                  {t('import-vault-dialog.seleziona-file')}</Button>
               )}
             </>
           )}
@@ -1489,8 +1456,7 @@ export function ImportVaultDialog({
                 onClick={() => setStep('select')}
                 disabled={importing}
               >
-                Indietro
-              </Button>
+                {t('import-vault-dialog.indietro')}</Button>
               <Button
                 type="button"
                 disabled={
@@ -1503,15 +1469,14 @@ export function ImportVaultDialog({
                 {importing ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    Importazione in corso...
-                  </>
+                    {t('import-vault-dialog.importazione-in-corso')}</>
                 ) : (
                   <>
                     <Upload className="size-4" />
-                    Importa {effectiveSelectedIndices.length}{' '}
+                    {t('import-vault-dialog.importa')} {effectiveSelectedIndices.length}{' '}
                     {effectiveSelectedIndices.length === 1
-                      ? 'credenziale'
-                      : 'credenziali'}
+                      ? t('import-vault-dialog.credenziale')
+                      : t('import-vault-dialog.credenziali')}
                   </>
                 )}
               </Button>
@@ -1520,8 +1485,7 @@ export function ImportVaultDialog({
 
           {step === 'result' && (
             <Button type="button" onClick={() => onOpenChange(false)}>
-              Chiudi e apri cartella
-            </Button>
+              {t('import-vault-dialog.chiudi-e-apri-cartella')}</Button>
           )}
         </DialogFooter>
       </DialogContent>

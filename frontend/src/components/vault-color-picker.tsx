@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { getVaultColor, VAULT_COLORS } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface VaultColorPickerProps {
   value: string
@@ -48,7 +49,7 @@ export function VaultColorPicker({ value, onChange }: VaultColorPickerProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          title="Scegli un colore"
+          title={t('vault-color-picker.scegli-un-colore')}
           className={cn(
             'flex w-full cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs transition-colors',
             isCustom
@@ -77,8 +78,7 @@ export function VaultColorPicker({ value, onChange }: VaultColorPickerProps) {
         style={{ '--vc': palette.hex } as CSSProperties}
       >
         <p className="mb-2.5 text-[11px] font-bold tracking-[0.14em] text-muted-foreground uppercase">
-          Scegli un colore
-        </p>
+          {t('vault-color-picker.scegli-un-colore')}</p>
 
         <div className="grid grid-cols-4 gap-2">
           {Object.entries(VAULT_COLORS).map(([key, p]) => {

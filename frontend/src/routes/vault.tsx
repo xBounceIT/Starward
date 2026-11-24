@@ -55,6 +55,7 @@ import {
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { isRecentlyAdded, type PasswordOptions } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 const LAST_ACCESSED_STORAGE_KEY = 'starward-last-accessed'
 const DETAIL_PANEL_WIDTH_STORAGE_KEY = 'starward-detail-panel-width'
@@ -231,7 +232,7 @@ function VaultWorkspace() {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore di connessione al backend Rust',
+          : t('vault.errore-di-connessione-al-backend-rust'),
       )
     } finally {
       setLoading(false)
@@ -287,7 +288,7 @@ function VaultWorkspace() {
       const target = vault ?? defaultImportVault
       if (!target) {
         toast.error(
-          'Nessuna cartella con permessi di scrittura disponibile per importare credenziali',
+          t('vault.nessuna-cartella-con-permessi-di-scrittura-dispo'),
         )
         return
       }
@@ -539,7 +540,7 @@ function VaultWorkspace() {
     setPendingDeleteCred(null)
     try {
       await vaultApi.deleteCredential(cred.id)
-      toast.success(`Credenziale "${cred.title}" eliminata`)
+      toast.success(t('vault.credenziale-v0-eliminata', { v0: cred.title }))
       if (selectedCredentialId === cred.id) {
         setSelectedCredentialId(null)
         setMobileDetailOpen(false)
@@ -547,7 +548,7 @@ function VaultWorkspace() {
       await refreshData()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore eliminazione credenziale',
+        err instanceof Error ? err.message : t('vault.errore-eliminazione-credenziale'),
       )
     }
   }
@@ -562,7 +563,7 @@ function VaultWorkspace() {
       )
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore aggiornamento preferito',
+        err instanceof Error ? err.message : t('vault.errore-aggiornamento-preferito'),
       )
     }
   }, [])
@@ -625,7 +626,7 @@ function VaultWorkspace() {
       )
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore aggiornamento tag',
+        err instanceof Error ? err.message : t('vault.errore-aggiornamento-tag'),
       )
     }
   }
@@ -636,14 +637,14 @@ function VaultWorkspace() {
     setPendingDeleteVault(null)
     try {
       await vaultApi.deleteVault(vault.id)
-      toast.success(`Cartella "${vault.name}" eliminata`)
+      toast.success(t('vault.cartella-v0-eliminata', { v0: vault.name }))
       if (selection.type === 'vault' && selection.vaultId === vault.id) {
         setSelection({ type: 'all' })
       }
       await refreshData()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore eliminazione cartella',
+        err instanceof Error ? err.message : t('vault.errore-eliminazione-cartella'),
       )
     }
   }
@@ -654,14 +655,14 @@ function VaultWorkspace() {
     setPendingDeleteGroup(null)
     try {
       await vaultApi.deleteGroup(group.id)
-      toast.success(`Gruppo "${group.name}" eliminato`)
+      toast.success(t('vault.gruppo-v0-eliminato', { v0: group.name }))
       if (selection.type === 'group' && selection.groupId === group.id) {
         setSelection({ type: 'all' })
       }
       await refreshData()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore eliminazione gruppo',
+        err instanceof Error ? err.message : t('vault.errore-eliminazione-gruppo'),
       )
     }
   }
@@ -740,8 +741,7 @@ function VaultWorkspace() {
                 onClick={() => setMobileDetailOpen(false)}
               >
                 <ArrowLeft className="size-4" />
-                Lista
-              </Button>
+                {t('vault.lista')}</Button>
             ) : (
               <>
                 <SidebarTrigger className="md:hidden" />
@@ -753,10 +753,10 @@ function VaultWorkspace() {
             )}
             <span className="font-sans text-sm font-semibold">
               {selection.type === 'admin'
-                ? 'Pannello Admin'
+                ? t('vault.pannello-admin')
                 : selection.type === 'group' && activeGroup
-                  ? `Gruppo · ${activeGroup.name}`
-                  : 'Starward Vault'}
+                  ? t('vault.gruppo-v0', { v0: activeGroup.name })
+                  : t('vault.starward-vault')}
             </span>
           </div>
           {selection.type !== 'admin' && selection.type !== 'group' && (
@@ -767,8 +767,7 @@ function VaultWorkspace() {
                 setCredDialogOpen(true)
               }}
             >
-              Nuova
-            </Button>
+              {t('vault.nuova')}</Button>
           )}
         </header>
 
@@ -864,12 +863,12 @@ function VaultWorkspace() {
                 <div
                   role="separator"
                   aria-orientation="vertical"
-                  aria-label="Ridimensiona pannello anteprima"
+                  aria-label={t('vault.ridimensiona-pannello-anteprima')}
                   aria-valuemin={MIN_DETAIL_WIDTH}
                   aria-valuemax={maxDetailWidth}
                   aria-valuenow={effectiveDetailWidth}
                   tabIndex={0}
-                  title="Trascina per ridimensionare (doppio clic per ripristinare)"
+                  title={t('vault.trascina-per-ridimensionare-doppio-clic-per-ripr')}
                   onPointerDown={handleDetailResizeStart}
                   onDoubleClick={handleDetailResizeDoubleClick}
                   onKeyDown={handleDetailResizeKeyDown}
@@ -1041,24 +1040,21 @@ function VaultWorkspace() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare questa credenziale?</AlertDialogTitle>
+            <AlertDialogTitle>{t('vault.eliminare-questa-credenziale')}</AlertDialogTitle>
             <AlertDialogDescription>
-              La credenziale{' '}
+              {t('vault.la-credenziale')}{' '}
               <strong className="text-foreground">
                 "{pendingDeleteCred?.title}"
               </strong>{' '}
-              verrà eliminata definitivamente dal vault. Questa azione non può
-              essere annullata.
-            </AlertDialogDescription>
+              {t('vault.verra-eliminata-definitivamente-dal-vault-questa')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('vault.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmDeleteCredential}
             >
-              Elimina
-            </AlertDialogAction>
+              {t('vault.elimina')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1072,24 +1068,21 @@ function VaultWorkspace() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare questa cartella?</AlertDialogTitle>
+            <AlertDialogTitle>{t('vault.eliminare-questa-cartella')}</AlertDialogTitle>
             <AlertDialogDescription>
-              La cartella{' '}
+              {t('vault.la-cartella')}{' '}
               <strong className="text-foreground">
                 "{pendingDeleteVault?.name}"
               </strong>{' '}
-              e tutte le credenziali al suo interno verranno eliminate
-              definitivamente.
-            </AlertDialogDescription>
+              {t('vault.e-tutte-le-credenziali-al-suo-interno-verranno-e')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('vault.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmDeleteVault}
             >
-              Elimina cartella
-            </AlertDialogAction>
+              {t('vault.elimina-cartella')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1102,26 +1095,21 @@ function VaultWorkspace() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare questo gruppo?</AlertDialogTitle>
+            <AlertDialogTitle>{t('vault.eliminare-questo-gruppo')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Il gruppo{' '}
+              {t('vault.il-gruppo')}{' '}
               <strong className="text-foreground">
                 "{pendingDeleteGroup?.name}"
               </strong>{' '}
-              verrà eliminato. Le condivisioni delle cartelle verso questo
-              gruppo saranno revocate, mentre eventuali cartelle create a nome
-              del gruppo torneranno di proprietà del loro creatore senza
-              perdita di credenziali.
-            </AlertDialogDescription>
+              {t('vault.verra-eliminato-le-condivisioni-delle-cartelle-v')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('vault.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmDeleteGroup}
             >
-              Elimina gruppo
-            </AlertDialogAction>
+              {t('vault.elimina-gruppo')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

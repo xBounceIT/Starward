@@ -1,5 +1,7 @@
 import type { CSSProperties } from 'react'
 
+import i18n, { t } from '@/lib/i18n'
+
 export interface PasswordOptions {
   length: number
   uppercase: boolean
@@ -59,7 +61,7 @@ export interface PasswordStrength {
 
 export function evaluatePasswordStrength(password: string): PasswordStrength {
   if (!password) {
-    return { score: 0, label: 'Vuota', colorClass: 'bg-muted', percent: 0 }
+    return { score: 0, label: t('vault-utils.strength-empty'), colorClass: 'bg-muted', percent: 0 }
   }
 
   let points = 0
@@ -73,7 +75,7 @@ export function evaluatePasswordStrength(password: string): PasswordStrength {
   if (points <= 2) {
     return {
       score: 1,
-      label: 'Debole',
+      label: t('vault-utils.strength-weak'),
       colorClass: 'bg-destructive',
       percent: 25,
     }
@@ -81,7 +83,7 @@ export function evaluatePasswordStrength(password: string): PasswordStrength {
   if (points <= 3) {
     return {
       score: 2,
-      label: 'Discreta',
+      label: t('vault-utils.strength-fair'),
       colorClass: 'bg-amber-500',
       percent: 50,
     }
@@ -89,14 +91,14 @@ export function evaluatePasswordStrength(password: string): PasswordStrength {
   if (points <= 4) {
     return {
       score: 3,
-      label: 'Forte',
+      label: t('vault-utils.strength-strong'),
       colorClass: 'bg-emerald-500',
       percent: 75,
     }
   }
   return {
     score: 4,
-    label: 'Eccellente',
+    label: t('vault-utils.strength-excellent'),
     colorClass: 'bg-primary',
     percent: 100,
   }
@@ -113,22 +115,30 @@ export function getInitials(nameOrEmail?: string | null): string {
   return cleaned.slice(0, 2).toUpperCase()
 }
 
-const RELATIVE_DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-})
+function intlLocale(): string {
+  return i18n.language === 'en' ? 'en-GB' : 'it-IT'
+}
 
-const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('it-IT', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-})
+// i18n.language e' reactive: i formatter vengono ricreati quando cambia lingua
+const formatterCache = new Map<string, Intl.DateTimeFormat>()
 
-const TIME_FORMATTER = new Intl.DateTimeFormat('it-IT', {
-  hour: '2-digit',
-  minute: '2-digit',
-})
+function getFormatter(
+  kind: 'relative' | 'short' | 'time',
+): Intl.DateTimeFormat {
+  const locale = intlLocale()
+  const key = `${locale}:${kind}`
+  const cached = formatterCache.get(key)
+  if (cached) return cached
+  const options =
+    kind === 'time'
+      ? { hour: '2-digit', minute: '2-digit' } as const
+      : kind === 'short'
+        ? { day: 'numeric', month: 'short', year: 'numeric' } as const
+        : { day: '2-digit', month: 'short', year: 'numeric' } as const
+  const fmt = new Intl.DateTimeFormat(locale, options)
+  formatterCache.set(key, fmt)
+  return fmt
+}
 
 const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000
 
@@ -137,13 +147,13 @@ export function formatRelativeDate(iso: string): string {
     const date = new Date(iso)
     const diffMs = Date.now() - date.getTime()
     const diffMin = Math.floor(diffMs / 60000)
-    if (diffMin < 1) return 'adesso'
-    if (diffMin < 60) return `${diffMin} min fa`
+    if (diffMin < 1) return t('vault-utils.rel-just-now')
+    if (diffMin < 60) return t('vault-utils.rel-minutes-ago', { count: diffMin })
     const diffHours = Math.floor(diffMin / 60)
-    if (diffHours < 24) return `${diffHours} ore fa`
+    if (diffHours < 24) return t('vault-utils.rel-hours-ago', { count: diffHours })
     const diffDays = Math.floor(diffHours / 24)
-    if (diffDays < 7) return `${diffDays}g fa`
-    return RELATIVE_DATE_FORMATTER.format(date)
+    if (diffDays < 7) return t('vault-utils.rel-days-ago', { count: diffDays })
+    return getFormatter('relative').format(date)
   } catch {
     return iso
   }
@@ -171,19 +181,17 @@ export function formatModifiedRelative(iso: string): string {
       Math.round((startOfToday - startOfTarget) / 86400000),
     )
 
-    if (diffDays === 0) return 'Modificata oggi'
-    if (diffDays === 1) return 'Modificata ieri'
-    if (diffDays < 7) return `Modificata ${diffDays} giorni fa`
+    if (diffDays === 0) return t('vault-utils.mod-today')
+    if (diffDays === 1) return t('vault-utils.mod-yesterday')
+    if (diffDays < 7) return t('vault-utils.mod-days-ago', { count: diffDays })
 
     const diffWeeks = Math.floor(diffDays / 7)
-    if (diffWeeks === 1) return 'Modificata 1 settimana fa'
-    if (diffWeeks < 5) return `Modificata ${diffWeeks} settimane fa`
+    if (diffWeeks < 5) return t('vault-utils.mod-weeks-ago', { count: diffWeeks })
 
     const diffMonths = Math.max(1, Math.floor(diffDays / 30))
-    if (diffMonths === 1) return 'Modificata 1 mese fa'
-    if (diffMonths < 12) return `Modificata ${diffMonths} mesi fa`
+    if (diffMonths < 12) return t('vault-utils.mod-months-ago', { count: diffMonths })
 
-    return `Modificata il ${formatShortDate(iso)}`
+    return t('vault-utils.mod-on', { date: formatShortDate(iso) })
   } catch {
     return ''
   }
@@ -194,7 +202,7 @@ export function formatShortDate(iso?: string | null): string {
   try {
     const date = new Date(iso)
     if (Number.isNaN(date.getTime())) return '—'
-    return SHORT_DATE_FORMATTER.format(date).replace('.', '')
+    return getFormatter('short').format(date).replace('.', '')
   } catch {
     return '—'
   }
@@ -219,11 +227,11 @@ export function formatAccessTimestamp(iso?: string | null): string {
       date.getMonth() === yesterday.getMonth() &&
       date.getDate() === yesterday.getDate()
 
-    const timeStr = TIME_FORMATTER.format(date)
+    const timeStr = getFormatter('time').format(date)
 
-    if (isToday) return `Oggi, ${timeStr}`
-    if (isYesterday) return `Ieri, ${timeStr}`
-    return `${formatShortDate(iso)}, ${timeStr}`
+    if (isToday) return t('vault-utils.access-today', { time: timeStr })
+    if (isYesterday) return t('vault-utils.access-yesterday', { time: timeStr })
+    return t('vault-utils.access-on', { date: formatShortDate(iso), time: timeStr })
   } catch {
     return '—'
   }
@@ -252,9 +260,11 @@ export interface VaultColorPalette {
   style: CSSProperties
 }
 
-function palette(label: string, hex: string): VaultColorPalette {
+function palette(labelKey: string, hex: string): VaultColorPalette {
   return {
-    label,
+    get label() {
+      return t(`vault-utils.${labelKey}`)
+    },
     hex,
     bg: 'vault-color-bg',
     text: 'vault-color-text',
@@ -265,14 +275,14 @@ function palette(label: string, hex: string): VaultColorPalette {
 }
 
 export const VAULT_COLORS: Record<string, VaultColorPalette> = {
-  indigo: palette('Indaco', '#6366f1'),
-  emerald: palette('Smeraldo', '#10b981'),
-  amber: palette('Ambra', '#f59e0b'),
-  rose: palette('Rosa', '#f43f5e'),
-  sky: palette('Cielo', '#0ea5e9'),
-  violet: palette('Viola', '#8b5cf6'),
-  orange: palette('Arancio', '#f97316'),
-  lime: palette('Lime', '#84cc16'),
+  indigo: palette('color-indigo', '#6366f1'),
+  emerald: palette('color-emerald', '#10b981'),
+  amber: palette('color-amber', '#f59e0b'),
+  rose: palette('color-rose', '#f43f5e'),
+  sky: palette('color-sky', '#0ea5e9'),
+  violet: palette('color-violet', '#8b5cf6'),
+  orange: palette('color-orange', '#f97316'),
+  lime: palette('color-lime', '#84cc16'),
 }
 
 const HEX_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
@@ -293,7 +303,13 @@ export function getVaultColor(color: string): VaultColorPalette {
   const key = color?.trim().toLowerCase() ?? ''
   if (HEX_COLOR_RE.test(key)) {
     const hex = normalizeHexColor(key)
-    return { ...palette('Personalizzato', hex), label: `Personalizzato ${hex}` }
+    const base = palette('color-custom', hex)
+    return {
+      ...base,
+      get label() {
+        return t('vault-utils.color-custom', { hex })
+      },
+    }
   }
   return VAULT_COLORS[key] ?? VAULT_COLORS.indigo
 }

@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { vaultApi, type AuditLog, type Vault } from '@/lib/api'
 import { formatRelativeDate, formatShortDate } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface AuditDialogProps {
   open: boolean
@@ -48,11 +49,10 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="size-5 text-primary" />
-            Registro attività — {vault.name}
+            {t('audit-dialog.registro-attivita')} {vault.name}
           </DialogTitle>
           <DialogDescription>
-            Cronologia delle modifiche e condivisioni su questa cartella.
-          </DialogDescription>
+            {t('audit-dialog.cronologia-delle-modifiche-e-condivisioni-su-que')}</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh] pr-3">
@@ -70,8 +70,7 @@ export function AuditDialog({ open, onOpenChange, vault }: AuditDialogProps) {
             </div>
           ) : logs.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Nessuna attività registrata finora.
-            </p>
+              {t('audit-dialog.nessuna-attivita-registrata-finora')}</p>
           ) : (
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {logs.map((log) => (

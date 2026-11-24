@@ -28,6 +28,7 @@ import {
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface ShareVaultDialogProps {
   open: boolean
@@ -74,7 +75,7 @@ export function ShareVaultDialog({
       .catch(() => {
         if (!active) return
         setUsers([])
-        toast.error('Errore nel caricamento degli utenti')
+        toast.error(t('share-vault-dialog.errore-nel-caricamento-degli-utenti'))
       })
       .finally(() => {
         if (active) setLoadingUsers(false)
@@ -143,7 +144,7 @@ export function ShareVaultDialog({
     e.preventDefault()
     const targetUser = availableUsers.find((u) => u.id === selectedUserId)
     if (!targetUser) {
-      toast.error('Seleziona un utente con cui condividere la cartella')
+      toast.error(t('share-vault-dialog.seleziona-un-utente-con-cui-condividere-la-carte'))
       return
     }
 
@@ -157,11 +158,11 @@ export function ShareVaultDialog({
       onVaultUpdated(updated)
       setSelectedUserId('')
       toast.success(
-        `Cartella condivisa con ${targetUser.name || targetUser.email}`,
+        t('share-vault-dialog.cartella-condivisa-con-v0', { v0: targetUser.name || targetUser.email }),
       )
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore durante la condivisione',
+        err instanceof Error ? err.message : t('share-vault-dialog.errore-durante-la-condivisione'),
       )
     } finally {
       setSubmitting(false)
@@ -171,7 +172,7 @@ export function ShareVaultDialog({
   const handleShareGroup = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedGroupId) {
-      toast.error('Seleziona un gruppo con cui condividere la cartella')
+      toast.error(t('share-vault-dialog.seleziona-un-gruppo-con-cui-condividere-la-carte'))
       return
     }
 
@@ -185,14 +186,14 @@ export function ShareVaultDialog({
       onVaultUpdated(updated)
       toast.success(
         targetGroup
-          ? `Cartella condivisa con il gruppo "${targetGroup.name}"`
-          : 'Cartella condivisa con il gruppo',
+          ? t('share-vault-dialog.cartella-condivisa-con-il-gruppo-v0', { v0: targetGroup.name })
+          : t('share-vault-dialog.cartella-condivisa-con-il-gruppo'),
       )
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante la condivisione con il gruppo',
+          : t('share-vault-dialog.errore-durante-la-condivisione-con-il-gruppo'),
       )
     } finally {
       setSubmitting(false)
@@ -211,10 +212,10 @@ export function ShareVaultDialog({
         newRole,
       )
       onVaultUpdated(updated)
-      toast.success('Permessi aggiornati')
+      toast.success(t('share-vault-dialog.permessi-aggiornati'))
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore aggiornamento ruolo',
+        err instanceof Error ? err.message : t('share-vault-dialog.errore-aggiornamento-ruolo'),
       )
     } finally {
       setBusyId(null)
@@ -230,7 +231,7 @@ export function ShareVaultDialog({
     try {
       await vaultApi.removeMember(vault.id, memberId)
       if (isSelf) {
-        toast.success(`Hai lasciato la cartella "${vault.name}"`)
+        toast.success(t('share-vault-dialog.hai-lasciato-la-cartella-v0', { v0: vault.name }))
         onLeftVault(vault.id)
         onOpenChange(false)
       } else {
@@ -241,11 +242,11 @@ export function ShareVaultDialog({
           member_count: Math.max(1, vault.member_count - 1),
           is_shared: nextMembers.length > 1 || vault.shared_groups.length > 0,
         })
-        toast.success(`Accesso rimosso per ${memberEmail}`)
+        toast.success(t('share-vault-dialog.accesso-rimosso-per-v0', { v0: memberEmail }))
       }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore rimozione membro',
+        err instanceof Error ? err.message : t('share-vault-dialog.errore-rimozione-membro'),
       )
     } finally {
       setBusyId(null)
@@ -264,12 +265,12 @@ export function ShareVaultDialog({
         newRole,
       )
       onVaultUpdated(updated)
-      toast.success('Permessi del gruppo aggiornati')
+      toast.success(t('share-vault-dialog.permessi-del-gruppo-aggiornati'))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore aggiornamento permessi gruppo',
+          : t('share-vault-dialog.errore-aggiornamento-permessi-gruppo'),
       )
     } finally {
       setBusyId(null)
@@ -289,10 +290,10 @@ export function ShareVaultDialog({
         group_count: nextGroups.length,
         is_shared: vault.members.length > 1 || nextGroups.length > 0,
       })
-      toast.success(`Accesso rimosso per il gruppo "${groupName}"`)
+      toast.success(t('share-vault-dialog.accesso-rimosso-per-il-gruppo-v0', { v0: groupName }))
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore rimozione gruppo',
+        err instanceof Error ? err.message : t('share-vault-dialog.errore-rimozione-gruppo'),
       )
     } finally {
       setBusyId(null)
@@ -305,12 +306,10 @@ export function ShareVaultDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="size-5 text-primary" />
-            Condivisione cartella "{vault.name}"
+            {t('share-vault-dialog.condivisione-cartella')}{vault.name}"
           </DialogTitle>
           <DialogDescription>
-            Condividi questa cartella con singoli utenti oppure con interi gruppi
-            di lavoro.
-          </DialogDescription>
+            {t('share-vault-dialog.condividi-questa-cartella-con-singoli-utenti-opp')}</DialogDescription>
         </DialogHeader>
 
         <div
@@ -334,8 +333,7 @@ export function ShareVaultDialog({
                   )}
                 >
                   <User className="size-3.5" />
-                  Condividi con utente
-                </button>
+                  {t('share-vault-dialog.condividi-con-utente')}</button>
                 <button
                   type="button"
                   onClick={() => setShareMode('group')}
@@ -347,14 +345,13 @@ export function ShareVaultDialog({
                   )}
                 >
                   <Users className="size-3.5" />
-                  Condividi con gruppo
-                </button>
+                  {t('share-vault-dialog.condividi-con-gruppo')}</button>
               </div>
 
               {shareMode === 'user' ? (
                 <form onSubmit={handleShareUser} className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="share-user">Seleziona utente</Label>
+                    <Label htmlFor="share-user">{t('share-vault-dialog.seleziona-utente')}</Label>
                     <div className="flex gap-2">
                       <Select
                         value={selectedUserId}
@@ -368,10 +365,10 @@ export function ShareVaultDialog({
                           <SelectValue
                             placeholder={
                               loadingUsers
-                                ? 'Caricamento utenti...'
+                                ? t('share-vault-dialog.caricamento-utenti')
                                 : availableUsers.length === 0
-                                  ? 'Nessun utente disponibile'
-                                  : 'Seleziona un utente...'
+                                  ? t('share-vault-dialog.nessun-utente-disponibile')
+                                  : t('share-vault-dialog.seleziona-un-utente')
                             }
                           />
                         </SelectTrigger>
@@ -406,8 +403,8 @@ export function ShareVaultDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="viewer">Sola lettura</SelectItem>
+                          <SelectItem value="editor">{t('share-vault-dialog.editor')}</SelectItem>
+                          <SelectItem value="viewer">{t('share-vault-dialog.sola-lettura')}</SelectItem>
                         </SelectContent>
                       </Select>
                       <Button
@@ -420,30 +417,26 @@ export function ShareVaultDialog({
                         className="shrink-0"
                       >
                         <UserPlus className="size-4" />
-                        Condividi
-                      </Button>
+                        {t('share-vault-dialog.condividi')}</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {!loadingUsers && availableUsers.length === 0
                         ? users.length === 0
-                          ? 'Non ci sono altri utenti registrati disponibili da aggiungere.'
-                          : 'Tutti gli utenti registrati hanno già accesso diretto a questa cartella.'
+                          ? t('share-vault-dialog.non-ci-sono-altri-utenti-registrati-disponibili-')
+                          : t('share-vault-dialog.tutti-gli-utenti-registrati-hanno-gia-accesso-di')
                         : role === 'editor'
-                          ? 'Editor: può visualizzare, copiare, aggiungere e modificare le credenziali nella cartella.'
-                          : 'Sola lettura: può visualizzare e copiare le credenziali senza modificarle.'}
+                          ? t('share-vault-dialog.editor-puo-visualizzare-copiare-aggiungere-e-mod')
+                          : t('share-vault-dialog.sola-lettura-puo-visualizzare-e-copiare-le-crede')}
                     </p>
                   </div>
                 </form>
               ) : (
                 <form onSubmit={handleShareGroup} className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label>Seleziona gruppo</Label>
+                    <Label>{t('share-vault-dialog.seleziona-gruppo')}</Label>
                     {availableGroups.length === 0 ? (
                       <div className="rounded-lg border border-dashed bg-muted/20 px-3 py-4 text-center text-xs text-muted-foreground">
-                        Nessun altro gruppo disponibile da aggiungere. Puoi
-                        creare un nuovo gruppo dalla sezione Gruppi nella
-                        sidebar.
-                      </div>
+                        {t('share-vault-dialog.nessun-altro-gruppo-disponibile-da-aggiungere-pu')}</div>
                     ) : (
                       <>
                         <div className="flex gap-2">
@@ -452,7 +445,7 @@ export function ShareVaultDialog({
                             onValueChange={setSelectedGroupId}
                           >
                             <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Scegli un gruppo..." />
+                              <SelectValue placeholder={t('share-vault-dialog.scegli-un-gruppo')} />
                             </SelectTrigger>
                             <SelectContent>
                               {availableGroups.map((g) => (
@@ -469,8 +462,8 @@ export function ShareVaultDialog({
                                     <span className="text-xs text-muted-foreground">
                                       ({g.member_count}{' '}
                                       {g.member_count === 1
-                                        ? 'membro'
-                                        : 'membri'}
+                                        ? t('share-vault-dialog.membro')
+                                        : t('share-vault-dialog.membri')}
                                       )
                                     </span>
                                   </span>
@@ -489,10 +482,9 @@ export function ShareVaultDialog({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="editor">Editor</SelectItem>
+                              <SelectItem value="editor">{t('share-vault-dialog.editor')}</SelectItem>
                               <SelectItem value="viewer">
-                                Sola lettura
-                              </SelectItem>
+                                {t('share-vault-dialog.sola-lettura')}</SelectItem>
                             </SelectContent>
                           </Select>
 
@@ -502,13 +494,10 @@ export function ShareVaultDialog({
                             className="shrink-0"
                           >
                             <Share2 className="size-4" />
-                            Condividi
-                          </Button>
+                            {t('share-vault-dialog.condividi')}</Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Tutti i membri attuali e futuri del gruppo avranno
-                          automaticamente accesso a questa cartella.
-                        </p>
+                          {t('share-vault-dialog.tutti-i-membri-attuali-e-futuri-del-gruppo-avran')}</p>
                       </>
                     )}
                   </div>
@@ -530,7 +519,7 @@ export function ShareVaultDialog({
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                  Gruppi con accesso ({vault.shared_groups.length})
+                  {t('share-vault-dialog.gruppi-con-accesso')}{vault.shared_groups.length})
                 </span>
               </div>
 
@@ -565,15 +554,14 @@ export function ShareVaultDialog({
                                 className="gap-1 py-0 text-[10px]"
                               >
                                 <Crown className="size-2.5 text-amber-500" />
-                                Gruppo proprietario
-                              </Badge>
+                                {t('share-vault-dialog.gruppo-proprietario')}</Badge>
                             )}
                           </div>
                           <p className="truncate text-xs text-muted-foreground">
                             {sg.member_count}{' '}
-                            {sg.member_count === 1 ? 'membro' : 'membri'}
+                            {sg.member_count === 1 ? t('share-vault-dialog.membro') : t('share-vault-dialog.membri')}
                             {sg.is_owner_group
-                              ? ' · Gestori del gruppo hanno accesso completo'
+                              ? t('share-vault-dialog.gestori-del-gruppo-hanno-accesso-completo')
                               : ''}
                           </p>
                         </div>
@@ -596,10 +584,9 @@ export function ShareVaultDialog({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="editor">Editor</SelectItem>
+                                <SelectItem value="editor">{t('share-vault-dialog.editor')}</SelectItem>
                                 <SelectItem value="viewer">
-                                  Sola lettura
-                                </SelectItem>
+                                  {t('share-vault-dialog.sola-lettura')}</SelectItem>
                               </SelectContent>
                             </Select>
                             {!sg.is_owner_group && (
@@ -612,7 +599,7 @@ export function ShareVaultDialog({
                                 onClick={() =>
                                   handleRemoveGroup(sg.group_id, sg.group_name)
                                 }
-                                title="Revoca accesso al gruppo"
+                                title={t('share-vault-dialog.revoca-accesso-al-gruppo')}
                               >
                                 <Trash2 className="size-3.5" />
                               </Button>
@@ -620,7 +607,7 @@ export function ShareVaultDialog({
                           </>
                         ) : (
                           <Badge variant="outline">
-                            {sg.role === 'editor' ? 'Editor' : 'Sola lettura'}
+                            {sg.role === 'editor' ? 'Editor' : t('share-vault-dialog.sola-lettura')}
                           </Badge>
                         )}
                       </div>
@@ -635,15 +622,15 @@ export function ShareVaultDialog({
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                Persone con accesso diretto ({vault.members.length})
+                {t('share-vault-dialog.persone-con-accesso-diretto')}{vault.members.length})
               </span>
             </div>
 
             {vault.members.length === 0 ? (
               <p className="rounded-lg border border-dashed bg-muted/20 px-3 py-3 text-center text-xs text-muted-foreground">
                 {vault.owner_group_name
-                  ? `Nessun utente individuale extra: tutti i membri del gruppo "${vault.owner_group_name}" hanno già accesso automatico.`
-                  : 'Nessun membro diretto configurato.'}
+                  ? t('share-vault-dialog.nessun-utente-individuale-extra-tutti-i-membri-d', { v0: vault.owner_group_name })
+                  : t('share-vault-dialog.nessun-membro-diretto-configurato')}
               </p>
             ) : (
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
@@ -675,8 +662,7 @@ export function ShareVaultDialog({
                                 variant="outline"
                                 className="py-0 text-[10px]"
                               >
-                                In attesa di accesso
-                              </Badge>
+                                {t('share-vault-dialog.in-attesa-di-accesso')}</Badge>
                             )}
                           </div>
                           <p className="truncate text-xs text-muted-foreground">
@@ -689,8 +675,7 @@ export function ShareVaultDialog({
                         {member.role === 'owner' ? (
                           <Badge variant="secondary" className="gap-1">
                             <Crown className="size-3 text-amber-500" />
-                            Proprietario
-                          </Badge>
+                            {t('share-vault-dialog.proprietario')}</Badge>
                         ) : isOwner ? (
                           <>
                             <Select
@@ -707,10 +692,9 @@ export function ShareVaultDialog({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="editor">Editor</SelectItem>
+                                <SelectItem value="editor">{t('share-vault-dialog.editor')}</SelectItem>
                                 <SelectItem value="viewer">
-                                  Sola lettura
-                                </SelectItem>
+                                  {t('share-vault-dialog.sola-lettura')}</SelectItem>
                               </SelectContent>
                             </Select>
                             <Button
@@ -726,7 +710,7 @@ export function ShareVaultDialog({
                                   false,
                                 )
                               }
-                              title="Revoca accesso"
+                              title={t('share-vault-dialog.revoca-accesso')}
                             >
                               <Trash2 className="size-3.5" />
                             </Button>
@@ -736,7 +720,7 @@ export function ShareVaultDialog({
                             <Badge variant="outline">
                               {member.role === 'editor'
                                 ? 'Editor'
-                                : 'Sola lettura'}
+                                : t('share-vault-dialog.sola-lettura')}
                             </Badge>
                             {isSelf && (
                               <Button
@@ -753,8 +737,7 @@ export function ShareVaultDialog({
                                   )
                                 }
                               >
-                                Lascia
-                              </Button>
+                                {t('share-vault-dialog.lascia')}</Button>
                             )}
                           </div>
                         )}

@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 import {
   createContext,
   useCallback,
@@ -10,9 +11,9 @@ import {
 export type Theme = 'light' | 'dark' | 'sync-security'
 
 export const THEME_OPTIONS: { value: Theme; label: string }[] = [
-  { value: 'light', label: 'Chiaro' },
-  { value: 'dark', label: 'Scuro' },
-  { value: 'sync-security', label: 'Sync Security' },
+  { value: 'light', get label() { return t('common.themeLight') } },
+  { value: 'dark', get label() { return t('common.themeDark') } },
+  { value: 'sync-security', get label() { return t('common.themeSync') } },
 ]
 
 interface ThemeContextValue {

@@ -46,6 +46,7 @@ import {
   formatShortDate,
   getVaultColor,
 } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface CredentialDetailProps {
   credential: Credential | null
@@ -76,12 +77,12 @@ function getCoreValue(cred: Credential, key: string): string {
 function getDetailFieldLabel(category: string, field: CredentialFieldDef): string {
   if (category === 'login') {
     if (field.key === 'username') return 'Username'
-    if (field.key === 'password') return 'Password'
+    if (field.key === t('credential-detail.password-1')) return t('credential-detail.password-2')
     if (field.key === 'url') return 'URL'
-    if (field.key === 'notes') return 'Note'
+    if (field.key === 'notes') return t('credential-detail.note-1')
   }
-  if (field.key === 'totp') return 'Codice OTP (2FA)'
-  if (field.key === 'notes') return 'Note'
+  if (field.key === 'totp') return t('credential-detail.codice-otp-2fa')
+  if (field.key === 'notes') return t('credential-detail.note-1')
   return field.label
 }
 
@@ -125,8 +126,8 @@ export function CredentialDetail({
               type="button"
               onClick={onClose}
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-              title="Chiudi pannello"
-              aria-label="Chiudi pannello"
+              title={t('credential-detail.chiudi-pannello')}
+              aria-label={t('credential-detail.chiudi-pannello')}
             >
               <X className="size-4" />
             </button>
@@ -137,12 +138,9 @@ export function CredentialDetail({
             <ShieldCheck className="size-7" />
           </div>
           <h3 className="mt-4 font-semibold text-sm sync-security:text-[#ff9c00]">
-            Seleziona una credenziale
-          </h3>
+            {t('credential-detail.seleziona-una-credenziale')}</h3>
           <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-            Scegli una voce dalla lista per visualizzare i dettagli, copiare i
-            segreti con un clic o modificarla.
-          </p>
+            {t('credential-detail.scegli-una-voce-dalla-lista-per-visualizzare-i-d')}</p>
         </div>
       </section>
     )
@@ -167,7 +165,7 @@ export function CredentialDetail({
       toast.success(`${label} copiato negli appunti`)
       setTimeout(() => setCopiedField(null), 1800)
     } else {
-      toast.error('Impossibile copiare negli appunti')
+      toast.error(t('credential-detail.impossibile-copiare-negli-appunti'))
     }
   }
 
@@ -188,7 +186,7 @@ export function CredentialDetail({
     if (
       categoryConfig.value === 'login' &&
       (field.key === 'username' ||
-        field.key === 'password' ||
+        field.key === t('credential-detail.password-1') ||
         field.key === 'url')
     ) {
       return true
@@ -207,16 +205,16 @@ export function CredentialDetail({
       {
         key: 'username',
         storage: 'core',
-        label: 'Username',
+        label: t('credential-detail.username'),
         placeholder: '',
         type: 'text',
       },
       {
-        key: 'password',
+        key: t('credential-detail.password-1'),
         storage: 'core',
-        label: 'Password',
+        label: t('credential-detail.password-2'),
         placeholder: '',
-        type: 'password',
+        type: t('credential-detail.password-1'),
         mono: true,
         secret: true,
       },
@@ -295,8 +293,7 @@ export function CredentialDetail({
           <div className="min-w-0 flex-1 overflow-hidden">
             {!rawValue ? (
               <span className="text-xs italic text-muted-foreground">
-                Non specificato
-              </span>
+                {t('credential-detail.non-specificato')}</span>
             ) : field.secret && !isRevealed ? (
               <span className="block truncate font-mono text-sm tracking-widest text-foreground select-none">
                 {field.type === 'secret-textarea'
@@ -361,7 +358,7 @@ export function CredentialDetail({
                   target="_blank"
                   rel="noreferrer"
                   className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                  title="Apri URL"
+                  title={t('credential-detail.apri-url')}
                 >
                   <ExternalLink className="size-3.5" />
                 </a>
@@ -371,7 +368,7 @@ export function CredentialDetail({
                 type="button"
                 onClick={() => copyField(field.key, rawValue, label)}
                 className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                title={`Copia ${label.toLowerCase()}`}
+                title={t('credential-detail.copia-v0', { v0: label.toLowerCase() })}
               >
                 {copiedField === field.key ? (
                   <Check className="size-3.5 text-emerald-400" />
@@ -396,8 +393,8 @@ export function CredentialDetail({
               type="button"
               onClick={onClose}
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-              title="Chiudi pannello"
-              aria-label="Chiudi pannello"
+              title={t('credential-detail.chiudi-pannello')}
+              aria-label={t('credential-detail.chiudi-pannello')}
             >
               <X className="size-4" />
             </button>
@@ -424,8 +421,7 @@ export function CredentialDetail({
                 </span>
                 {!canWrite && (
                   <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                    Sola lettura
-                  </Badge>
+                    {t('credential-detail.sola-lettura')}</Badge>
                 )}
               </div>
             </div>
@@ -442,8 +438,8 @@ export function CredentialDetail({
                   onClick={() => onToggleFavorite(credential)}
                   title={
                     credential.favorite
-                      ? 'Rimuovi dai preferiti'
-                      : 'Aggiungi ai preferiti'
+                      ? t('credential-detail.rimuovi-dai-preferiti')
+                      : t('credential-detail.aggiungi-ai-preferiti')
                   }
                 >
                   <Star
@@ -464,8 +460,7 @@ export function CredentialDetail({
                   onClick={() => onEdit(credential)}
                 >
                   <Pencil className="size-3.5" />
-                  Modifica
-                </Button>
+                  {t('credential-detail.modifica')}</Button>
               </>
             )}
 
@@ -476,7 +471,7 @@ export function CredentialDetail({
                   variant="outline"
                   size="icon-sm"
                   className="size-8 border-border/80 bg-card/60 hover:bg-card"
-                  aria-label="Altre opzioni"
+                  aria-label={t('credential-detail.altre-opzioni')}
                 >
                   <MoreHorizontal className="size-4" />
                 </Button>
@@ -490,7 +485,7 @@ export function CredentialDetail({
                     style={vaultPalette.style}
                   />
                   <span className="truncate">
-                    Cartella: {credential.vault_name}
+                    {t('credential-detail.cartella-colon')} {credential.vault_name}
                   </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -499,8 +494,7 @@ export function CredentialDetail({
                   }
                 >
                   <Copy className="size-4" />
-                  Copia titolo
-                </DropdownMenuItem>
+                  {t('credential-detail.copia-titolo')}</DropdownMenuItem>
                 {extraFields.totp?.trim() &&
                   generateTotpFromRaw(extraFields.totp.trim()) && (
                     <DropdownMenuItem
@@ -509,13 +503,12 @@ export function CredentialDetail({
                           extraFields.totp!.trim(),
                         )
                         if (freshOtp) {
-                          void copyField('otp', freshOtp.code, 'Codice OTP')
+                          void copyField('otp', freshOtp.code, t('credential-detail.codice-otp'))
                         }
                       }}
                     >
                       <ShieldCheck className="size-4" />
-                      Copia codice OTP
-                    </DropdownMenuItem>
+                      {t('credential-detail.copia-codice-otp')}</DropdownMenuItem>
                   )}
                 {canWrite && (
                   <>
@@ -525,8 +518,7 @@ export function CredentialDetail({
                       onClick={() => onDelete(credential)}
                     >
                       <Trash2 className="size-4" />
-                      Elimina credenziale
-                    </DropdownMenuItem>
+                      {t('credential-detail.elimina-credenziale')}</DropdownMenuItem>
                   </>
                 )}
               </DropdownMenuContent>
@@ -541,8 +533,7 @@ export function CredentialDetail({
           {/* Titolo Field */}
           <div className="min-w-0 space-y-1.5">
             <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
-              Titolo
-            </p>
+              {t('credential-detail.titolo')}</p>
             <div className="flex min-w-0 items-center justify-between gap-2 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
               <span
                 title={credential.title}
@@ -554,7 +545,7 @@ export function CredentialDetail({
                 type="button"
                 onClick={() => copyField('title', credential.title, 'Titolo')}
                 className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-                title="Copia titolo"
+                title={t('credential-detail.copia-titolo')}
               >
                 {copiedField === 'title' ? (
                   <Check className="size-3.5 text-emerald-400" />
@@ -574,16 +565,15 @@ export function CredentialDetail({
             )}
 
           {/* Note Field */}
-          {(credential.notes || categoryConfig.value === 'login' || categoryConfig.value === 'note') && (
+          {(credential.notes || categoryConfig.value === 'login' || categoryConfig.value === t('credential-detail.note-2')) && (
             <div className="min-w-0 space-y-1.5">
               <div className="flex items-center justify-between">
                 <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
-                  Note
-                </p>
+                  {t('credential-detail.note-1')}</p>
                 {credential.notes && (
                   <button
                     type="button"
-                    onClick={() => copyField('notes', credential.notes, 'Note')}
+                    onClick={() => copyField('notes', credential.notes, t('credential-detail.note-1'))}
                     className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {copiedField === 'notes' ? (
@@ -591,8 +581,7 @@ export function CredentialDetail({
                     ) : (
                       <Copy className="size-3" />
                     )}
-                    Copia
-                  </button>
+                    {t('credential-detail.copia')}</button>
                 )}
               </div>
               <div className="min-w-0 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
@@ -602,8 +591,7 @@ export function CredentialDetail({
                   </p>
                 ) : (
                   <p className="text-xs italic text-muted-foreground">
-                    Nessuna nota
-                  </p>
+                    {t('credential-detail.nessuna-nota')}</p>
                 )}
               </div>
             </div>
@@ -612,8 +600,7 @@ export function CredentialDetail({
           {/* Tag Section */}
           <div className="min-w-0 space-y-1.5">
             <p className="text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
-              Tag
-            </p>
+              {t('credential-detail.tag')}</p>
             <div className="flex flex-wrap items-center gap-1.5">
               {tags.map((tag) => (
                 <span
@@ -628,7 +615,7 @@ export function CredentialDetail({
                       type="button"
                       onClick={() => handleRemoveTag(tag)}
                       className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                      aria-label={`Rimuovi tag ${tag}`}
+                      aria-label={t('credential-detail.rimuovi-tag-v0', { v0: tag })}
                     >
                       <X className="size-3" />
                     </button>
@@ -653,7 +640,7 @@ export function CredentialDetail({
                         setNewTagValue('')
                       }
                     }}
-                    placeholder="Nuovo tag..."
+                    placeholder={t('credential-detail.nuovo-tag')}
                     className="h-7 w-28 rounded-lg border border-ring bg-card px-2.5 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sync-security:border-[#ff9c00]/60"
                   />
                 ) : (
@@ -663,7 +650,7 @@ export function CredentialDetail({
                     className="inline-flex h-7 items-center gap-1 rounded-md border border-border/70 bg-card/30 px-2.5 text-xs text-muted-foreground transition-colors hover:bg-card/70 hover:text-foreground"
                   >
                     <Plus className="size-3" />
-                    <span>Aggiungi tag</span>
+                    <span>{t('credential-detail.aggiungi-tag')}</span>
                   </button>
                 ))}
             </div>
@@ -674,7 +661,7 @@ export function CredentialDetail({
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Plus className="size-3.5 shrink-0" />
-                <span>Creata</span>
+                <span>{t('credential-detail.creata')}</span>
               </div>
               <span className="shrink-0 font-medium text-foreground/90">
                 {formatShortDate(credential.created_at)}
@@ -684,7 +671,7 @@ export function CredentialDetail({
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Pencil className="size-3.5 shrink-0" />
-                <span>Ultima modifica</span>
+                <span>{t('credential-detail.ultima-modifica')}</span>
               </div>
               <span className="shrink-0 font-medium text-foreground/90">
                 {formatShortDate(credential.updated_at)}
@@ -694,7 +681,7 @@ export function CredentialDetail({
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Clock className="size-3.5 shrink-0" />
-                <span>Ultimo accesso</span>
+                <span>{t('credential-detail.ultimo-accesso')}</span>
               </div>
               <span className="shrink-0 font-medium text-foreground/90">
                 {formatAccessTimestamp(
@@ -722,7 +709,7 @@ export function CredentialDetail({
         >
           <Copy className="size-3.5 shrink-0" />
           <span className="truncate">
-            Copia {quickCopy.primary?.label.toLowerCase() ?? 'username'}
+            {t('credential-detail.copia')} {quickCopy.primary?.label.toLowerCase() ?? 'username'}
           </span>
         </Button>
 
@@ -733,14 +720,14 @@ export function CredentialDetail({
           disabled={!quickCopy.secondary && !credential.password}
           onClick={() => {
             const val = quickCopy.secondary?.value || credential.password
-            const lbl = quickCopy.secondary?.label || 'Password'
+            const lbl = quickCopy.secondary?.label || t('credential-detail.password-2')
             if (val) copyField('quick-secondary', val, lbl)
           }}
           className="h-9 min-w-0 flex-1 gap-1.5 border-border/80 bg-card/70 px-2.5 text-xs font-medium hover:bg-card"
         >
           <Copy className="size-3.5 shrink-0" />
           <span className="truncate">
-            Copia {quickCopy.secondary?.label.toLowerCase() ?? 'password'}
+            {t('credential-detail.copia')} {quickCopy.secondary?.label.toLowerCase() ?? t('credential-detail.password-1')}
           </span>
         </Button>
 
@@ -752,7 +739,7 @@ export function CredentialDetail({
             className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 bg-primary px-3.5 text-xs text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 rounded-md border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b] sync-security:hover:bg-[#000c20] sync-security:hover:text-[#ff9c00]"
           >
             <ExternalLink className="size-3.5 shrink-0" />
-            <span>Apri URL</span>
+            <span>{t('credential-detail.apri-url')}</span>
           </a>
         ) : (
           <button
@@ -761,7 +748,7 @@ export function CredentialDetail({
             className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 bg-primary px-3.5 text-xs font-semibold text-primary-foreground opacity-50 rounded-md border sync-security:border-[#ff9c00]/40 sync-security:bg-[#ff9c00]/40 sync-security:text-[#1a2c4b]/70"
           >
             <ExternalLink className="size-3.5 shrink-0" />
-            <span>Apri URL</span>
+            <span>{t('credential-detail.apri-url')}</span>
           </button>
         )}
       </div>

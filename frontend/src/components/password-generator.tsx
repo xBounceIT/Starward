@@ -10,6 +10,7 @@ import {
   generateSecurePassword,
   type PasswordOptions,
 } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface PasswordGeneratorProps {
   onSelect: (password: string) => void
@@ -45,14 +46,13 @@ export function PasswordGenerator({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-sm font-semibold">
           <Sparkles className="size-4 text-primary" />
-          Generatore Password
-        </div>
+          {t('password-generator.generatore-password')}</div>
         <Button
           type="button"
           variant="ghost"
           size="icon-sm"
           onClick={() => regenerate()}
-          title="Rigenera"
+          title={t('password-generator.rigenera')}
         >
           <RefreshCw className="size-3.5" />
         </Button>
@@ -64,7 +64,7 @@ export function PasswordGenerator({
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Robustezza</span>
+          <span className="text-muted-foreground">{t('password-generator.robustezza')}</span>
           <span className="font-medium">{strength.label}</span>
         </div>
         <Progress value={strength.percent} className="h-1.5" />
@@ -73,8 +73,7 @@ export function PasswordGenerator({
       <div className="space-y-2">
         <div className="flex items-center justify-between text-xs">
           <Label htmlFor="gen-length" className="text-xs">
-            Lunghezza
-          </Label>
+            {t('password-generator.lunghezza')}</Label>
           <span className="font-mono font-semibold">{options.length}</span>
         </div>
         <Slider
@@ -125,8 +124,7 @@ export function PasswordGenerator({
         onClick={() => onSelect(generated)}
       >
         <Check className="size-3.5" />
-        Usa questa password
-      </Button>
+        {t('password-generator.usa-questa-password')}</Button>
     </div>
   )
 }

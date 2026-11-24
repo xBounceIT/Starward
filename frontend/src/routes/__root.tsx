@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+
 import {
   HeadContent,
   Outlet,
@@ -6,9 +7,17 @@ import {
   Scripts,
   createRootRoute,
 } from '@tanstack/react-router'
+
+import { useTranslation } from 'react-i18next'
+
 import { Toaster } from '@/components/ui/sonner'
+
 import { TooltipProvider } from '@/components/ui/tooltip'
+
+import { t } from '@/lib/i18n'
+
 import { ThemeProvider } from '@/lib/theme'
+
 import appCss from '@/styles/app.css?url'
 
 const NO_TRANSITIONS_STYLE =
@@ -27,6 +36,9 @@ const CSP_POLICY = [
   "form-action 'self'",
 ].join('; ')
 
+// Pre-hydration: applica tema e lingua (da localStorage oppure rilevata dal
+// browser tramite navigator.languages — funziona sia su Chrome sia su Firefox)
+// cosi' <html lang> e i contenuti non "flashano" nella lingua sbagliata.
 const INITIAL_LOAD_SCRIPT = `(() => {
   const root = document.documentElement;
   root.classList.add('no-transitions');
@@ -37,6 +49,19 @@ const INITIAL_LOAD_SCRIPT = `(() => {
     root.classList.toggle('sync-security', theme === 'sync-security');
     root.dataset.theme = theme;
   } catch {}
+  try {
+    const savedLang = localStorage.getItem('starward-language');
+    let lang = savedLang === 'it' || savedLang === 'en' ? savedLang : null;
+    if (!lang) {
+      const nav = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || '']);
+      for (const raw of nav) {
+        const base = (raw || '').split('-')[0].toLowerCase();
+        if (base === 'it' || base === 'en') { lang = base; break; }
+      }
+      if (!lang) lang = 'it';
+    }
+    root.lang = lang;
+  } catch {}
 })();`
 
 export const Route = createRootRoute({
@@ -44,11 +69,10 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Starward — Password Manager' },
+      { title: t('root.title') },
       {
         name: 'description',
-        content:
-          'Vault centralizzato con cartelle condivise, cifratura AES-256-GCM e autenticazione locale o SSO.',
+        content: t('root.meta-description'),
       },
       { httpEquiv: 'Content-Security-Policy', content: CSP_POLICY },
       { name: 'referrer', content: 'strict-origin-when-cross-origin' },
@@ -72,6 +96,11 @@ export const Route = createRootRoute({
 })
 
 function RootDocument() {
+  // useTranslation() iscrive il root al cambio lingua: a ogni cambio
+  // l'intero albero viene ri-renderizzato e tutti i t() si aggiornano.
+  const { i18n: i18nInstance } = useTranslation()
+  const lang = i18nInstance.language
+
   useEffect(() => {
     let raf1 = 0
     let raf2 = 0
@@ -86,8 +115,17 @@ function RootDocument() {
     }
   }, [])
 
+  useEffect(() => {
+    document.documentElement.lang = lang
+    document.title = t('root.title')
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="description"]',
+    )
+    if (meta) meta.content = t('root.meta-description')
+  }, [lang])
+
   return (
-    <html lang="it" className="dark" suppressHydrationWarning>
+    <html lang={lang} className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
         <ScriptOnce>{INITIAL_LOAD_SCRIPT}</ScriptOnce>

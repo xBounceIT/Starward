@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { VaultColorPicker } from '@/components/vault-color-picker'
 import { vaultApi, type Group, type UserSummary } from '@/lib/api'
+import { t } from '@/lib/i18n'
 
 interface GroupDialogProps {
   open: boolean
@@ -83,7 +84,7 @@ export function GroupDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      toast.error('Inserisci un nome per il gruppo')
+      toast.error(t('group-dialog.inserisci-un-nome-per-il-gruppo'))
       return
     }
 
@@ -104,14 +105,14 @@ export function GroupDialog({
 
       toast.success(
         editingGroup
-          ? `Gruppo "${saved.name}" aggiornato`
-          : `Gruppo "${saved.name}" creato`,
+          ? t('group-dialog.gruppo-v0-aggiornato', { v0: saved.name })
+          : t('group-dialog.gruppo-v0-creato', { v0: saved.name }),
       )
       onSaved(saved)
       onOpenChange(false)
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore nel salvataggio del gruppo',
+        err instanceof Error ? err.message : t('group-dialog.errore-nel-salvataggio-del-gruppo'),
       )
     } finally {
       setSubmitting(false)
@@ -124,22 +125,22 @@ export function GroupDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Users className="size-5 text-primary" />
-            {editingGroup ? 'Modifica gruppo' : 'Nuovo gruppo'}
+            {editingGroup ? t('group-dialog.modifica-gruppo') : t('group-dialog.nuovo-gruppo')}
           </DialogTitle>
           <DialogDescription>
             {editingGroup
-              ? 'Aggiorna il nome, la descrizione o il colore del gruppo.'
-              : 'Raggruppa gli utenti per condividere cartelle o creare cartelle condivise automaticamente con tutti i membri.'}
+              ? t('group-dialog.aggiorna-il-nome-la-descrizione-o-il-colore-del-')
+              : t('group-dialog.raggruppa-gli-utenti-per-condividere-cartelle-o-')}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="group-name">Nome gruppo</Label>
+              <Label htmlFor="group-name">{t('group-dialog.nome-gruppo')}</Label>
               <Input
                 id="group-name"
-                placeholder="es. DevOps, Engineering, Marketing..."
+                placeholder={t('group-dialog.es-devops-engineering-marketing')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
@@ -148,16 +149,16 @@ export function GroupDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Colore</Label>
+              <Label>{t('group-dialog.colore')}</Label>
               <VaultColorPicker value={color} onChange={setColor} />
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="group-desc">Descrizione (opzionale)</Label>
+            <Label htmlFor="group-desc">{t('group-dialog.descrizione-opzionale')}</Label>
             <Textarea
               id="group-desc"
-              placeholder="Chi fa parte di questo gruppo o quale area gestisce?"
+              placeholder={t('group-dialog.chi-fa-parte-di-questo-gruppo-o-quale-area-gesti')}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="min-h-16"
@@ -167,12 +168,11 @@ export function GroupDialog({
           {!editingGroup && (
             <div className="space-y-2">
               <Label htmlFor="group-initial-member">
-                Aggiungi membri iniziali (opzionale)
-              </Label>
+                {t('group-dialog.aggiungi-membri-iniziali-opzionale')}</Label>
               <Input
                 id="group-initial-member"
                 type="text"
-                placeholder="Cerca utenti per nome o email..."
+                placeholder={t('group-dialog.cerca-utenti-per-nome-o-email')}
                 value={memberInput}
                 onChange={(e) => setMemberInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -203,7 +203,7 @@ export function GroupDialog({
                         type="button"
                         onClick={() => removeMember(u.id)}
                         className="rounded-md p-0.5 hover:bg-background/60"
-                        aria-label={`Rimuovi ${u.name}`}
+                        aria-label={t('group-dialog.rimuovi-v0', { v0: u.name })}
                       >
                         <X className="size-3" />
                       </button>
@@ -215,8 +215,7 @@ export function GroupDialog({
               {suggestions.length > 0 && (
                 <div className="rounded-lg border bg-muted/30 p-2">
                   <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                    Utenti della piattaforma
-                  </p>
+                    {t('group-dialog.utenti-della-piattaforma')}</p>
                   <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                     {suggestions.slice(0, 8).map((u) => (
                       <button
@@ -244,14 +243,13 @@ export function GroupDialog({
               variant="outline"
               onClick={() => onOpenChange(false)}
             >
-              Annulla
-            </Button>
+              {t('group-dialog.annulla')}</Button>
             <Button type="submit" disabled={submitting}>
               {submitting
                 ? 'Salvataggio...'
                 : editingGroup
-                  ? 'Salva modifiche'
-                  : 'Crea gruppo'}
+                  ? t('group-dialog.salva-modifiche')
+                  : t('group-dialog.crea-gruppo')}
             </Button>
           </DialogFooter>
         </form>

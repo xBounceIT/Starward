@@ -1,4 +1,5 @@
 import type { Credential } from '@/lib/api'
+import { t } from '@/lib/i18n'
 
 export type CredentialCategory =
   | 'login'
@@ -15,15 +16,15 @@ export const CREDENTIAL_CATEGORIES: readonly {
   value: CredentialCategory
   label: string
 }[] = [
-  { value: 'login', label: 'Login Web' },
-  { value: 'passkey', label: 'Passkey' },
-  { value: 'identity', label: 'Identità' },
-  { value: 'api_key', label: 'API Key / Token' },
-  { value: 'database', label: 'Database' },
-  { value: 'ssh', label: 'SSH / Server' },
-  { value: 'card', label: 'Carta di pagamento' },
-  { value: 'license', label: 'Licenza Software' },
-  { value: 'note', label: 'Nota Sicura' },
+  { value: "login", get label() { return t('credential-types.login-web') } },
+  { value: 'passkey', get label() { return t('credential-types.passkey') } },
+  { value: 'identity', get label() { return t('credential-types.identita') } },
+  { value: 'api_key', get label() { return t('credential-types.api-key-token') } },
+  { value: "database", get label() { return t('credential-types.database-2') } },
+  { value: "ssh", get label() { return t('credential-types.ssh-server') } },
+  { value: 'card', get label() { return t('credential-types.carta-di-pagamento') } },
+  { value: 'license', get label() { return t('credential-types.licenza-software-1') } },
+  { value: "note", get label() { return t('credential-types.nota-sicura-1') } },
 ] as const
 
 export interface CredentialFieldOption {
@@ -64,25 +65,25 @@ export interface CredentialCategoryConfig {
 }
 
 const DB_TYPE_OPTIONS: CredentialFieldOption[] = [
-  { value: 'postgresql', label: 'PostgreSQL' },
-  { value: 'mysql', label: 'MySQL / MariaDB' },
-  { value: 'mongodb', label: 'MongoDB' },
-  { value: 'redis', label: 'Redis' },
-  { value: 'mssql', label: 'SQL Server' },
-  { value: 'oracle', label: 'Oracle' },
-  { value: 'sqlite', label: 'SQLite' },
-  { value: 'other', label: 'Altro' },
+  { value: 'postgresql', get label() { return t('credential-types.postgresql') } },
+  { value: 'mysql', get label() { return t('credential-types.mysql-mariadb') } },
+  { value: 'mongodb', get label() { return t('credential-types.mongodb') } },
+  { value: 'redis', get label() { return t('credential-types.redis') } },
+  { value: 'mssql', get label() { return t('credential-types.sql-server') } },
+  { value: 'oracle', get label() { return t('credential-types.oracle') } },
+  { value: 'sqlite', get label() { return t('credential-types.sqlite') } },
+  { value: 'other', get label() { return t('credential-types.altro') } },
 ]
 
 const ENVIRONMENT_OPTIONS: CredentialFieldOption[] = [
-  { value: 'production', label: 'Produzione' },
-  { value: 'staging', label: 'Staging' },
-  { value: 'development', label: 'Sviluppo' },
+  { value: 'production', get label() { return t('credential-types.produzione') } },
+  { value: "staging", get label() { return t('credential-types.staging-2') } },
+  { value: 'development', get label() { return t('credential-types.sviluppo') } },
 ]
 
 const DISCOVERABLE_OPTIONS: CredentialFieldOption[] = [
-  { value: 'true', label: 'Sì (Resident Key)' },
-  { value: 'false', label: 'No' },
+  { value: 'true', get label() { return t('credential-types.si-resident-key') } },
+  { value: 'false', get label() { return t('credential-types.no') } },
 ]
 
 export const CREDENTIAL_CATEGORY_CONFIGS: Record<
@@ -90,23 +91,23 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   CredentialCategoryConfig
 > = {
   login: {
-    value: 'login',
-    label: 'Login Web',
+    value: "login",
+    get label() { return t('credential-types.login-web') },
     fields: [
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Username / Email',
+        get label() { return t('credential-types.username-email') },
         placeholder: 'admin@azienda.it',
         type: 'text',
         colSpan: 2,
       },
       {
-        key: 'password',
+        key: "password",
         storage: 'core',
-        label: 'Password',
-        placeholder: 'Inserisci o genera una password sicura',
-        type: 'password',
+        get label() { return t('credential-types.password-2') },
+        get placeholder() { return t('credential-types.inserisci-o-genera-una-password-sicura') },
+        type: "password",
         required: true,
         mono: true,
         secret: true,
@@ -117,9 +118,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'totp',
         storage: 'extra',
-        label: 'Codice OTP (2FA / TOTP)',
-        placeholder:
-          'Chiave Base32 (es. JBSWY3DPEHPK3PXP) o URI otpauth://totp/...',
+        get label() { return t('credential-types.codice-otp-2fa-totp') },
+        get placeholder() { return t('credential-types.chiave-base32-es-jbswy3dpehpk3pxp-o-uri-otpauth-') },
         type: 'totp',
         mono: true,
         secret: true,
@@ -128,7 +128,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'url',
         storage: 'core',
-        label: 'URL Sito Web',
+        get label() { return t('credential-types.url-sito-web') },
         placeholder: 'https://console.example.com',
         type: 'url',
         isLink: true,
@@ -137,8 +137,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Codici di recupero, dettagli 2FA, istruzioni accesso...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.codici-di-recupero-dettagli-2fa-istruzioni-acces') },
         type: 'textarea',
         colSpan: 2,
       },
@@ -146,12 +146,12 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   },
   passkey: {
     value: 'passkey',
-    label: 'Passkey',
+    get label() { return t('credential-types.passkey') },
     fields: [
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Username / Account',
+        get label() { return t('credential-types.username-account') },
         placeholder: 'utente@esempio.it',
         type: 'text',
         colSpan: 2,
@@ -159,7 +159,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'rp_id',
         storage: 'extra',
-        label: 'Relying Party ID (RP ID)',
+        get label() { return t('credential-types.relying-party-id-rp-id') },
         placeholder: 'github.com',
         type: 'text',
         mono: true,
@@ -168,24 +168,24 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'rp_name',
         storage: 'extra',
-        label: 'Servizio / Relying Party',
-        placeholder: 'GitHub',
+        get label() { return t('credential-types.servizio-relying-party') },
+        get placeholder() { return t('credential-types.github') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'user_display_name',
         storage: 'extra',
-        label: 'Nome visualizzato',
-        placeholder: 'Mario Rossi',
+        get label() { return t('credential-types.nome-visualizzato') },
+        get placeholder() { return t('credential-types.mario-rossi') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'user_handle',
         storage: 'extra',
-        label: 'User Handle',
-        placeholder: 'base64url / opaque id',
+        get label() { return t('credential-types.user-handle') },
+        get placeholder() { return t('credential-types.base64url-opaque-id') },
         type: 'text',
         mono: true,
         colSpan: 1,
@@ -193,8 +193,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'credential_id',
         storage: 'extra',
-        label: 'Credential ID',
-        placeholder: 'ID credenziale WebAuthn / FIDO2',
+        get label() { return t('credential-types.credential-id') },
+        get placeholder() { return t('credential-types.id-credenziale-webauthn-fido2') },
         type: 'text',
         mono: true,
         colSpan: 2,
@@ -202,7 +202,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'private_key',
         storage: 'extra',
-        label: 'Chiave Privata (PKCS#8 / FIDO2)',
+        get label() { return t('credential-types.chiave-privata-pkcs-8-fido2') },
         placeholder: 'MIGHAgEAMBMGByqGSM49AgEG...',
         type: 'secret-textarea',
         mono: true,
@@ -212,7 +212,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'key_type',
         storage: 'extra',
-        label: 'Tipo chiave',
+        get label() { return t('credential-types.tipo-chiave') },
         placeholder: 'public-key',
         type: 'text',
         mono: true,
@@ -221,7 +221,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'key_algorithm',
         storage: 'extra',
-        label: 'Algoritmo',
+        get label() { return t('credential-types.algoritmo') },
         placeholder: 'ECDSA',
         type: 'text',
         mono: true,
@@ -230,7 +230,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'key_curve',
         storage: 'extra',
-        label: 'Curva crittografica',
+        get label() { return t('credential-types.curva-crittografica') },
         placeholder: 'P-256',
         type: 'text',
         mono: true,
@@ -239,8 +239,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'discoverable',
         storage: 'extra',
-        label: 'Discoverable',
-        placeholder: 'Seleziona',
+        get label() { return t('credential-types.discoverable') },
+        get placeholder() { return t('credential-types.seleziona') },
         type: 'select',
         options: DISCOVERABLE_OPTIONS,
         colSpan: 1,
@@ -248,7 +248,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'counter',
         storage: 'extra',
-        label: 'Contatore firme',
+        get label() { return t('credential-types.contatore-firme') },
         placeholder: '0',
         type: 'text',
         mono: true,
@@ -257,7 +257,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'creation_date',
         storage: 'extra',
-        label: 'Data creazione',
+        get label() { return t('credential-types.data-creazione') },
         placeholder: '2026-01-01T00:00:00Z',
         type: 'text',
         mono: true,
@@ -266,7 +266,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'url',
         storage: 'core',
-        label: 'URL Sito Web',
+        get label() { return t('credential-types.url-sito-web') },
         placeholder: 'https://github.com',
         type: 'url',
         isLink: true,
@@ -275,8 +275,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Dispositivo registrato, dettagli passkey, note recupero...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.dispositivo-registrato-dettagli-passkey-note-rec') },
         type: 'textarea',
         colSpan: 2,
       },
@@ -284,52 +284,52 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   },
   identity: {
     value: 'identity',
-    label: 'Identità',
+    get label() { return t('credential-types.identita') },
     fields: [
       {
         key: 'identity_title',
         storage: 'extra',
-        label: 'Titolo / Appellativo',
-        placeholder: 'Sig., Dott., Ing.',
+        get label() { return t('credential-types.titolo-appellativo') },
+        get placeholder() { return t('credential-types.sig-dott-ing') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'first_name',
         storage: 'extra',
-        label: 'Nome',
-        placeholder: 'Mario',
+        get label() { return t('credential-types.nome') },
+        get placeholder() { return t('credential-types.mario') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'middle_name',
         storage: 'extra',
-        label: 'Secondo nome',
-        placeholder: 'Luigi',
+        get label() { return t('credential-types.secondo-nome') },
+        get placeholder() { return t('credential-types.luigi') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'last_name',
         storage: 'extra',
-        label: 'Cognome',
-        placeholder: 'Rossi',
+        get label() { return t('credential-types.cognome') },
+        get placeholder() { return t('credential-types.rossi') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'company',
         storage: 'extra',
-        label: 'Azienda / Organizzazione',
-        placeholder: 'Acme S.r.l.',
+        get label() { return t('credential-types.azienda-organizzazione') },
+        get placeholder() { return t('credential-types.acme-s-r-l') },
         type: 'text',
         colSpan: 2,
       },
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Email',
+        get label() { return t('credential-types.email') },
         placeholder: 'mario.rossi@azienda.it',
         type: 'text',
         colSpan: 1,
@@ -337,7 +337,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'phone',
         storage: 'extra',
-        label: 'Telefono',
+        get label() { return t('credential-types.telefono') },
         placeholder: '+39 02 1234567',
         type: 'text',
         colSpan: 1,
@@ -345,31 +345,31 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'identity_username',
         storage: 'extra',
-        label: 'Username',
-        placeholder: 'mrossi',
+        get label() { return t('credential-types.username-2') },
+        get placeholder() { return t('credential-types.mrossi') },
         type: 'text',
         colSpan: 2,
       },
       {
         key: 'address1',
         storage: 'extra',
-        label: 'Indirizzo (riga 1)',
-        placeholder: 'Via Roma 10',
+        get label() { return t('credential-types.indirizzo-riga-1') },
+        get placeholder() { return t('credential-types.via-roma-10') },
         type: 'text',
         colSpan: 2,
       },
       {
         key: 'address2',
         storage: 'extra',
-        label: 'Indirizzo (riga 2)',
-        placeholder: 'Scala B, Int. 4',
+        get label() { return t('credential-types.indirizzo-riga-2') },
+        get placeholder() { return t('credential-types.scala-b-int-4') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'address3',
         storage: 'extra',
-        label: 'Indirizzo (riga 3)',
+        get label() { return t('credential-types.indirizzo-riga-3') },
         placeholder: 'Presso...',
         type: 'text',
         colSpan: 1,
@@ -377,23 +377,23 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'city',
         storage: 'extra',
-        label: 'Città',
-        placeholder: 'Milano',
+        get label() { return t('credential-types.citta') },
+        get placeholder() { return t('credential-types.milano') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'state',
         storage: 'extra',
-        label: 'Provincia / Stato',
-        placeholder: 'MI',
+        get label() { return t('credential-types.provincia-stato') },
+        get placeholder() { return t('credential-types.mi') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'postal_code',
         storage: 'extra',
-        label: 'CAP / Codice postale',
+        get label() { return t('credential-types.cap-codice-postale') },
         placeholder: '20121',
         type: 'text',
         mono: true,
@@ -402,17 +402,17 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'country',
         storage: 'extra',
-        label: 'Paese',
-        placeholder: 'Italia',
+        get label() { return t('credential-types.paese') },
+        get placeholder() { return t('credential-types.italia') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'ssn',
         storage: 'extra',
-        label: 'Codice Fiscale / SSN',
+        get label() { return t('credential-types.codice-fiscale-ssn') },
         placeholder: 'RSSMRA80A01F205X',
-        type: 'password',
+        type: "password",
         mono: true,
         secret: true,
         colSpan: 2,
@@ -420,9 +420,9 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'passport_number',
         storage: 'extra',
-        label: 'Numero passaporto',
+        get label() { return t('credential-types.numero-passaporto') },
         placeholder: 'YA1234567',
-        type: 'password',
+        type: "password",
         mono: true,
         secret: true,
         colSpan: 1,
@@ -430,9 +430,9 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'license_number',
         storage: 'extra',
-        label: 'Patente / Documento',
+        get label() { return t('credential-types.patente-documento') },
         placeholder: 'MI1234567A',
-        type: 'password',
+        type: "password",
         mono: true,
         secret: true,
         colSpan: 1,
@@ -440,8 +440,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Note personali, riferimenti aggiuntivi...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.note-personali-riferimenti-aggiuntivi') },
         type: 'textarea',
         colSpan: 2,
       },
@@ -449,40 +449,40 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   },
   api_key: {
     value: 'api_key',
-    label: 'API Key / Token',
+    get label() { return t('credential-types.api-key-token') },
     fields: [
       {
-        key: 'provider',
+        key: "provider",
         storage: 'extra',
-        label: 'Servizio / Provider',
-        placeholder: 'es. OpenAI, Stripe, AWS',
+        get label() { return t('credential-types.servizio-provider') },
+        get placeholder() { return t('credential-types.es-openai-stripe-aws') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'environment',
         storage: 'extra',
-        label: 'Ambiente',
-        placeholder: 'Seleziona ambiente',
+        get label() { return t('credential-types.ambiente') },
+        get placeholder() { return t('credential-types.seleziona-ambiente') },
         type: 'select',
         options: ENVIRONMENT_OPTIONS,
         colSpan: 1,
       },
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Key ID / Client ID',
-        placeholder: 'es. AKIAIOSFODNN7EXAMPLE',
+        get label() { return t('credential-types.key-id-client-id') },
+        get placeholder() { return t('credential-types.es-akiaiosfodnn7example') },
         type: 'text',
         mono: true,
         colSpan: 2,
       },
       {
-        key: 'password',
+        key: "password",
         storage: 'core',
-        label: 'API Key / Secret Token',
+        get label() { return t('credential-types.api-key-secret-token') },
         placeholder: 'sk_live_...',
-        type: 'password',
+        type: "password",
         required: true,
         mono: true,
         secret: true,
@@ -492,7 +492,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'url',
         storage: 'core',
-        label: 'Endpoint / Base URL',
+        get label() { return t('credential-types.endpoint-base-url') },
         placeholder: 'https://api.example.com/v1',
         type: 'url',
         isLink: true,
@@ -501,7 +501,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'expires_at',
         storage: 'extra',
-        label: 'Data di scadenza',
+        get label() { return t('credential-types.data-di-scadenza') },
         placeholder: '',
         type: 'date',
         colSpan: 1,
@@ -509,22 +509,22 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Permessi, scope, note sulla rotazione...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.permessi-scope-note-sulla-rotazione') },
         type: 'textarea',
         colSpan: 2,
       },
     ],
   },
   database: {
-    value: 'database',
-    label: 'Database',
+    value: "database",
+    get label() { return t('credential-types.database-2') },
     fields: [
       {
         key: 'db_type',
         storage: 'extra',
-        label: 'Motore Database',
-        placeholder: 'Seleziona motore',
+        get label() { return t('credential-types.motore-database') },
+        get placeholder() { return t('credential-types.seleziona-motore') },
         type: 'select',
         options: DB_TYPE_OPTIONS,
         colSpan: 1,
@@ -532,8 +532,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'database_name',
         storage: 'extra',
-        label: 'Nome Database',
-        placeholder: 'es. starward_prod',
+        get label() { return t('credential-types.nome-database') },
+        get placeholder() { return t('credential-types.es-starward-prod') },
         type: 'text',
         mono: true,
         colSpan: 1,
@@ -541,8 +541,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'url',
         storage: 'core',
-        label: 'Host / Indirizzo',
-        placeholder: 'db.internal o 10.0.1.5',
+        get label() { return t('credential-types.host-indirizzo') },
+        get placeholder() { return t('credential-types.db-internal-o-10-0-1-5') },
         type: 'text',
         mono: true,
         colSpan: 1,
@@ -550,27 +550,27 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'port',
         storage: 'extra',
-        label: 'Porta',
+        get label() { return t('credential-types.porta') },
         placeholder: '5432',
         type: 'text',
         mono: true,
         colSpan: 1,
       },
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Utente Database',
-        placeholder: 'postgres',
+        get label() { return t('credential-types.utente-database') },
+        get placeholder() { return t('credential-types.postgres') },
         type: 'text',
         mono: true,
         colSpan: 2,
       },
       {
-        key: 'password',
+        key: "password",
         storage: 'core',
-        label: 'Password Database',
-        placeholder: 'Password utente database',
-        type: 'password',
+        get label() { return t('credential-types.password-database') },
+        get placeholder() { return t('credential-types.password-utente-database') },
+        type: "password",
         required: true,
         mono: true,
         secret: true,
@@ -581,9 +581,9 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'connection_string',
         storage: 'extra',
-        label: 'Stringa di connessione',
+        get label() { return t('credential-types.stringa-di-connessione') },
         placeholder: 'postgresql://user:pass@host:5432/db',
-        type: 'password',
+        type: "password",
         mono: true,
         secret: true,
         colSpan: 2,
@@ -591,22 +591,22 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Certificati SSL, tunnel VPN, bastion host...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.certificati-ssl-tunnel-vpn-bastion-host') },
         type: 'textarea',
         colSpan: 2,
       },
     ],
   },
   ssh: {
-    value: 'ssh',
-    label: 'SSH / Server',
+    value: "ssh",
+    get label() { return t('credential-types.ssh-server') },
     fields: [
       {
         key: 'url',
         storage: 'core',
-        label: 'Host / Indirizzo IP',
-        placeholder: '192.168.1.10 o srv.example.com',
+        get label() { return t('credential-types.host-indirizzo-ip') },
+        get placeholder() { return t('credential-types.192-168-1-10-o-srv-example-com') },
         type: 'text',
         mono: true,
         colSpan: 1,
@@ -614,27 +614,27 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'port',
         storage: 'extra',
-        label: 'Porta SSH',
+        get label() { return t('credential-types.porta-ssh') },
         placeholder: '22',
         type: 'text',
         mono: true,
         colSpan: 1,
       },
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Utente SSH',
-        placeholder: 'root o ubuntu',
+        get label() { return t('credential-types.utente-ssh') },
+        get placeholder() { return t('credential-types.root-o-ubuntu') },
         type: 'text',
         mono: true,
         colSpan: 2,
       },
       {
-        key: 'password',
+        key: "password",
         storage: 'core',
-        label: 'Password / Passphrase',
-        placeholder: 'Opzionale se usi una chiave privata',
-        type: 'password',
+        get label() { return t('credential-types.password-passphrase') },
+        get placeholder() { return t('credential-types.opzionale-se-usi-una-chiave-privata') },
+        type: "password",
         mono: true,
         secret: true,
         showGenerator: true,
@@ -644,8 +644,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'private_key',
         storage: 'extra',
-        label: 'Chiave Privata (PEM / OpenSSH)',
-        placeholder: '-----BEGIN OPENSSH PRIVATE KEY-----',
+        get label() { return t('credential-types.chiave-privata-pem-openssh') },
+        get placeholder() { return t('credential-types.begin-openssh-private-key') },
         type: 'secret-textarea',
         mono: true,
         secret: true,
@@ -654,8 +654,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'public_key',
         storage: 'extra',
-        label: 'Chiave Pubblica / Fingerprint',
-        placeholder: 'ssh-ed25519 AAAA...',
+        get label() { return t('credential-types.chiave-pubblica-fingerprint') },
+        get placeholder() { return t('credential-types.ssh-ed25519-aaaa') },
         type: 'text',
         mono: true,
         colSpan: 2,
@@ -663,8 +663,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Jump host, istruzioni firewall, comandi...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.jump-host-istruzioni-firewall-comandi') },
         type: 'textarea',
         colSpan: 2,
       },
@@ -672,22 +672,22 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   },
   card: {
     value: 'card',
-    label: 'Carta di pagamento',
+    get label() { return t('credential-types.carta-di-pagamento') },
     fields: [
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Titolare carta',
-        placeholder: 'Mario Rossi',
+        get label() { return t('credential-types.titolare-carta') },
+        get placeholder() { return t('credential-types.mario-rossi') },
         type: 'text',
         colSpan: 2,
       },
       {
-        key: 'password',
+        key: "password",
         storage: 'core',
-        label: 'Numero carta',
+        get label() { return t('credential-types.numero-carta') },
         placeholder: '4532 0000 0000 0000',
-        type: 'password',
+        type: "password",
         required: true,
         mono: true,
         secret: true,
@@ -697,18 +697,18 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'expiry',
         storage: 'extra',
-        label: 'Scadenza (MM/AA)',
+        get label() { return t('credential-types.scadenza-mm-aa') },
         placeholder: '12/28',
         type: 'text',
         mono: true,
         colSpan: 1,
       },
       {
-        key: 'cvv',
+        key: "cvv",
         storage: 'extra',
-        label: 'CVV / CVC',
+        get label() { return t('credential-types.cvv-cvc') },
         placeholder: '123',
-        type: 'password',
+        type: "password",
         mono: true,
         secret: true,
         colSpan: 1,
@@ -716,17 +716,17 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'brand',
         storage: 'extra',
-        label: 'Circuito / Banca',
-        placeholder: 'Visa, Mastercard, Amex...',
+        get label() { return t('credential-types.circuito-banca') },
+        get placeholder() { return t('credential-types.visa-mastercard-amex') },
         type: 'text',
         colSpan: 1,
       },
       {
-        key: 'pin',
+        key: "pin",
         storage: 'extra',
-        label: 'PIN (opzionale)',
+        get label() { return t('credential-types.pin-opzionale') },
         placeholder: '••••',
-        type: 'password',
+        type: "password",
         mono: true,
         secret: true,
         colSpan: 1,
@@ -734,8 +734,8 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Indirizzo di fatturazione, massimali, note...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.indirizzo-di-fatturazione-massimali-note') },
         type: 'textarea',
         colSpan: 2,
       },
@@ -743,38 +743,38 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
   },
   license: {
     value: 'license',
-    label: 'Licenza Software',
+    get label() { return t('credential-types.licenza-software-1') },
     fields: [
       {
         key: 'product',
         storage: 'extra',
-        label: 'Prodotto / Software',
-        placeholder: 'es. JetBrains All Products',
+        get label() { return t('credential-types.prodotto-software') },
+        get placeholder() { return t('credential-types.es-jetbrains-all-products') },
         type: 'text',
         colSpan: 1,
       },
       {
         key: 'expires_at',
         storage: 'extra',
-        label: 'Scadenza / Rinnovo',
-        placeholder: 'es. 2027-01-15 o Perpetua',
+        get label() { return t('credential-types.scadenza-rinnovo') },
+        get placeholder() { return t('credential-types.es-2027-01-15-o-perpetua') },
         type: 'text',
         colSpan: 1,
       },
       {
-        key: 'username',
+        key: "username",
         storage: 'core',
-        label: 'Email / Intestatario',
+        get label() { return t('credential-types.email-intestatario') },
         placeholder: 'licenze@azienda.it',
         type: 'text',
         colSpan: 2,
       },
       {
-        key: 'password',
+        key: "password",
         storage: 'core',
-        label: 'Chiave di licenza / Seriale',
+        get label() { return t('credential-types.chiave-di-licenza-seriale') },
         placeholder: 'XXXX-XXXX-XXXX-XXXX',
-        type: 'password',
+        type: "password",
         required: true,
         mono: true,
         secret: true,
@@ -783,7 +783,7 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'url',
         storage: 'core',
-        label: 'URL Portale / Download',
+        get label() { return t('credential-types.url-portale-download') },
         placeholder: 'https://account.vendor.com',
         type: 'url',
         isLink: true,
@@ -792,23 +792,22 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       {
         key: 'notes',
         storage: 'core',
-        label: 'Note cifrate',
-        placeholder: 'Numero postazioni, riferimenti fattura...',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.numero-postazioni-riferimenti-fattura') },
         type: 'textarea',
         colSpan: 2,
       },
     ],
   },
   note: {
-    value: 'note',
-    label: 'Nota Sicura',
+    value: "note",
+    get label() { return t('credential-types.nota-sicura-1') },
     fields: [
       {
         key: 'notes',
         storage: 'core',
-        label: 'Contenuto nota cifrata',
-        placeholder:
-          'Scrivi qui la tua nota sicura, codici di recupero o istruzioni riservate...',
+        get label() { return t('credential-types.contenuto-nota-cifrata') },
+        get placeholder() { return t('credential-types.scrivi-qui-la-tua-nota-sicura-codici-di-recupero') },
         type: 'textarea',
         required: true,
         rowsClass: 'min-h-40',
@@ -885,7 +884,7 @@ export function getCredentialSubtitle(cred: Credential): string {
         fields.rp_name || fields.rp_id,
         cred.username || fields.user_display_name,
       ].filter(Boolean)
-      return parts.join(' · ') || cred.url || 'Passkey FIDO2'
+      return parts.join(' · ') || cred.url || t('credential-types.passkey-fido2')
     }
     case 'identity': {
       const fullName = getIdentityFullName(fields)
@@ -894,17 +893,17 @@ export function getCredentialSubtitle(cred: Credential): string {
         cred.username || fields.phone,
         fields.company,
       ].filter(Boolean)
-      return parts.join(' · ') || getIdentityAddress(fields) || 'Identità'
+      return parts.join(' · ') || getIdentityAddress(fields) || t('credential-types.identita')
     }
     case 'note': {
       const firstLine = cred.notes
         .split('\n')
         .map((line) => line.trim())
         .find(Boolean)
-      return firstLine || 'Nota cifrata'
+      return firstLine || t('credential-types.nota-cifrata')
     }
     case 'database': {
-      const dbConfig = getCategoryConfig('database')
+      const dbConfig = getCategoryConfig(t('credential-types.database-1'))
       const dbTypeField = dbConfig.fields.find((f) => f.key === 'db_type')
       const engine =
         fields.db_type && dbTypeField
@@ -916,7 +915,7 @@ export function getCredentialSubtitle(cred: Credential): string {
           : cred.url
         : ''
       const parts = [engine, hostPort || cred.username].filter(Boolean)
-      return parts.join(' · ') || 'Database'
+      return parts.join(' · ') || t('credential-types.database-2')
     }
     case 'ssh': {
       if (cred.username && cred.url) {
@@ -924,7 +923,7 @@ export function getCredentialSubtitle(cred: Credential): string {
           ? `${cred.username}@${cred.url}:${fields.port}`
           : `${cred.username}@${cred.url}`
       }
-      return cred.url || cred.username || 'Server SSH'
+      return cred.url || cred.username || t('credential-types.server-ssh')
     }
     case 'api_key': {
       const apiConfig = getCategoryConfig('api_key')
@@ -936,20 +935,20 @@ export function getCredentialSubtitle(cred: Credential): string {
       const parts = [fields.provider, envLabel, cred.username || cred.url].filter(
         Boolean,
       )
-      return parts.join(' · ') || 'API Key'
+      return parts.join(' · ') || t('credential-types.api-key')
     }
     case 'card': {
       const last4 = cred.password.replace(/\s+/g, '').slice(-4)
       const masked = last4 ? `•••• ${last4}` : ''
       const parts = [fields.brand, masked, cred.username].filter(Boolean)
-      return parts.join(' · ') || 'Carta di pagamento'
+      return parts.join(' · ') || t('credential-types.carta-di-pagamento')
     }
     case 'license': {
       const parts = [fields.product, cred.username, cred.url].filter(Boolean)
-      return parts.join(' · ') || 'Licenza Software'
+      return parts.join(' · ') || t('credential-types.licenza-software-1')
     }
     default:
-      return cred.username || cred.url || 'Nessun username'
+      return cred.username || cred.url || t('credential-types.nessun-username')
   }
 }
 
@@ -961,12 +960,12 @@ export function getCredentialQuickCopy(cred: Credential): {
   switch (cred.category) {
     case 'passkey': {
       const primaryValue = cred.username || fields.rp_id || ''
-      const primaryLabel = cred.username ? 'Username' : 'RP ID'
+      const primaryLabel = cred.username ? t('credential-types.username-2') : 'RP ID'
       const secondaryValue =
         fields.credential_id || fields.private_key || cred.password || ''
       const secondaryLabel = fields.credential_id
-        ? 'Credential ID'
-        : 'Chiave privata'
+        ? t('credential-types.credential-id')
+        : t('credential-types.chiave-privata')
       return {
         primary: primaryValue
           ? { label: primaryLabel, value: primaryValue }
@@ -981,29 +980,29 @@ export function getCredentialQuickCopy(cred: Credential): {
       const address = getIdentityAddress(fields)
       return {
         primary: cred.username
-          ? { label: 'Email', value: cred.username }
+          ? { label: t('credential-types.email'), value: cred.username }
           : fullName
-            ? { label: 'Nome', value: fullName }
+            ? { label: t('credential-types.nome'), value: fullName }
             : undefined,
         secondary: fields.phone
-          ? { label: 'Telefono', value: fields.phone }
+          ? { label: t('credential-types.telefono'), value: fields.phone }
           : address
-            ? { label: 'Indirizzo', value: address }
+            ? { label: t('credential-types.indirizzo'), value: address }
             : fields.ssn
-              ? { label: 'Codice Fiscale', value: fields.ssn }
+              ? { label: t('credential-types.codice-fiscale'), value: fields.ssn }
               : undefined,
       }
     }
     case 'note':
       return cred.notes
-        ? { secondary: { label: 'Nota', value: cred.notes } }
+        ? { secondary: { label: t('credential-types.nota'), value: cred.notes } }
         : {}
     case 'ssh': {
       const secondaryValue = cred.password || fields.private_key || ''
-      const secondaryLabel = cred.password ? 'Password' : 'Chiave privata'
+      const secondaryLabel = cred.password ? t('credential-types.password-2') : t('credential-types.chiave-privata')
       return {
         primary: cred.username
-          ? { label: 'Utente SSH', value: cred.username }
+          ? { label: t('credential-types.utente-ssh'), value: cred.username }
           : undefined,
         secondary: secondaryValue
           ? { label: secondaryLabel, value: secondaryValue }
@@ -1013,19 +1012,19 @@ export function getCredentialQuickCopy(cred: Credential): {
     case 'card':
       return {
         primary: cred.username
-          ? { label: 'Titolare', value: cred.username }
+          ? { label: t('credential-types.titolare'), value: cred.username }
           : undefined,
         secondary: cred.password
-          ? { label: 'Numero carta', value: cred.password }
+          ? { label: t('credential-types.numero-carta'), value: cred.password }
           : undefined,
       }
     case 'api_key':
       return {
         primary: cred.username
-          ? { label: 'Key ID', value: cred.username }
+          ? { label: t('credential-types.key-id'), value: cred.username }
           : undefined,
         secondary: cred.password
-          ? { label: 'API Key', value: cred.password }
+          ? { label: t('credential-types.api-key'), value: cred.password }
           : undefined,
       }
     case 'license':
@@ -1034,16 +1033,16 @@ export function getCredentialQuickCopy(cred: Credential): {
           ? { label: 'Intestatario', value: cred.username }
           : undefined,
         secondary: cred.password
-          ? { label: 'Chiave di licenza', value: cred.password }
+          ? { label: t('credential-types.chiave-di-licenza'), value: cred.password }
           : undefined,
       }
     default:
       return {
         primary: cred.username
-          ? { label: 'Username', value: cred.username }
+          ? { label: t('credential-types.username-2'), value: cred.username }
           : undefined,
         secondary: cred.password
-          ? { label: 'Password', value: cred.password }
+          ? { label: t('credential-types.password-2'), value: cred.password }
           : undefined,
       }
   }
@@ -1074,7 +1073,7 @@ export function getCredentialListColumns(cred: Credential): {
     case 'identity': {
       const fullName = getIdentityFullName(fields)
       const address = getIdentityAddress(fields)
-      const primary = fullName || cred.username || fields.company || 'Identità'
+      const primary = fullName || cred.username || fields.company || t('credential-types.identita')
       const secondary = [
         cred.username && cred.username !== primary ? cred.username : '',
         fields.phone,
@@ -1110,7 +1109,7 @@ export function getCredentialListColumns(cred: Credential): {
         } else {
           const portPart =
             fields.port && fields.port !== '22' ? `:${fields.port}` : ''
-          secondary = `ssh://${cred.url}${portPart}`
+          secondary = t('credential-types.ssh-v0-v1', { v0: cred.url, v1: portPart })
         }
       }
       return { primary, secondary }
@@ -1128,15 +1127,15 @@ export function getCredentialListColumns(cred: Credential): {
       return { primary, secondary }
     }
     case 'card': {
-      const primary = cred.username || fields.brand || 'Carta di pagamento'
+      const primary = cred.username || fields.brand || t('credential-types.carta-di-pagamento')
       const secondary = maskSecretValue(cred.password, 'card')
       return { primary, secondary }
     }
     case 'license': {
-      const primary = cred.username || fields.product || 'Licenza software'
+      const primary = cred.username || fields.product || t('credential-types.licenza-software-2')
       const secondary =
         cred.url ||
-        (fields.expires_at ? `Scadenza: ${fields.expires_at}` : '')
+        (fields.expires_at ? t('credential-types.scadenza-v0', { v0: fields.expires_at }) : '')
       return { primary, secondary }
     }
     case 'note': {
@@ -1145,8 +1144,8 @@ export function getCredentialListColumns(cred: Credential): {
         .map((line) => line.trim())
         .find(Boolean)
       return {
-        primary: firstLine || 'Nota sicura',
-        secondary: 'Nota cifrata',
+        primary: firstLine || t('credential-types.nota-sicura-2'),
+        secondary: t('credential-types.nota-cifrata'),
       }
     }
     default: {

@@ -37,6 +37,7 @@ import {
 } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getInitials, getVaultColor } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface GroupDetailPanelProps {
   group: Group
@@ -137,13 +138,13 @@ export function GroupDetailPanel({
       })
       onGroupUpdated(updated)
       setMemberSearch('')
-      toast.success(`${user.name} aggiunto al gruppo "${group.name}"`)
+      toast.success(t('group-detail-panel.v0-aggiunto-al-gruppo-v1', { v0: user.name, v1: group.name }))
       onDataChanged()
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore aggiunta membro al gruppo',
+          : t('group-detail-panel.errore-aggiunta-membro-al-gruppo'),
       )
     } finally {
       setSubmitting(false)
@@ -159,11 +160,11 @@ export function GroupDetailPanel({
         newRole,
       )
       onGroupUpdated(updated)
-      toast.success('Ruolo aggiornato')
+      toast.success(t('group-detail-panel.ruolo-aggiornato'))
       onDataChanged()
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore aggiornamento ruolo',
+        err instanceof Error ? err.message : t('group-detail-panel.errore-aggiornamento-ruolo'),
       )
     } finally {
       setBusyMemberId(null)
@@ -179,7 +180,7 @@ export function GroupDetailPanel({
     try {
       await vaultApi.removeGroupMember(group.id, memberId)
       if (isSelf) {
-        toast.success(`Hai lasciato il gruppo "${group.name}"`)
+        toast.success(t('group-detail-panel.hai-lasciato-il-gruppo-v0', { v0: group.name }))
         onLeftGroup(group.id)
       } else {
         const nextMembers = group.members.filter((m) => m.id !== memberId)
@@ -188,12 +189,12 @@ export function GroupDetailPanel({
           members: nextMembers,
           member_count: nextMembers.length,
         })
-        toast.success(`${memberEmail} rimosso dal gruppo`)
+        toast.success(t('group-detail-panel.v0-rimosso-dal-gruppo', { v0: memberEmail }))
         onDataChanged()
       }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore rimozione membro',
+        err instanceof Error ? err.message : t('group-detail-panel.errore-rimozione-membro'),
       )
     } finally {
       setBusyMemberId(null)
@@ -227,17 +228,15 @@ export function GroupDetailPanel({
                   className="gap-1 text-[11px] font-semibold"
                 >
                   <Crown className="size-3 text-amber-500" />
-                  Gestore
-                </Badge>
+                  {t('group-detail-panel.gestore')}</Badge>
               ) : group.my_role === 'member' ? (
                 <Badge variant="outline" className="text-[11px]">
-                  Membro
-                </Badge>
+                  {t('group-detail-panel.membro')}</Badge>
               ) : null}
             </div>
             <p className="mt-1 truncate pl-11.5 text-xs text-muted-foreground">
               {group.description ||
-                'Gruppo di utenti per la condivisione automatica di cartelle e credenziali.'}
+                t('group-detail-panel.gruppo-di-utenti-per-la-condivisione-automatica-')}
             </p>
           </div>
 
@@ -250,8 +249,7 @@ export function GroupDetailPanel({
                 onClick={() => onNewGroupVault(group)}
               >
                 <FolderPlus className="size-3.5" />
-                Nuova cartella del gruppo
-              </Button>
+                {t('group-detail-panel.nuova-cartella-del-gruppo')}</Button>
             )}
             {canManage && (
               <>
@@ -263,16 +261,15 @@ export function GroupDetailPanel({
                   onClick={() => onEditGroup(group)}
                 >
                   <Pencil className="size-3.5" />
-                  Modifica
-                </Button>
+                  {t('group-detail-panel.modifica')}</Button>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon-sm"
                   className="size-9 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
                   onClick={() => onDeleteGroup(group)}
-                  title="Elimina gruppo"
-                  aria-label="Elimina gruppo"
+                  title={t('group-detail-panel.elimina-gruppo')}
+                  aria-label={t('group-detail-panel.elimina-gruppo')}
                 >
                   <Trash2 className="size-4" />
                 </Button>
@@ -290,8 +287,7 @@ export function GroupDetailPanel({
                 }
               >
                 <LogOut className="size-3.5" />
-                Lascia gruppo
-              </Button>
+                {t('group-detail-panel.lascia-gruppo')}</Button>
             )}
           </div>
         </div>
@@ -307,8 +303,7 @@ export function GroupDetailPanel({
                 {group.member_count}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Membri nel gruppo
-              </p>
+                {t('group-detail-panel.membri-nel-gruppo')}</p>
             </div>
           </div>
 
@@ -321,8 +316,7 @@ export function GroupDetailPanel({
                 {ownedVaults.length}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Cartelle del gruppo
-              </p>
+                {t('group-detail-panel.cartelle-del-gruppo')}</p>
             </div>
           </div>
 
@@ -335,8 +329,7 @@ export function GroupDetailPanel({
                 {sharedVaults.length}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Cartelle condivise
-              </p>
+                {t('group-detail-panel.cartelle-condivise')}</p>
             </div>
           </div>
 
@@ -349,8 +342,7 @@ export function GroupDetailPanel({
                 {totalCredentials}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Credenziali accessibili
-              </p>
+                {t('group-detail-panel.credenziali-accessibili')}</p>
             </div>
           </div>
         </div>
@@ -363,11 +355,9 @@ export function GroupDetailPanel({
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold">Cartelle del gruppo</h3>
+                <h3 className="text-sm font-semibold">{t('group-detail-panel.cartelle-del-gruppo')}</h3>
                 <p className="text-xs text-muted-foreground">
-                  Cartelle create a nome del gruppo o condivise con questo
-                  gruppo.
-                </p>
+                  {t('group-detail-panel.cartelle-create-a-nome-del-gruppo-o-condivise-co')}</p>
               </div>
               {group.my_role && (
                 <Button
@@ -378,8 +368,7 @@ export function GroupDetailPanel({
                   onClick={() => onNewGroupVault(group)}
                 >
                   <FolderPlus className="size-3.5" />
-                  Nuova cartella
-                </Button>
+                  {t('group-detail-panel.nuova-cartella')}</Button>
               )}
             </div>
 
@@ -389,12 +378,9 @@ export function GroupDetailPanel({
                   <Folder className="size-5" />
                 </div>
                 <p className="mt-3 text-sm font-semibold">
-                  Nessuna cartella associata
-                </p>
+                  {t('group-detail-panel.nessuna-cartella-associata')}</p>
                 <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                  Crea una cartella a nome di "{group.name}" oppure condividi
-                  una cartella esistente con questo gruppo.
-                </p>
+                  {t('group-detail-panel.crea-una-cartella-a-nome-di')}{group.name}{t('group-detail-panel.oppure-condividi-una-cartella-esistente-con-ques')}</p>
                 {group.my_role && (
                   <Button
                     type="button"
@@ -403,7 +389,7 @@ export function GroupDetailPanel({
                     onClick={() => onNewGroupVault(group)}
                   >
                     <FolderPlus className="size-4" />
-                    Crea cartella per {group.name}
+                    {t('group-detail-panel.crea-cartella-per')} {group.name}
                   </Button>
                 )}
               </div>
@@ -444,8 +430,7 @@ export function GroupDetailPanel({
                               variant="secondary"
                               className="px-1.5 py-0 text-[10px]"
                             >
-                              Del gruppo
-                            </Badge>
+                              {t('group-detail-panel.del-gruppo')}</Badge>
                             {groupShare && (
                               <Badge
                                 variant="outline"
@@ -453,13 +438,13 @@ export function GroupDetailPanel({
                               >
                                 {groupShare.role === 'editor'
                                   ? 'Editor'
-                                  : 'Sola lettura'}
+                                  : t('group-detail-panel.sola-lettura')}
                               </Badge>
                             )}
                           </div>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
                             {vault.description ||
-                              `${vault.credential_count} ${vault.credential_count === 1 ? 'credenziale' : 'credenziali'}`}
+                              `${vault.credential_count} ${vault.credential_count === 1 ? t('group-detail-panel.credenziale') : t('group-detail-panel.credenziali')}`}
                           </p>
                         </div>
                       </div>
@@ -506,14 +491,14 @@ export function GroupDetailPanel({
                               variant="outline"
                               className="px-1.5 py-0 text-[10px]"
                             >
-                              Condivisa ·{' '}
+                              {t('group-detail-panel.condivisa')}{' '}
                               {groupShare?.role === 'editor'
                                 ? 'Editor'
-                                : 'Sola lettura'}
+                                : t('group-detail-panel.sola-lettura')}
                             </Badge>
                           </div>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                            Proprietario: {vault.owner_name}
+                            {t('group-detail-panel.proprietario-colon')} {vault.owner_name}
                           </p>
                         </div>
                       </div>
@@ -532,25 +517,22 @@ export function GroupDetailPanel({
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-semibold">
-                Membri del gruppo ({group.members.length})
+                {t('group-detail-panel.membri-del-gruppo')}{group.members.length})
               </h3>
               <p className="text-xs text-muted-foreground">
-                Ogni membro riceve automaticamente accesso a tutte le cartelle
-                del gruppo e condivise con il gruppo.
-              </p>
+                {t('group-detail-panel.ogni-membro-riceve-automaticamente-accesso-a-tut')}</p>
             </div>
 
             {canManage && (
               <div className="space-y-3 rounded-xl border border-border/70 bg-card/40 p-3.5">
                 <div className="space-y-1.5">
                   <Label htmlFor="group-member-search" className="text-xs">
-                    Aggiungi membro dalla piattaforma
-                  </Label>
+                    {t('group-detail-panel.aggiungi-membro-dalla-piattaforma')}</Label>
                   <div className="flex flex-wrap gap-2">
                     <Input
                       id="group-member-search"
                       type="text"
-                      placeholder="Cerca utente per nome o email..."
+                      placeholder={t('group-detail-panel.cerca-utente-per-nome-o-email')}
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       onKeyDown={(e) => {
@@ -571,8 +553,8 @@ export function GroupDetailPanel({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="member">Membro</SelectItem>
-                        <SelectItem value="owner">Gestore</SelectItem>
+                        <SelectItem value="member">{t('group-detail-panel.membro')}</SelectItem>
+                        <SelectItem value="owner">{t('group-detail-panel.gestore')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -581,8 +563,7 @@ export function GroupDetailPanel({
                 {suggestions.length > 0 && (
                   <div className="rounded-lg border bg-muted/30 p-2">
                     <p className="mb-1.5 px-1 text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-                      Utenti della piattaforma
-                    </p>
+                      {t('group-detail-panel.utenti-della-piattaforma')}</p>
                     <div className="flex flex-col gap-1">
                       {suggestions.slice(0, 8).map((u) => (
                         <button
@@ -635,8 +616,7 @@ export function GroupDetailPanel({
                               variant="outline"
                               className="py-0 text-[10px]"
                             >
-                              In attesa
-                            </Badge>
+                              {t('group-detail-panel.in-attesa')}</Badge>
                           )}
                         </div>
                         <p className="truncate text-xs text-muted-foreground">
@@ -659,8 +639,8 @@ export function GroupDetailPanel({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="owner">Gestore</SelectItem>
-                              <SelectItem value="member">Membro</SelectItem>
+                              <SelectItem value="owner">{t('group-detail-panel.gestore')}</SelectItem>
+                              <SelectItem value="member">{t('group-detail-panel.membro')}</SelectItem>
                             </SelectContent>
                           </Select>
                           <Button
@@ -678,8 +658,8 @@ export function GroupDetailPanel({
                             }
                             title={
                               isSelf
-                                ? 'Lascia gruppo'
-                                : 'Rimuovi membro dal gruppo'
+                                ? t('group-detail-panel.lascia-gruppo')
+                                : t('group-detail-panel.rimuovi-membro-dal-gruppo')
                             }
                           >
                             <Trash2 className="size-3.5" />
@@ -690,7 +670,7 @@ export function GroupDetailPanel({
                           {member.role === 'owner' && (
                             <Crown className="size-3 text-amber-500" />
                           )}
-                          {member.role === 'owner' ? 'Gestore' : 'Membro'}
+                          {member.role === 'owner' ? 'Gestore' : t('group-detail-panel.membro')}
                         </Badge>
                       )}
                     </div>

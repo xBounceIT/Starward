@@ -20,6 +20,7 @@ import {
 import type { Credential } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getVaultColor } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 // Una cartella di un gruppo resta una cartella: se ha l'icona "Team" (users)
 // salvata nel DB, la mostriamo come cartella per non confonderla col gruppo.
@@ -33,14 +34,14 @@ export function getVaultDisplayIcon(vault: {
 }
 
 export const VAULT_ICON_OPTIONS = [
-  { value: 'folder', label: 'Cartella' },
-  { value: 'lock', label: 'Privata' },
-  { value: 'users', label: 'Team' },
-  { value: 'shield', label: 'Sicurezza' },
-  { value: 'server', label: 'Server' },
-  { value: 'globe', label: 'Web' },
-  { value: 'key', label: 'Chiavi' },
-  { value: 'building', label: 'Azienda' },
+  { value: 'folder', get label() { return t('vault-icon.cartella') } },
+  { value: 'lock', get label() { return t('vault-icon.privata') } },
+  { value: 'users', get label() { return t('vault-icon.team') } },
+  { value: 'shield', get label() { return t('vault-icon.sicurezza') } },
+  { value: 'server', get label() { return t('vault-icon.server') } },
+  { value: 'globe', get label() { return t('vault-icon.web') } },
+  { value: 'key', get label() { return t('vault-icon.chiavi') } },
+  { value: 'building', get label() { return t('vault-icon.azienda') } },
 ] as const
 
 export function VaultIcon({
@@ -223,8 +224,7 @@ export function CredentialBrandIcon({
         )}
       >
         <span className="font-sans text-[11px] font-extrabold leading-none tracking-tight text-white">
-          aws
-        </span>
+          {t('vault-icon.aws')}</span>
         <span className="mt-0.5 h-0.5 w-5 rounded-full bg-amber-500" />
       </div>
     )

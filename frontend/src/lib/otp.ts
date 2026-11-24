@@ -1,3 +1,4 @@
+import { t } from '@/lib/i18n'
 export type OtpAlgorithm = 'SHA1' | 'SHA256' | 'SHA512'
 
 export interface ParsedTotpConfig {
@@ -359,23 +360,23 @@ function decodeBase32WithError(
   | { ok: false; error: string } {
   const cleaned = input.replace(/[\s-]+/g, '').toUpperCase()
   if (!cleaned) {
-    return { ok: false, error: 'Il segreto OTP non può essere vuoto' }
+    return { ok: false, error: t('otp.il-segreto-otp-non-puo-essere-vuoto') }
   }
 
   const withoutPad = cleaned.replace(/=+$/, '')
   if (withoutPad.includes('=')) {
     return {
       ok: false,
-      error: "Il segreto Base32 contiene caratteri '=' non validi",
+      error: t('otp.il-segreto-base32-contiene-caratteri-non-validi'),
     }
   }
   if (!withoutPad) {
-    return { ok: false, error: 'Il segreto OTP non può essere vuoto' }
+    return { ok: false, error: t('otp.il-segreto-otp-non-puo-essere-vuoto') }
   }
 
   const mod = withoutPad.length % 8
   if (mod === 1 || mod === 3 || mod === 6) {
-    return { ok: false, error: 'Il segreto Base32 ha una lunghezza non valida' }
+    return { ok: false, error: t('otp.il-segreto-base32-ha-una-lunghezza-non-valida') }
   }
 
   const out: number[] = []
@@ -393,7 +394,7 @@ function decodeBase32WithError(
       return {
         ok: false,
         error:
-          'Il segreto Base32 contiene caratteri non validi (ammessi solo A-Z e 2-7)',
+          t('otp.il-segreto-base32-contiene-caratteri-non-validi-'),
       }
     }
 
@@ -409,7 +410,7 @@ function decodeBase32WithError(
   if (out.length < 5) {
     return {
       ok: false,
-      error: 'Il segreto OTP è troppo corto (minimo 8 caratteri Base32)',
+      error: t('otp.il-segreto-otp-e-troppo-corto-minimo-8-caratteri'),
     }
   }
 
@@ -443,7 +444,7 @@ function parseAlgorithm(raw: string): OtpAlgorithm | null {
 export function parseTotpConfig(raw: string): ParseTotpResult {
   const trimmed = raw.trim()
   if (!trimmed) {
-    return { ok: false, error: 'Il segreto OTP non può essere vuoto' }
+    return { ok: false, error: t('otp.il-segreto-otp-non-puo-essere-vuoto') }
   }
 
   if (trimmed.toLowerCase().startsWith('otpauth://')) {
@@ -463,13 +464,13 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
       return {
         ok: false,
         error:
-          'I codici HOTP basati su contatore non sono supportati; usa un segreto TOTP (otpauth://totp/...)',
+          t('otp.i-codici-hotp-basati-su-contatore-non-sono-suppo'),
       }
     }
     if (otpType !== 'totp') {
       return {
         ok: false,
-        error: "URI otpauth non valido: è supportato solo il tipo 'totp'",
+        error: t('otp.uri-otpauth-non-valido-e-supportato-solo-il-tipo'),
       }
     }
 
@@ -490,7 +491,7 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
 
     for (const [rawKey, value] of params.entries()) {
       const key = rawKey.toLowerCase()
-      if (key === 'secret') {
+      if (key === t('otp.secret')) {
         secretParam = value
       } else if (key === 'algorithm') {
         const alg = parseAlgorithm(value)
@@ -498,7 +499,7 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
           return {
             ok: false,
             error:
-              'Algoritmo OTP non supportato (ammessi SHA1, SHA256, SHA512)',
+              t('otp.algoritmo-otp-non-supportato-ammessi-sha1-sha256'),
           }
         }
         algorithm = alg
@@ -508,14 +509,14 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
           if (!/^\d+$/.test(cleanDigits)) {
             return {
               ok: false,
-              error: 'Il numero di cifre OTP deve essere compreso tra 6 e 8',
+              error: t('otp.il-numero-di-cifre-otp-deve-essere-compreso-tra-'),
             }
           }
           const parsedDigits = Number.parseInt(cleanDigits, 10)
           if (parsedDigits < 6 || parsedDigits > 8) {
             return {
               ok: false,
-              error: 'Il numero di cifre OTP deve essere compreso tra 6 e 8',
+              error: t('otp.il-numero-di-cifre-otp-deve-essere-compreso-tra-'),
             }
           }
           digits = parsedDigits
@@ -527,7 +528,7 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
             return {
               ok: false,
               error:
-                'Il periodo OTP deve essere compreso tra 10 e 300 secondi',
+                t('otp.il-periodo-otp-deve-essere-compreso-tra-10-e-300'),
             }
           }
           const parsedPeriod = Number.parseInt(cleanPeriod, 10)
@@ -535,7 +536,7 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
             return {
               ok: false,
               error:
-                'Il periodo OTP deve essere compreso tra 10 e 300 secondi',
+                t('otp.il-periodo-otp-deve-essere-compreso-tra-10-e-300'),
             }
           }
           period = parsedPeriod
@@ -551,7 +552,7 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
     if (!secretParam.trim()) {
       return {
         ok: false,
-        error: "Parametro 'secret' mancante nell'URI otpauth://",
+        error: t('otp.parametro-secret-mancante-nell-uri-otpauth'),
       }
     }
 
@@ -578,7 +579,7 @@ export function parseTotpConfig(raw: string): ParseTotpResult {
     return {
       ok: false,
       error:
-        "URI OTP non valido: usa 'otpauth://totp/...' oppure una chiave Base32",
+        t('otp.uri-otp-non-valido-usa-otpauth-totp-oppure-una-c'),
     }
   }
 
@@ -626,9 +627,9 @@ export function buildTotpStorageValue(params: {
     return cleanSecret
   }
 
-  const encodedLabel = encodeURIComponent(label || issuer || 'Account')
+  const encodedLabel = encodeURIComponent(label || issuer || t('otp.account'))
   const search = new URLSearchParams()
-  search.set('secret', cleanSecret)
+  search.set(t('otp.secret'), cleanSecret)
   if (issuer) search.set('issuer', issuer)
   search.set('algorithm', algorithm)
   search.set('digits', String(digits))

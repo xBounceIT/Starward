@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { authClient } from '@/lib/auth-client'
 import { getServerSessionFn, getSsoProvidersFn } from '@/lib/auth-server'
 import type { PublicSsoProvider } from '@/lib/sso-config'
+import { t } from '@/lib/i18n'
 
 export const Route = createFileRoute('/login')({
   beforeLoad: async () => {
@@ -52,14 +53,14 @@ function LoginPage() {
         password,
       })
       if (res.error) {
-        toast.error(res.error.message || 'Credenziali non valide')
+        toast.error(res.error.message || t('login.credenziali-non-valide'))
         return
       }
-      toast.success('Accesso effettuato')
+      toast.success(t('login.accesso-effettuato'))
       await navigate({ to: '/vault' })
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore durante il login',
+        err instanceof Error ? err.message : t('login.errore-durante-il-login'),
       )
     } finally {
       setLoading(false)
@@ -69,7 +70,7 @@ function LoginPage() {
   const handleLocalRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     if (password.length < 8) {
-      toast.error('La password deve contenere almeno 8 caratteri')
+      toast.error(t('login.la-password-deve-contenere-almeno-8-caratteri'))
       return
     }
     setLoading(true)
@@ -81,15 +82,15 @@ function LoginPage() {
       })
       if (res.error) {
         toast.error(
-          res.error.message || 'Impossibile completare la registrazione',
+          res.error.message || t('login.impossibile-completare-la-registrazione'),
         )
         return
       }
-      toast.success('Account creato con successo')
+      toast.success(t('login.account-creato-con-successo'))
       await navigate({ to: '/vault' })
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore durante la registrazione',
+        err instanceof Error ? err.message : t('login.errore-durante-la-registrazione'),
       )
     } finally {
       setLoading(false)
@@ -105,7 +106,7 @@ function LoginPage() {
       })
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore avvio flusso SSO',
+        err instanceof Error ? err.message : t('login.errore-avvio-flusso-sso'),
       )
       setSsoLoadingId(null)
     }
@@ -119,19 +120,17 @@ function LoginPage() {
             <ShieldCheck className="size-4.5" />
           </div>
           <span className="font-sans text-lg font-semibold tracking-normal">
-            Starward
-          </span>
+            {t('login.starward')}</span>
         </div>
 
         <Card className="sync-security:border-white/20 border-t-2 sync-security:border-t-[#ff9c00]">
           <CardHeader className="text-center">
             <CardTitle className="text-lg sync-security:text-[#ff9c00]">
-              Accedi al tuo Vault
-            </CardTitle>
+              {t('login.accedi-al-tuo-vault')}</CardTitle>
             <CardDescription>
               {ssoProviders.length > 0
-                ? 'Accedi con le tue credenziali o tramite SSO.'
-                : 'Inserisci le tue credenziali per accedere al vault.'}
+                ? t('login.accedi-con-le-tue-credenziali-o-tramite-sso')
+                : t('login.inserisci-le-tue-credenziali-per-accedere-al-vau')}
             </CardDescription>
           </CardHeader>
 
@@ -141,14 +140,14 @@ function LoginPage() {
               onValueChange={(v) => setMode(v as 'login' | 'register')}
             >
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Accedi</TabsTrigger>
-                <TabsTrigger value="register">Registrati</TabsTrigger>
+                <TabsTrigger value="login">{t('login.accedi')}</TabsTrigger>
+                <TabsTrigger value="register">{t('login.registrati')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="login" className="mt-4">
                 <form onSubmit={handleLocalLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
+                    <Label htmlFor="login-email">{t('login.email')}</Label>
                     <Input
                       id="login-email"
                       type="email"
@@ -160,7 +159,7 @@ function LoginPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                    <Label htmlFor="login-password">{t('login.password')}</Label>
                     <Input
                       id="login-password"
                       type="password"
@@ -172,7 +171,7 @@ function LoginPage() {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Accesso in corso...' : 'Accedi'}
+                    {loading ? t('login.accesso-in-corso') : t('login.accedi')}
                   </Button>
                 </form>
               </TabsContent>
@@ -180,10 +179,10 @@ function LoginPage() {
               <TabsContent value="register" className="mt-4">
                 <form onSubmit={handleLocalRegister} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="reg-name">Nome completo</Label>
+                    <Label htmlFor="reg-name">{t('login.nome-completo')}</Label>
                     <Input
                       id="reg-name"
-                      placeholder="Mario Rossi"
+                      placeholder={t('login.mario-rossi')}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       autoComplete="name"
@@ -191,7 +190,7 @@ function LoginPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="reg-email">Email</Label>
+                    <Label htmlFor="reg-email">{t('login.email')}</Label>
                     <Input
                       id="reg-email"
                       type="email"
@@ -204,12 +203,11 @@ function LoginPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="reg-password">
-                      Password (min. 8 caratteri)
-                    </Label>
+                      {t('login.password-min-8-caratteri')}</Label>
                     <Input
                       id="reg-password"
                       type="password"
-                      placeholder="Crea una password sicura"
+                      placeholder={t('login.crea-una-password-sicura')}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="new-password"
@@ -218,7 +216,7 @@ function LoginPage() {
                     />
                   </div>
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Creazione account...' : 'Crea account'}
+                    {loading ? t('login.creazione-account') : t('login.crea-account')}
                   </Button>
                 </form>
               </TabsContent>
@@ -232,8 +230,7 @@ function LoginPage() {
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
                     <span className="bg-card px-2 text-muted-foreground">
-                      Oppure continua con
-                    </span>
+                      {t('login.oppure-continua-con')}</span>
                   </div>
                 </div>
 

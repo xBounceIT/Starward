@@ -73,6 +73,7 @@ import {
   getInitials,
   getVaultColor,
 } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 export type CredentialSortOption =
   | 'updated_desc'
@@ -81,10 +82,10 @@ export type CredentialSortOption =
   | 'title_desc'
 
 const SORT_OPTIONS: { value: CredentialSortOption; label: string }[] = [
-  { value: 'updated_desc', label: 'Ultima modifica' },
-  { value: 'created_desc', label: 'Aggiunte di recente' },
-  { value: 'title_asc', label: 'Titolo (A-Z)' },
-  { value: 'title_desc', label: 'Titolo (Z-A)' },
+  { value: 'updated_desc', get label() { return t('credential-list.ultima-modifica') } },
+  { value: 'created_desc', get label() { return t('credential-list.aggiunte-di-recente') } },
+  { value: 'title_asc', get label() { return t('credential-list.titolo-a-z') } },
+  { value: 'title_desc', get label() { return t('credential-list.titolo-z-a') } },
 ]
 
 const LIST_ROW_HEIGHT = 68
@@ -131,7 +132,7 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
           e.stopPropagation()
           onOpenChange(cred.id)
         }}
-        aria-label="Azioni credenziale"
+        aria-label={t('credential-list.azioni-credenziale')}
         aria-haspopup="menu"
         aria-expanded={false}
       >
@@ -162,7 +163,7 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
           size="icon-xs"
           className="size-7 text-muted-foreground hover:text-foreground"
           onClick={(e) => e.stopPropagation()}
-          aria-label="Azioni credenziale"
+          aria-label={t('credential-list.azioni-credenziale')}
         >
           <MoreHorizontal className="size-4" />
         </Button>
@@ -183,7 +184,7 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
             }
           >
             <User className="size-4" />
-            Copia {quickCopy.primary.label.toLowerCase()}
+            {t('credential-list.copia')} {quickCopy.primary.label.toLowerCase()}
           </DropdownMenuItem>
         )}
         {quickCopy.secondary && (
@@ -197,7 +198,7 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
             }
           >
             <Copy className="size-4" />
-            Copia {quickCopy.secondary.label.toLowerCase()}
+            {t('credential-list.copia')} {quickCopy.secondary.label.toLowerCase()}
           </DropdownMenuItem>
         )}
         {hasCredentialTotp(cred) && (
@@ -206,22 +207,20 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
               e.stopPropagation()
               const otp = generateTotpFromRaw(cred.fields.totp)
               if (!otp) {
-                toast.error('Configurazione OTP non valida')
+                toast.error(t('credential-list.configurazione-otp-non-valida'))
                 return
               }
-              onCopyQuick(e, otp.code, 'Codice OTP')
+              onCopyQuick(e, otp.code, t('credential-list.codice-otp'))
             }}
           >
             <ShieldCheck className="size-4" />
-            Copia codice OTP
-          </DropdownMenuItem>
+            {t('credential-list.copia-codice-otp')}</DropdownMenuItem>
         )}
         {normalizedUrl && (
           <DropdownMenuItem asChild>
             <a href={normalizedUrl} target="_blank" rel="noreferrer">
               <ExternalLink className="size-4" />
-              Apri URL
-            </a>
+              {t('credential-list.apri-url')}</a>
           </DropdownMenuItem>
         )}
         {canWrite && (
@@ -232,15 +231,13 @@ const CredentialRowMenuButton = memo(function CredentialRowMenuButton({
               hasCredentialTotp(cred)) && <DropdownMenuSeparator />}
             <DropdownMenuItem onClick={() => onEditCredential(cred)}>
               <Pencil className="size-4" />
-              Modifica
-            </DropdownMenuItem>
+              {t('credential-list.modifica')}</DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               onClick={() => onDeleteCredential(cred)}
             >
               <Trash2 className="size-4" />
-              Elimina
-            </DropdownMenuItem>
+              {t('credential-list.elimina')}</DropdownMenuItem>
           </>
         )}
       </DropdownMenuContent>
@@ -338,7 +335,7 @@ const CredentialGridCard = memo(function CredentialGridCard({
               if (canWrite) onToggleFavorite(cred)
             }}
             title={
-              cred.favorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'
+              cred.favorite ? t('credential-list.rimuovi-dai-preferiti') : t('credential-list.aggiungi-ai-preferiti')
             }
           >
             <Star
@@ -483,7 +480,7 @@ const CredentialListRow = memo(function CredentialListRow({
             if (canWrite) onToggleFavorite(cred)
           }}
           title={
-            cred.favorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'
+            cred.favorite ? t('credential-list.rimuovi-dai-preferiti') : t('credential-list.aggiungi-ai-preferiti')
           }
         >
           <Star
@@ -770,7 +767,7 @@ export const CredentialList = memo(function CredentialList({
       if (await copyToClipboard(text)) {
         toast.success(`${label} copiato negli appunti`)
       } else {
-        toast.error('Impossibile copiare negli appunti')
+        toast.error(t('credential-list.impossibile-copiare-negli-appunti'))
       }
     },
     [],
@@ -782,22 +779,22 @@ export const CredentialList = memo(function CredentialList({
 
   const headerTitle =
     selection.type === 'all'
-      ? 'Tutte le credenziali'
+      ? t('credential-list.tutte-le-credenziali')
       : selection.type === 'favorites'
-        ? 'Preferiti'
-        : (activeVault?.name ?? 'Cartella')
+        ? t('credential-list.preferiti')
+        : (activeVault?.name ?? t('credential-list.cartella'))
 
   const headerSubtitle =
     selection.type === 'all'
-      ? 'Tutte le tue credenziali in un unico posto, ordinate e sempre accessibili.'
+      ? t('credential-list.tutte-le-tue-credenziali-in-un-unico-posto-ordin')
       : selection.type === 'favorites'
-        ? 'Accesso rapido alle credenziali principali contrassegnate come preferite.'
+        ? t('credential-list.accesso-rapido-alle-credenziali-principali-contr')
         : activeVault?.description ||
           (activeVault?.owner_group_name
-            ? `Cartella del gruppo ${activeVault.owner_group_name} · condivisa automaticamente con tutti i membri.`
+            ? t('credential-list.cartella-del-gruppo-v0-condivisa-automaticamente', { v0: activeVault.owner_group_name })
             : activeVault?.is_shared_with_me
-              ? `Cartella condivisa da ${activeVault.owner_name}`
-              : 'Tutte le tue credenziali archiviate in questa cartella.')
+              ? t('credential-list.cartella-condivisa-da-v0', { v0: activeVault.owner_name })
+              : t('credential-list.tutte-le-tue-credenziali-archiviate-in-questa-ca'))
 
   const canCreateInCurrent =
     !activeVault ||
@@ -807,7 +804,7 @@ export const CredentialList = memo(function CredentialList({
   const canImport = activeVault ? canCreateInCurrent : hasWritableVault
 
   const currentSortLabel =
-    SORT_OPTIONS.find((s) => s.value === sortBy)?.label ?? 'Ultima modifica'
+    SORT_OPTIONS.find((s) => s.value === sortBy)?.label ?? t('credential-list.ultima-modifica')
 
   return (
     <section className="@container flex h-full min-w-0 flex-1 flex-col bg-background">
@@ -856,7 +853,7 @@ export const CredentialList = memo(function CredentialList({
                 (activeVault?.owner_group_id &&
                   activeVault.role !== 'owner')) && (
                 <Badge variant="secondary" className="text-[10px]">
-                  {activeVault.role === 'editor' ? 'Editor' : 'Sola lettura'}
+                  {activeVault.role === 'editor' ? 'Editor' : t('credential-list.sola-lettura')}
                 </Badge>
               )}
             </div>
@@ -889,8 +886,7 @@ export const CredentialList = memo(function CredentialList({
                   onClick={() => onImportVault(activeVault)}
                 >
                   <Upload className="size-3.5" />
-                  Importa da altri password manager
-                </Button>
+                  {t('credential-list.importa-da-altri-password-manager')}</Button>
               )}
 
               {activeVault && (
@@ -907,8 +903,8 @@ export const CredentialList = memo(function CredentialList({
                       <Share2 className="size-3.5" />
                     )}
                     {activeVault.role === 'owner'
-                      ? 'Condividi'
-                      : `Membri (${activeVault.member_count})`}
+                      ? t('credential-list.condividi')
+                      : t('credential-list.membri-v0', { v0: activeVault.member_count })}
                   </Button>
 
                   <DropdownMenu>
@@ -922,39 +918,34 @@ export const CredentialList = memo(function CredentialList({
                         <>
                           <DropdownMenuItem onClick={onNewCredential}>
                             <Plus className="size-4" />
-                            Nuova credenziale
-                          </DropdownMenuItem>
+                            {t('credential-list.nuova-credenziale')}</DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => onImportVault(activeVault)}
                           >
                             <Upload className="size-4" />
-                            Importa credenziali
-                          </DropdownMenuItem>
+                            {t('credential-list.importa-credenziali')}</DropdownMenuItem>
                         </>
                       )}
                       {activeVault.role === 'owner' && (
                         <DropdownMenuItem onClick={() => onEditVault(activeVault)}>
                           <Pencil className="size-4" />
-                          Rinomina
-                        </DropdownMenuItem>
+                          {t('credential-list.rinomina')}</DropdownMenuItem>
                       )}
                       <DropdownMenuItem onClick={() => onShareVault(activeVault)}>
                         {activeVault.role === 'owner' ? (
                           <>
                             <Share2 className="size-4" />
-                            Condividi
-                          </>
+                            {t('credential-list.condividi')}</>
                         ) : (
                           <>
                             <Users className="size-4" />
-                            Membri ({activeVault.member_count})
+                            {t('credential-list.membri')}{activeVault.member_count})
                           </>
                         )}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onOpenAudit(activeVault)}>
                         <History className="size-4" />
-                        Registro attività
-                      </DropdownMenuItem>
+                        {t('credential-list.registro-attivita')}</DropdownMenuItem>
                       {activeVault.role === 'owner' && (
                         <>
                           <DropdownMenuSeparator />
@@ -967,8 +958,7 @@ export const CredentialList = memo(function CredentialList({
                             }}
                           >
                             <Trash2 className="size-4" />
-                            Cancella
-                          </DropdownMenuItem>
+                            {t('credential-list.cancella')}</DropdownMenuItem>
                         </>
                       )}
                     </DropdownMenuContent>
@@ -990,8 +980,7 @@ export const CredentialList = memo(function CredentialList({
                 {stats.total}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Credenziali totali
-              </p>
+                {t('credential-list.credenziali-totali')}</p>
             </div>
           </div>
 
@@ -1004,8 +993,7 @@ export const CredentialList = memo(function CredentialList({
                 {stats.favorites}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Preferiti
-              </p>
+                {t('credential-list.preferiti')}</p>
             </div>
           </div>
 
@@ -1018,8 +1006,7 @@ export const CredentialList = memo(function CredentialList({
                 {stats.vaults}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Cartelle
-              </p>
+                {t('credential-list.cartelle')}</p>
             </div>
           </div>
 
@@ -1032,8 +1019,7 @@ export const CredentialList = memo(function CredentialList({
                 {stats.recent}
               </p>
               <p className="mt-1 truncate text-xs text-muted-foreground">
-                Aggiunte di recente
-              </p>
+                {t('credential-list.aggiunte-di-recente')}</p>
             </div>
           </div>
         </div>
@@ -1044,7 +1030,7 @@ export const CredentialList = memo(function CredentialList({
             <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               ref={searchInputRef}
-              placeholder="Cerca titolo, username, URL..."
+              placeholder={t('credential-list.cerca-titolo-username-url')}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="h-10 border-border/70 bg-card/50 pr-24 pl-10 text-sm rounded-lg sync-security:border-white/20 sync-security:bg-[#0e1b33]"
@@ -1057,14 +1043,13 @@ export const CredentialList = memo(function CredentialList({
                   size="icon-xs"
                   onClick={() => onSearchChange('')}
                   className="size-6 text-muted-foreground hover:text-foreground"
-                  aria-label="Cancella ricerca"
+                  aria-label={t('credential-list.cancella-ricerca')}
                 >
                   <X className="size-3.5" />
                 </Button>
               )}
               <kbd className="pointer-events-none hidden rounded-md border border-border/80 bg-muted/60 px-2 py-0.5 font-sans text-[11px] font-medium text-muted-foreground sync-security:border-[#ff9c00]/35 sync-security:bg-[#1a2c4b] sync-security:text-[#ff9c00] @[520px]:inline-block">
-                Ctrl + K
-              </kbd>
+                {t('credential-list.ctrl-k')}</kbd>
             </div>
           </div>
 
@@ -1099,8 +1084,8 @@ export const CredentialList = memo(function CredentialList({
             <button
               type="button"
               onClick={() => handleViewModeChange('list')}
-              title="Vista lista"
-              aria-label="Vista lista"
+              title={t('credential-list.vista-lista')}
+              aria-label={t('credential-list.vista-lista')}
               className={cn(
                 'flex size-8 items-center justify-center transition-colors rounded-md',
                 viewMode === 'list'
@@ -1113,8 +1098,8 @@ export const CredentialList = memo(function CredentialList({
             <button
               type="button"
               onClick={() => handleViewModeChange('grid')}
-              title="Vista griglia"
-              aria-label="Vista griglia"
+              title={t('credential-list.vista-griglia')}
+              aria-label={t('credential-list.vista-griglia')}
               className={cn(
                 'flex size-8 items-center justify-center transition-colors rounded-md',
                 viewMode === 'grid'
@@ -1144,8 +1129,7 @@ export const CredentialList = memo(function CredentialList({
                     : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
                 )}
               >
-                Tutte
-              </button>
+                {t('credential-list.tutte')}</button>
               {CREDENTIAL_CATEGORIES.map((cat) => {
                 const active = categoryFilter === cat.value
                 return (
@@ -1184,7 +1168,7 @@ export const CredentialList = memo(function CredentialList({
 
           <span className="shrink-0 text-xs text-muted-foreground">
             {credentials.length}{' '}
-            {credentials.length === 1 ? 'credenziale' : 'credenziali'}
+            {credentials.length === 1 ? t('credential-list.credenziale') : t('credential-list.credenziali')}
           </span>
         </div>
       </div>
@@ -1220,19 +1204,17 @@ export const CredentialList = memo(function CredentialList({
               <KeyRound className="size-6" />
             </div>
             <p className="mt-3 text-sm font-semibold">
-              Nessuna credenziale trovata
-            </p>
+              {t('credential-list.nessuna-credenziale-trovata')}</p>
             <p className="mt-1 max-w-xs text-xs text-muted-foreground">
               {searchQuery || categoryFilter
-                ? 'Prova a modificare la ricerca o i filtri per categoria.'
-                : 'Aggiungi la prima credenziale in questa cartella per iniziare.'}
+                ? t('credential-list.prova-a-modificare-la-ricerca-o-i-filtri-per-cat')
+                : t('credential-list.aggiungi-la-prima-credenziale-in-questa-cartella')}
             </p>
             {canCreateInCurrent && !searchQuery && !categoryFilter && (
               <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <Button size="sm" onClick={onNewCredential}>
                   <Plus className="size-4" />
-                  Aggiungi credenziale
-                </Button>
+                  {t('credential-list.aggiungi-credenziale')}</Button>
                 {canImport && (
                   <Button
                     variant="outline"
@@ -1240,8 +1222,7 @@ export const CredentialList = memo(function CredentialList({
                     onClick={() => onImportVault(activeVault)}
                   >
                     <Upload className="size-4" />
-                    Importa da altri password manager
-                  </Button>
+                    {t('credential-list.importa-da-altri-password-manager')}</Button>
                 )}
               </div>
             )}

@@ -79,6 +79,12 @@ import {
   getInitials,
   getVaultColor,
 } from '@/lib/vault-utils'
+import {
+  getLanguagePreference,
+  setLanguagePreference,
+  t,
+  type LanguagePreference,
+} from '@/lib/i18n'
 
 export type SettingsTab =
   | 'profile'
@@ -112,9 +118,9 @@ interface SessionItem {
 const AUTO_DEFAULT_VAULT = '__auto__'
 
 function formatUserAgent(ua?: string | null): string {
-  if (!ua) return 'Dispositivo web'
+  if (!ua) return t('user-settings-dialog.dispositivo-web')
   const lower = ua.toLowerCase()
-  let browser = 'Browser'
+  let browser = t('user-settings-dialog.browser')
   if (lower.includes('edg/')) browser = 'Edge'
   else if (lower.includes('chrome/')) browser = 'Chrome'
   else if (lower.includes('firefox/')) browser = 'Firefox'
@@ -191,7 +197,7 @@ function VaultScopeSelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <Label className="text-xs">Ambito cartelle (Scope)</Label>
+        <Label className="text-xs">{t('user-settings-dialog.ambito-cartelle-scope')}</Label>
         <div className="flex items-center gap-1 rounded-lg border bg-background p-0.5 text-xs">
           <button
             type="button"
@@ -203,8 +209,7 @@ function VaultScopeSelector({
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            Tutte le cartelle
-          </button>
+            {t('user-settings-dialog.tutte-le-cartelle')}</button>
           <button
             type="button"
             onClick={() => onScopeModeChange('selected')}
@@ -215,8 +220,7 @@ function VaultScopeSelector({
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            Cartelle specifiche
-          </button>
+            {t('user-settings-dialog.cartelle-specifiche')}</button>
         </div>
       </div>
 
@@ -279,13 +283,12 @@ function ScopedKeyCard({
             className="text-[10px]"
           >
             {item.permission === 'read_write'
-              ? 'Lettura & Scrittura'
-              : 'Sola lettura'}
+              ? t('user-settings-dialog.lettura-scrittura')
+              : t('user-settings-dialog.sola-lettura')}
           </Badge>
           {item.is_expired && (
             <Badge variant="destructive" className="text-[10px]">
-              Scaduta
-            </Badge>
+              {t('user-settings-dialog.scaduta')}</Badge>
           )}
         </div>
 
@@ -293,19 +296,19 @@ function ScopedKeyCard({
           <span className="flex items-center gap-1">
             <FolderLock className="size-3" />
             {scopedNames.length === 0
-              ? 'Tutte le cartelle'
-              : `Cartelle: ${scopedNames.join(', ')}`}
+              ? t('user-settings-dialog.tutte-le-cartelle')
+              : t('user-settings-dialog.cartelle-v0', { v0: scopedNames.join(', ') })}
           </span>
-          <span>Creata il {formatShortDate(item.created_at)}</span>
+          <span>{t('user-settings-dialog.creata-il')} {formatShortDate(item.created_at)}</span>
           <span>
             {item.expires_at
-              ? `Scadenza: ${formatShortDate(item.expires_at)}`
-              : 'Nessuna scadenza'}
+              ? t('user-settings-dialog.scadenza-v0', { v0: formatShortDate(item.expires_at) })
+              : t('user-settings-dialog.nessuna-scadenza')}
           </span>
           <span>
             {item.last_used_at
-              ? `Ultimo uso: ${formatRelativeDate(item.last_used_at)}`
-              : 'Mai utilizzata'}
+              ? t('user-settings-dialog.ultimo-uso-v0', { v0: formatRelativeDate(item.last_used_at) })
+              : t('user-settings-dialog.mai-utilizzata')}
           </span>
         </div>
       </div>
@@ -319,8 +322,7 @@ function ScopedKeyCard({
           onClick={onRevoke}
         >
           <Trash2 className="size-3.5" />
-          Revoca
-        </Button>
+          {t('user-settings-dialog.revoca')}</Button>
       </div>
     </div>
   )
@@ -383,6 +385,14 @@ export function UserSettingsDialog({
   )
   const [savingPrefs, setSavingPrefs] = useState(false)
   const [previewSeed, setPreviewSeed] = useState(0)
+  const [languagePref, setLanguagePrefState] = useState<LanguagePreference>(() =>
+    getLanguagePreference(),
+  )
+
+  const handleLanguageChange = (pref: LanguagePreference) => {
+    setLanguagePrefState(pref)
+    setLanguagePreference(pref)
+  }
 
   // API Keys tab state
   const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([])
@@ -454,6 +464,7 @@ export function UserSettingsDialog({
       setPrefLower(settings?.password_generator_lowercase ?? true)
       setPrefNumbers(settings?.password_generator_numbers ?? true)
       setPrefSymbols(settings?.password_generator_symbols ?? true)
+      setLanguagePrefState(getLanguagePreference())
       settingsHydratedRef.current = settings !== null
     } else if (justClosed) {
       settingsHydratedRef.current = false
@@ -505,7 +516,7 @@ export function UserSettingsDialog({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nel caricamento delle API Key',
+          : t('user-settings-dialog.errore-nel-caricamento-delle-api-key'),
       )
     } finally {
       setLoadingApiKeys(false)
@@ -521,7 +532,7 @@ export function UserSettingsDialog({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nel caricamento delle chiavi MCP',
+          : t('user-settings-dialog.errore-nel-caricamento-delle-chiavi-mcp'),
       )
     } finally {
       setLoadingMcpKeys(false)
@@ -556,7 +567,7 @@ export function UserSettingsDialog({
     e.preventDefault()
     const cleanName = displayName.trim()
     if (!cleanName) {
-      toast.error('Inserisci un nome visualizzato valido')
+      toast.error(t('user-settings-dialog.inserisci-un-nome-visualizzato-valido'))
       return
     }
 
@@ -569,12 +580,12 @@ export function UserSettingsDialog({
         // Better Auth update is best-effort alongside Rust vault record
       }
       onUserUpdated(updated)
-      toast.success('Profilo aggiornato con successo')
+      toast.success(t('user-settings-dialog.profilo-aggiornato-con-successo'))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante il salvataggio del profilo',
+          : t('user-settings-dialog.errore-durante-il-salvataggio-del-profilo'),
       )
     } finally {
       setSavingProfile(false)
@@ -584,15 +595,15 @@ export function UserSettingsDialog({
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!currentPassword) {
-      toast.error('Inserisci la password attuale')
+      toast.error(t('user-settings-dialog.inserisci-la-password-attuale'))
       return
     }
     if (newPassword.length < 8) {
-      toast.error('La nuova password deve avere almeno 8 caratteri')
+      toast.error(t('user-settings-dialog.la-nuova-password-deve-avere-almeno-8-caratteri'))
       return
     }
     if (newPassword !== confirmPassword) {
-      toast.error('La conferma della nuova password non coincide')
+      toast.error(t('user-settings-dialog.la-conferma-della-nuova-password-non-coincide'))
       return
     }
 
@@ -606,20 +617,20 @@ export function UserSettingsDialog({
       if (res.error) {
         toast.error(
           res.error.message ||
-            'Impossibile aggiornare la password. Verifica la password attuale.',
+            t('user-settings-dialog.impossibile-aggiornare-la-password-verifica-la-p'),
         )
         return
       }
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      toast.success('Password aggiornata con successo')
+      toast.success(t('user-settings-dialog.password-aggiornata-con-successo'))
       if (revokeOthersOnPwChange) {
         await loadSessions()
       }
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : 'Errore durante il cambio password',
+        err instanceof Error ? err.message : t('user-settings-dialog.errore-durante-il-cambio-password'),
       )
     } finally {
       setChangingPassword(false)
@@ -631,9 +642,9 @@ export function UserSettingsDialog({
     try {
       await authClient.revokeSession({ token })
       setSessions((prev) => prev.filter((s) => s.token !== token))
-      toast.success('Sessione disconnessa')
+      toast.success(t('user-settings-dialog.sessione-disconnessa'))
     } catch {
-      toast.error('Errore durante la revoca della sessione')
+      toast.error(t('user-settings-dialog.errore-durante-la-revoca-della-sessione'))
     } finally {
       setRevokingToken(null)
     }
@@ -643,7 +654,7 @@ export function UserSettingsDialog({
     e.preventDefault()
     if (!prefUpper && !prefLower && !prefNumbers && !prefSymbols) {
       toast.error(
-        'Seleziona almeno un set di caratteri per il generatore password',
+        t('user-settings-dialog.seleziona-almeno-un-set-di-caratteri-per-il-gene'),
       )
       return
     }
@@ -662,12 +673,12 @@ export function UserSettingsDialog({
       })
       setTheme(updated.theme)
       onSettingsUpdated(updated)
-      toast.success('Preferenze salvate')
+      toast.success(t('user-settings-dialog.preferenze-salvate'))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nel salvataggio delle preferenze',
+          : t('user-settings-dialog.errore-nel-salvataggio-delle-preferenze'),
       )
     } finally {
       setSavingPrefs(false)
@@ -694,12 +705,12 @@ export function UserSettingsDialog({
     e.preventDefault()
     const cleanName = newKeyName.trim()
     if (!cleanName) {
-      toast.error('Inserisci un nome identificativo per la API Key')
+      toast.error(t('user-settings-dialog.inserisci-un-nome-identificativo-per-la-api-key'))
       return
     }
     if (newKeyScopeMode === 'selected' && newKeyVaultIds.length === 0) {
       toast.error(
-        'Seleziona almeno una cartella o scegli "Tutte le cartelle"',
+        t('user-settings-dialog.seleziona-almeno-una-cartella-o-scegli-tutte-le-'),
       )
       return
     }
@@ -719,12 +730,12 @@ export function UserSettingsDialog({
       setNewKeyName('')
       setNewKeyVaultIds([])
       setNewKeyScopeMode('all')
-      toast.success(`API Key "${created.api_key.name}" generata`)
+      toast.success(t('user-settings-dialog.api-key-v0-generata', { v0: created.api_key.name }))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nella generazione della API Key',
+          : t('user-settings-dialog.errore-nella-generazione-della-api-key'),
       )
     } finally {
       setCreatingKey(false)
@@ -741,12 +752,12 @@ export function UserSettingsDialog({
       if (newlyCreatedKey?.api_key.id === target.id) {
         setNewlyCreatedKey(null)
       }
-      toast.success(`API Key "${target.name}" revocata`)
+      toast.success(t('user-settings-dialog.api-key-v0-revocata', { v0: target.name }))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante la revoca della API Key',
+          : t('user-settings-dialog.errore-durante-la-revoca-della-api-key'),
       )
     }
   }
@@ -755,12 +766,12 @@ export function UserSettingsDialog({
     e.preventDefault()
     const cleanName = newMcpKeyName.trim()
     if (!cleanName) {
-      toast.error('Inserisci un nome identificativo per la chiave MCP')
+      toast.error(t('user-settings-dialog.inserisci-un-nome-identificativo-per-la-chiave-m'))
       return
     }
     if (newMcpKeyScopeMode === 'selected' && newMcpKeyVaultIds.length === 0) {
       toast.error(
-        'Seleziona almeno una cartella o scegli "Tutte le cartelle"',
+        t('user-settings-dialog.seleziona-almeno-una-cartella-o-scegli-tutte-le-'),
       )
       return
     }
@@ -782,12 +793,12 @@ export function UserSettingsDialog({
       setNewMcpKeyName('')
       setNewMcpKeyVaultIds([])
       setNewMcpKeyScopeMode('all')
-      toast.success(`Chiave MCP "${created.mcp_key.name}" generata`)
+      toast.success(t('user-settings-dialog.chiave-mcp-v0-generata', { v0: created.mcp_key.name }))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nella generazione della chiave MCP',
+          : t('user-settings-dialog.errore-nella-generazione-della-chiave-mcp'),
       )
     } finally {
       setCreatingMcpKey(false)
@@ -804,12 +815,12 @@ export function UserSettingsDialog({
       if (newlyCreatedMcpKey?.mcp_key.id === target.id) {
         setNewlyCreatedMcpKey(null)
       }
-      toast.success(`Chiave MCP "${target.name}" revocata`)
+      toast.success(t('user-settings-dialog.chiave-mcp-v0-revocata', { v0: target.name }))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante la revoca della chiave MCP',
+          : t('user-settings-dialog.errore-durante-la-revoca-della-chiave-mcp'),
       )
     }
   }
@@ -824,7 +835,7 @@ export function UserSettingsDialog({
       setTimeout(() => onFlag?.(false), 2000)
       toast.success(`${label} copiato negli appunti`)
     } else {
-      toast.error('Impossibile copiare negli appunti')
+      toast.error(t('user-settings-dialog.impossibile-copiare-negli-appunti'))
     }
   }
 
@@ -850,12 +861,9 @@ export function UserSettingsDialog({
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="size-5 text-primary" />
-              Impostazioni Utente, API Key & Server MCP
-            </DialogTitle>
+              {t('user-settings-dialog.impostazioni-utente-api-key-server-mcp')}</DialogTitle>
             <DialogDescription>
-              Gestisci il tuo profilo, la sicurezza dell'account, le preferenze
-              del vault, le API Key personali e le chiavi del Server MCP.
-            </DialogDescription>
+              {t('user-settings-dialog.gestisci-il-tuo-profilo-la-sicurezza-dell-accoun')}</DialogDescription>
           </DialogHeader>
 
           <Tabs
@@ -875,28 +883,28 @@ export function UserSettingsDialog({
                 className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
               >
                 <UserIcon className="size-3.5" />
-                <span>Profilo</span>
+                <span>{t('user-settings-dialog.profilo')}</span>
               </TabsTrigger>
               <TabsTrigger
                 value="security"
                 className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
               >
                 <Shield className="size-3.5" />
-                <span>Sicurezza</span>
+                <span>{t('user-settings-dialog.sicurezza')}</span>
               </TabsTrigger>
               <TabsTrigger
                 value="preferences"
                 className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
               >
                 <Sparkles className="size-3.5" />
-                <span>Preferenze</span>
+                <span>{t('user-settings-dialog.preferenze')}</span>
               </TabsTrigger>
               <TabsTrigger
                 value="api-keys"
                 className="gap-1 px-1.5 text-[11px] sm:gap-1.5 sm:px-2 sm:text-sm"
               >
                 <KeyRound className="size-3.5" />
-                <span>API Key</span>
+                <span>{t('user-settings-dialog.api-key')}</span>
               </TabsTrigger>
               <TabsTrigger
                 value="mcp"
@@ -926,8 +934,7 @@ export function UserSettingsDialog({
                         {user.name}
                       </h3>
                       <Badge variant="secondary" className="text-[11px]">
-                        Account Attivo
-                      </Badge>
+                        {t('user-settings-dialog.account-attivo')}</Badge>
                     </div>
                     <p className="truncate text-sm text-muted-foreground">
                       {user.email}
@@ -941,9 +948,9 @@ export function UserSettingsDialog({
                         variant="ghost"
                         size="icon-xs"
                         onClick={() =>
-                          copyText(user.id, 'ID Utente', setCopiedUserId)
+                          copyText(user.id, t('user-settings-dialog.id-utente'), setCopiedUserId)
                         }
-                        title="Copia ID utente"
+                        title={t('user-settings-dialog.copia-id-utente')}
                       >
                         {copiedUserId ? (
                           <Check className="size-3 text-emerald-500" />
@@ -958,24 +965,21 @@ export function UserSettingsDialog({
                 <form onSubmit={handleSaveProfile} className="space-y-4">
                   <div className="space-y-1.5">
                     <Label htmlFor="settings-display-name">
-                      Nome visualizzato
-                    </Label>
+                      {t('user-settings-dialog.nome-visualizzato')}</Label>
                     <Input
                       id="settings-display-name"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      placeholder="Il tuo nome o nickname"
+                      placeholder={t('user-settings-dialog.il-tuo-nome-o-nickname')}
                       maxLength={80}
                       required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Questo nome è visibile ai membri con cui condividi le
-                      cartelle e nei registri attività (Audit Log).
-                    </p>
+                      {t('user-settings-dialog.questo-nome-e-visibile-ai-membri-con-cui-condivi')}</p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="settings-email">Indirizzo Email</Label>
+                    <Label htmlFor="settings-email">{t('user-settings-dialog.indirizzo-email')}</Label>
                     <Input
                       id="settings-email"
                       value={user.email}
@@ -983,14 +987,12 @@ export function UserSettingsDialog({
                       className="bg-muted/50 text-muted-foreground"
                     />
                     <p className="text-xs text-muted-foreground">
-                      L'email viene utilizzata per il login e per gli inviti
-                      alle cartelle condivise.
-                    </p>
+                      {t('user-settings-dialog.l-email-viene-utilizzata-per-il-login-e-per-gli-')}</p>
                   </div>
 
                   <div className="flex justify-end pt-2">
                     <Button type="submit" disabled={savingProfile}>
-                      {savingProfile ? 'Salvataggio...' : 'Salva profilo'}
+                      {savingProfile ? 'Salvataggio...' : t('user-settings-dialog.salva-profilo')}
                     </Button>
                   </div>
                 </form>
@@ -1002,22 +1004,20 @@ export function UserSettingsDialog({
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
                       <Lock className="size-4 text-primary" />
-                      Cambio Password
-                    </h3>
+                      {t('user-settings-dialog.cambio-password')}</h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      Aggiorna la password del tuo account locale Starward.
-                    </p>
+                      {t('user-settings-dialog.aggiorna-la-password-del-tuo-account-locale-star')}</p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="current-password">Password attuale</Label>
+                    <Label htmlFor="current-password">{t('user-settings-dialog.password-attuale')}</Label>
                     <div className="relative">
                       <Input
                         id="current-password"
-                        type={showCurrentPw ? 'text' : 'password'}
+                        type={showCurrentPw ? 'text' : t('user-settings-dialog.password')}
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Inserisci la password attuale"
+                        placeholder={t('user-settings-dialog.inserisci-la-password-attuale')}
                         className="pr-10"
                         required
                       />
@@ -1040,14 +1040,14 @@ export function UserSettingsDialog({
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label htmlFor="new-password">Nuova password</Label>
+                      <Label htmlFor="new-password">{t('user-settings-dialog.nuova-password')}</Label>
                       <div className="relative">
                         <Input
                           id="new-password"
-                          type={showNewPw ? 'text' : 'password'}
+                          type={showNewPw ? 'text' : t('user-settings-dialog.password')}
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Minimo 8 caratteri"
+                          placeholder={t('user-settings-dialog.minimo-8-caratteri')}
                           className="pr-10"
                           required
                         />
@@ -1070,14 +1070,13 @@ export function UserSettingsDialog({
 
                     <div className="space-y-1.5">
                       <Label htmlFor="confirm-password">
-                        Conferma nuova password
-                      </Label>
+                        {t('user-settings-dialog.conferma-nuova-password')}</Label>
                       <Input
                         id="confirm-password"
-                        type={showNewPw ? 'text' : 'password'}
+                        type={showNewPw ? 'text' : t('user-settings-dialog.password')}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Ripeti la nuova password"
+                        placeholder={t('user-settings-dialog.ripeti-la-nuova-password')}
                         required
                       />
                     </div>
@@ -1090,15 +1089,14 @@ export function UserSettingsDialog({
                         className="h-1.5 flex-1"
                       />
                       <span className="text-xs font-medium text-muted-foreground">
-                        Robustezza: {newPwStrength.label}
+                        {t('user-settings-dialog.robustezza-colon')} {newPwStrength.label}
                       </span>
                     </div>
                   )}
 
                   <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2 text-xs">
                     <span>
-                      Disconnetti automaticamente tutte le altre sessioni attive
-                    </span>
+                      {t('user-settings-dialog.disconnetti-automaticamente-tutte-le-altre-sessi')}</span>
                     <Switch
                       checked={revokeOthersOnPwChange}
                       onCheckedChange={setRevokeOthersOnPwChange}
@@ -1109,7 +1107,7 @@ export function UserSettingsDialog({
                     <Button type="submit" size="sm" disabled={changingPassword}>
                       {changingPassword
                         ? 'Aggiornamento...'
-                        : 'Aggiorna password'}
+                        : t('user-settings-dialog.aggiorna-password')}
                     </Button>
                   </div>
                 </form>
@@ -1121,12 +1119,9 @@ export function UserSettingsDialog({
                     <div>
                       <h3 className="flex items-center gap-2 text-sm font-semibold">
                         <Laptop className="size-4 text-primary" />
-                        Sessioni Attive
-                      </h3>
+                        {t('user-settings-dialog.sessioni-attive')}</h3>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Dispositivi e browser attualmente collegati al tuo
-                        account.
-                      </p>
+                        {t('user-settings-dialog.dispositivi-e-browser-attualmente-collegati-al-t')}</p>
                     </div>
                     <Button
                       type="button"
@@ -1141,15 +1136,14 @@ export function UserSettingsDialog({
                           loadingSessions && 'animate-spin',
                         )}
                       />
-                      Aggiorna
-                    </Button>
+                      {t('user-settings-dialog.aggiorna')}</Button>
                   </div>
 
                   {sessions.length === 0 ? (
                     <p className="rounded-lg border bg-muted/20 py-4 text-center text-xs text-muted-foreground">
                       {loadingSessions
-                        ? 'Caricamento sessioni...'
-                        : 'Sessione corrente attiva.'}
+                        ? t('user-settings-dialog.caricamento-sessioni')
+                        : t('user-settings-dialog.sessione-corrente-attiva')}
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -1170,14 +1164,13 @@ export function UserSettingsDialog({
                                     variant="secondary"
                                     className="text-[10px]"
                                   >
-                                    Sessione corrente
-                                  </Badge>
+                                    {t('user-settings-dialog.sessione-corrente')}</Badge>
                                 )}
                               </div>
                               <p className="text-muted-foreground">
                                 {s.ipAddress ? `IP: ${s.ipAddress} · ` : ''}
                                 {s.createdAt
-                                  ? `Avviata ${formatRelativeDate(String(s.createdAt))}`
+                                  ? t('user-settings-dialog.avviata-v0', { v0: formatRelativeDate(String(s.createdAt)) })
                                   : 'Attiva'}
                               </p>
                             </div>
@@ -1190,8 +1183,7 @@ export function UserSettingsDialog({
                                 disabled={revokingToken === s.token}
                                 onClick={() => handleRevokeSession(s.token)}
                               >
-                                Disconnetti
-                              </Button>
+                                {t('user-settings-dialog.disconnetti')}</Button>
                             )}
                           </div>
                         )
@@ -1205,7 +1197,7 @@ export function UserSettingsDialog({
               <TabsContent value="preferences" className="mt-0 min-w-0">
                 <form onSubmit={handleSavePreferences} className="space-y-5">
                   <div className="space-y-2">
-                    <Label>Tema Interfaccia</Label>
+                    <Label>{t('user-settings-dialog.tema-interfaccia')}</Label>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                       <button
                         type="button"
@@ -1220,10 +1212,9 @@ export function UserSettingsDialog({
                       >
                         <Moon className="size-4 shrink-0 text-foreground" />
                         <div>
-                          <div>Tema Scuro</div>
+                          <div>{t('user-settings-dialog.tema-scuro')}</div>
                           <div className="text-xs font-normal text-muted-foreground">
-                            Bassa luminosità
-                          </div>
+                            {t('user-settings-dialog.bassa-luminosita')}</div>
                         </div>
                       </button>
 
@@ -1240,10 +1231,9 @@ export function UserSettingsDialog({
                       >
                         <Sun className="size-4 shrink-0 text-amber-500" />
                         <div>
-                          <div>Tema Chiaro</div>
+                          <div>{t('user-settings-dialog.tema-chiaro')}</div>
                           <div className="text-xs font-normal text-muted-foreground">
-                            Contrasto elevato
-                          </div>
+                            {t('user-settings-dialog.contrasto-elevato')}</div>
                         </div>
                       </button>
 
@@ -1265,42 +1255,67 @@ export function UserSettingsDialog({
                           <span className="size-2 rounded-full bg-[#ff9c00]" />
                         </span>
                         <div>
-                          <div>Sync Security</div>
+                          <div>{t('user-settings-dialog.sync-security')}</div>
                           <div className="text-xs font-normal text-muted-foreground">
-                            Stile syncsecurity.it
-                          </div>
+                            {t('user-settings-dialog.stile-syncsecurity-it')}</div>
                         </div>
                       </button>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
+                    <Label htmlFor="pref-language">{t('common.language')}</Label>
+                    <Select
+                      value={languagePref}
+                      onValueChange={(v) =>
+                        handleLanguageChange(v as LanguagePreference)
+                      }
+                    >
+                      <SelectTrigger id="pref-language" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">
+                          {t('common.languageAuto')}
+                        </SelectItem>
+                        <SelectItem value="it">
+                          {t('common.languageItalian')}
+                        </SelectItem>
+                        <SelectItem value="en">
+                          {t('common.languageEnglish')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t('common.languageAutoHint')}
+                    </p>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-1.5">
                     <Label htmlFor="pref-default-vault">
-                      Cartella predefinita per nuove credenziali
-                    </Label>
+                      {t('user-settings-dialog.cartella-predefinita-per-nuove-credenziali')}</Label>
                     <Select
                       value={prefDefaultVaultId}
                       onValueChange={setPrefDefaultVaultId}
                     >
                       <SelectTrigger id="pref-default-vault" className="w-full">
-                        <SelectValue placeholder="Seleziona cartella predefinita" />
+                        <SelectValue placeholder={t('user-settings-dialog.seleziona-cartella-predefinita')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={AUTO_DEFAULT_VAULT}>
-                          Automatica (cartella attualmente aperta)
-                        </SelectItem>
+                          {t('user-settings-dialog.automatica-cartella-attualmente-aperta')}</SelectItem>
                         {writableVaults.map((v) => (
                           <SelectItem key={v.id} value={v.id}>
                             {v.name}
-                            {v.is_personal ? ' (Personale)' : ''}
+                            {v.is_personal ? t('user-settings-dialog.personale') : ''}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
-                      Usata quando premi "Nuova credenziale" dalla vista
-                      generale o dai Preferiti.
-                    </p>
+                      {t('user-settings-dialog.usata-quando-premi-nuova-credenziale-dalla-vista')}</p>
                   </div>
 
                   <Separator />
@@ -1308,22 +1323,17 @@ export function UserSettingsDialog({
                   <div className="space-y-3">
                     <div>
                       <h3 className="text-sm font-semibold">
-                        Valori predefiniti Generatore Password
-                      </h3>
+                        {t('user-settings-dialog.valori-predefiniti-generatore-password')}</h3>
                       <p className="text-xs text-muted-foreground">
-                        Personalizza lunghezza e set di caratteri predefiniti
-                        quando generi nuove password o secret.
-                      </p>
+                        {t('user-settings-dialog.personalizza-lunghezza-e-set-di-caratteri-predef')}</p>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs">
                         <Label htmlFor="pref-pw-len">
-                          Lunghezza predefinita
-                        </Label>
+                          {t('user-settings-dialog.lunghezza-predefinita')}</Label>
                         <span className="font-mono text-sm font-semibold">
-                          {prefLength} caratteri
-                        </span>
+                          {prefLength} {t('user-settings-dialog.caratteri')}</span>
                       </div>
                       <Slider
                         id="pref-pw-len"
@@ -1337,28 +1347,28 @@ export function UserSettingsDialog({
 
                     <div className="grid grid-cols-2 gap-2.5 text-xs">
                       <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-                        <span>Lettere maiuscole (A-Z)</span>
+                        <span>{t('user-settings-dialog.lettere-maiuscole-a-z')}</span>
                         <Switch
                           checked={prefUpper}
                           onCheckedChange={setPrefUpper}
                         />
                       </label>
                       <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-                        <span>Lettere minuscole (a-z)</span>
+                        <span>{t('user-settings-dialog.lettere-minuscole-a-z')}</span>
                         <Switch
                           checked={prefLower}
                           onCheckedChange={setPrefLower}
                         />
                       </label>
                       <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-                        <span>Numeri (0-9)</span>
+                        <span>{t('user-settings-dialog.numeri-0-9')}</span>
                         <Switch
                           checked={prefNumbers}
                           onCheckedChange={setPrefNumbers}
                         />
                       </label>
                       <label className="flex cursor-pointer items-center justify-between rounded-lg border px-3 py-2">
-                        <span>Simboli (!@#$)</span>
+                        <span>{t('user-settings-dialog.simboli')}</span>
                         <Switch
                           checked={prefSymbols}
                           onCheckedChange={setPrefSymbols}
@@ -1369,8 +1379,7 @@ export function UserSettingsDialog({
                     <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2">
                       <div className="min-w-0">
                         <span className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                          Anteprima password generata
-                        </span>
+                          {t('user-settings-dialog.anteprima-password-generata')}</span>
                         <span className="block truncate font-mono text-xs">
                           {previewPassword}
                         </span>
@@ -1380,7 +1389,7 @@ export function UserSettingsDialog({
                         variant="ghost"
                         size="icon-xs"
                         onClick={() => setPreviewSeed((s) => s + 1)}
-                        title="Rigenera anteprima"
+                        title={t('user-settings-dialog.rigenera-anteprima')}
                       >
                         <RefreshCw className="size-3.5" />
                       </Button>
@@ -1389,7 +1398,7 @@ export function UserSettingsDialog({
 
                   <div className="flex justify-end pt-2">
                     <Button type="submit" disabled={savingPrefs}>
-                      {savingPrefs ? 'Salvataggio...' : 'Salva preferenze'}
+                      {savingPrefs ? 'Salvataggio...' : t('user-settings-dialog.salva-preferenze')}
                     </Button>
                   </div>
                 </form>
@@ -1403,7 +1412,7 @@ export function UserSettingsDialog({
                       <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                         <AlertTriangle className="size-4 shrink-0" />
                         <span>
-                          Copia subito la tua nuova API Key "{newlyCreatedKey.api_key.name}"
+                          {t('user-settings-dialog.copia-subito-la-tua-nuova-api-key')}{newlyCreatedKey.api_key.name}"
                         </span>
                       </div>
                       <Button
@@ -1412,16 +1421,13 @@ export function UserSettingsDialog({
                         size="xs"
                         onClick={() => setNewlyCreatedKey(null)}
                       >
-                        Chiudi
-                      </Button>
+                        {t('user-settings-dialog.chiudi')}</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Per motivi di sicurezza il token completo viene mostrato{' '}
+                      {t('user-settings-dialog.per-motivi-di-sicurezza-il-token-completo-viene-')}{' '}
                       <strong className="text-foreground">
-                        una sola volta
-                      </strong>{' '}
-                      ed è salvato sul server esclusivamente come hash SHA-256.
-                    </p>
+                        {t('user-settings-dialog.una-sola-volta')}</strong>{' '}
+                      {t('user-settings-dialog.ed-e-salvato-sul-server-esclusivamente-come-hash')}</p>
                     <div className="flex items-center gap-2">
                       <code className="flex-1 rounded-lg border bg-background px-3 py-2 font-mono text-xs break-all select-all">
                         {newlyCreatedKey.secret_key}
@@ -1432,7 +1438,7 @@ export function UserSettingsDialog({
                         onClick={() =>
                           copyText(
                             newlyCreatedKey.secret_key,
-                            'API Key',
+                            t('user-settings-dialog.api-key'),
                             setCopiedSecretKey,
                           )
                         }
@@ -1440,13 +1446,11 @@ export function UserSettingsDialog({
                         {copiedSecretKey ? (
                           <>
                             <Check className="size-3.5" />
-                            Copiata
-                          </>
+                            {t('user-settings-dialog.copiata')}</>
                         ) : (
                           <>
                             <Copy className="size-3.5" />
-                            Copia
-                          </>
+                            {t('user-settings-dialog.copia')}</>
                         )}
                       </Button>
                     </div>
@@ -1459,17 +1463,15 @@ export function UserSettingsDialog({
                 >
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <Plus className="size-4 text-primary" />
-                    Genera nuova API Key
-                  </div>
+                    {t('user-settings-dialog.genera-nuova-api-key')}</div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="api-key-name" className="text-xs">
-                        Nome identificativo
-                      </Label>
+                        {t('user-settings-dialog.nome-identificativo')}</Label>
                       <Input
                         id="api-key-name"
-                        placeholder="es. CI/CD GitHub, CLI..."
+                        placeholder={t('user-settings-dialog.es-ci-cd-github-cli')}
                         value={newKeyName}
                         onChange={(e) => setNewKeyName(e.target.value)}
                         maxLength={80}
@@ -1479,8 +1481,7 @@ export function UserSettingsDialog({
 
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="api-key-perm" className="text-xs">
-                        Permessi
-                      </Label>
+                        {t('user-settings-dialog.permessi')}</Label>
                       <Select
                         value={newKeyPermission}
                         onValueChange={(v) =>
@@ -1492,19 +1493,16 @@ export function UserSettingsDialog({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="read">
-                            Sola lettura (Read)
-                          </SelectItem>
+                            {t('user-settings-dialog.sola-lettura-read')}</SelectItem>
                           <SelectItem value="read_write">
-                            Lettura e scrittura
-                          </SelectItem>
+                            {t('user-settings-dialog.lettura-e-scrittura')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="api-key-exp" className="text-xs">
-                        Scadenza
-                      </Label>
+                        {t('user-settings-dialog.scadenza')}</Label>
                       <Select
                         value={newKeyExpiry}
                         onValueChange={setNewKeyExpiry}
@@ -1513,12 +1511,11 @@ export function UserSettingsDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="30">30 giorni</SelectItem>
-                          <SelectItem value="90">90 giorni</SelectItem>
-                          <SelectItem value="365">1 anno</SelectItem>
+                          <SelectItem value="30">{t('user-settings-dialog.30-giorni')}</SelectItem>
+                          <SelectItem value="90">{t('user-settings-dialog.90-giorni')}</SelectItem>
+                          <SelectItem value="365">{t('user-settings-dialog.1-anno')}</SelectItem>
                           <SelectItem value="never">
-                            Nessuna scadenza
-                          </SelectItem>
+                            {t('user-settings-dialog.nessuna-scadenza')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1535,7 +1532,7 @@ export function UserSettingsDialog({
                   <div className="flex justify-end">
                     <Button type="submit" size="sm" disabled={creatingKey}>
                       <KeyRound className="size-3.5" />
-                      {creatingKey ? 'Generazione...' : 'Genera API Key'}
+                      {creatingKey ? 'Generazione...' : t('user-settings-dialog.genera-api-key')}
                     </Button>
                   </div>
                 </form>
@@ -1544,24 +1541,20 @@ export function UserSettingsDialog({
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Le tue API Key ({apiKeys.length})
+                      {t('user-settings-dialog.le-tue-api-key')}{apiKeys.length})
                     </h4>
                   </div>
 
                   {loadingApiKeys ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
-                      Caricamento API Key...
-                    </p>
+                      {t('user-settings-dialog.caricamento-api-key')}</p>
                   ) : apiKeys.length === 0 ? (
                     <div className="rounded-xl border border-dashed py-8 text-center">
                       <KeyRound className="mx-auto size-7 text-muted-foreground/60" />
                       <p className="mt-2 text-sm font-medium">
-                        Nessuna API Key attiva
-                      </p>
+                        {t('user-settings-dialog.nessuna-api-key-attiva')}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Genera una chiave sopra per accedere alle API REST di
-                        Starward da script, CLI o pipeline CI/CD.
-                      </p>
+                        {t('user-settings-dialog.genera-una-chiave-sopra-per-accedere-alle-api-re')}</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1582,38 +1575,34 @@ export function UserSettingsDialog({
                   <div className="flex items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 text-xs font-semibold">
                       <Terminal className="size-3.5 text-primary" />
-                      Esempio utilizzo API REST
-                    </span>
+                      {t('user-settings-dialog.esempio-utilizzo-api-rest')}</span>
                     <Button
                       type="button"
                       variant="ghost"
                       size="xs"
                       onClick={() =>
-                        copyText(curlExample, 'Comando cURL', setCopiedCurl)
+                        copyText(curlExample, t('user-settings-dialog.comando-curl'), setCopiedCurl)
                       }
                     >
                       {copiedCurl ? (
                         <>
                           <Check className="size-3 text-emerald-500" />
-                          Copiato
-                        </>
+                          {t('user-settings-dialog.copiato')}</>
                       ) : (
                         <>
                           <Copy className="size-3" />
-                          Copia cURL
-                        </>
+                          {t('user-settings-dialog.copia-curl')}</>
                       )}
                     </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Puoi autenticare qualsiasi chiamata a{' '}
+                    {t('user-settings-dialog.puoi-autenticare-qualsiasi-chiamata-a')}{' '}
                     <code className="font-mono">/api/v1/vaults</code> o{' '}
                     <code className="font-mono">/api/v1/credentials</code>{' '}
-                    passando l'header{' '}
+                    {t('user-settings-dialog.passando-l-header')}{' '}
                     <code className="font-mono">
-                      Authorization: Bearer sw_live_...
-                    </code>{' '}
-                    oppure <code className="font-mono">X-API-Key</code>:
+                      {t('user-settings-dialog.authorization-bearer-sw-live')}</code>{' '}
+                    {t('user-settings-dialog.oppure')} <code className="font-mono">X-API-Key</code>:
                   </p>
                   <pre className="overflow-x-auto rounded-lg border bg-background p-2.5 font-mono text-[11px] leading-relaxed">
                     {curlExample}
@@ -1629,7 +1618,7 @@ export function UserSettingsDialog({
                       <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                         <AlertTriangle className="size-4 shrink-0" />
                         <span>
-                          Copia subito la tua nuova chiave MCP "{newlyCreatedMcpKey.mcp_key.name}"
+                          {t('user-settings-dialog.copia-subito-la-tua-nuova-chiave-mcp')}{newlyCreatedMcpKey.mcp_key.name}"
                         </span>
                       </div>
                       <Button
@@ -1638,16 +1627,13 @@ export function UserSettingsDialog({
                         size="xs"
                         onClick={() => setNewlyCreatedMcpKey(null)}
                       >
-                        Chiudi
-                      </Button>
+                        {t('user-settings-dialog.chiudi')}</Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Per motivi di sicurezza il token completo viene mostrato{' '}
+                      {t('user-settings-dialog.per-motivi-di-sicurezza-il-token-completo-viene-')}{' '}
                       <strong className="text-foreground">
-                        una sola volta
-                      </strong>{' '}
-                      ed è salvato sul server esclusivamente come hash SHA-256.
-                    </p>
+                        {t('user-settings-dialog.una-sola-volta')}</strong>{' '}
+                      {t('user-settings-dialog.ed-e-salvato-sul-server-esclusivamente-come-hash')}</p>
                     <div className="flex items-center gap-2">
                       <code className="flex-1 rounded-lg border bg-background px-3 py-2 font-mono text-xs break-all select-all">
                         {newlyCreatedMcpKey.secret_key}
@@ -1658,7 +1644,7 @@ export function UserSettingsDialog({
                         onClick={() =>
                           copyText(
                             newlyCreatedMcpKey.secret_key,
-                            'Chiave MCP',
+                            t('user-settings-dialog.chiave-mcp'),
                             setCopiedMcpSecretKey,
                           )
                         }
@@ -1666,13 +1652,11 @@ export function UserSettingsDialog({
                         {copiedMcpSecretKey ? (
                           <>
                             <Check className="size-3.5" />
-                            Copiata
-                          </>
+                            {t('user-settings-dialog.copiata')}</>
                         ) : (
                           <>
                             <Copy className="size-3.5" />
-                            Copia
-                          </>
+                            {t('user-settings-dialog.copia')}</>
                         )}
                       </Button>
                     </div>
@@ -1685,17 +1669,15 @@ export function UserSettingsDialog({
                 >
                   <div className="flex items-center gap-2 text-sm font-semibold">
                     <Plus className="size-4 text-primary" />
-                    Genera nuova chiave MCP
-                  </div>
+                    {t('user-settings-dialog.genera-nuova-chiave-mcp')}</div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="mcp-key-name" className="text-xs">
-                        Nome client / chiave
-                      </Label>
+                        {t('user-settings-dialog.nome-client-chiave')}</Label>
                       <Input
                         id="mcp-key-name"
-                        placeholder="es. Claude Code, Cursor, Antigravity..."
+                        placeholder={t('user-settings-dialog.es-claude-code-cursor-antigravity')}
                         value={newMcpKeyName}
                         onChange={(e) => setNewMcpKeyName(e.target.value)}
                         maxLength={80}
@@ -1705,8 +1687,7 @@ export function UserSettingsDialog({
 
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="mcp-key-perm" className="text-xs">
-                        Permessi
-                      </Label>
+                        {t('user-settings-dialog.permessi')}</Label>
                       <Select
                         value={newMcpKeyPermission}
                         onValueChange={(v) =>
@@ -1718,19 +1699,16 @@ export function UserSettingsDialog({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="read">
-                            Sola lettura (Read)
-                          </SelectItem>
+                            {t('user-settings-dialog.sola-lettura-read')}</SelectItem>
                           <SelectItem value="read_write">
-                            Lettura e scrittura
-                          </SelectItem>
+                            {t('user-settings-dialog.lettura-e-scrittura')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="space-y-1.5 sm:col-span-1">
                       <Label htmlFor="mcp-key-exp" className="text-xs">
-                        Scadenza
-                      </Label>
+                        {t('user-settings-dialog.scadenza')}</Label>
                       <Select
                         value={newMcpKeyExpiry}
                         onValueChange={setNewMcpKeyExpiry}
@@ -1739,12 +1717,11 @@ export function UserSettingsDialog({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="30">30 giorni</SelectItem>
-                          <SelectItem value="90">90 giorni</SelectItem>
-                          <SelectItem value="365">1 anno</SelectItem>
+                          <SelectItem value="30">{t('user-settings-dialog.30-giorni')}</SelectItem>
+                          <SelectItem value="90">{t('user-settings-dialog.90-giorni')}</SelectItem>
+                          <SelectItem value="365">{t('user-settings-dialog.1-anno')}</SelectItem>
                           <SelectItem value="never">
-                            Nessuna scadenza
-                          </SelectItem>
+                            {t('user-settings-dialog.nessuna-scadenza')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1761,7 +1738,7 @@ export function UserSettingsDialog({
                   <div className="flex justify-end">
                     <Button type="submit" size="sm" disabled={creatingMcpKey}>
                       <Plug className="size-3.5" />
-                      {creatingMcpKey ? 'Generazione...' : 'Genera chiave MCP'}
+                      {creatingMcpKey ? 'Generazione...' : t('user-settings-dialog.genera-chiave-mcp')}
                     </Button>
                   </div>
                 </form>
@@ -1770,25 +1747,20 @@ export function UserSettingsDialog({
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Le tue chiavi MCP ({mcpKeys.length})
+                      {t('user-settings-dialog.le-tue-chiavi-mcp')}{mcpKeys.length})
                     </h4>
                   </div>
 
                   {loadingMcpKeys ? (
                     <p className="py-6 text-center text-xs text-muted-foreground">
-                      Caricamento chiavi MCP...
-                    </p>
+                      {t('user-settings-dialog.caricamento-chiavi-mcp')}</p>
                   ) : mcpKeys.length === 0 ? (
                     <div className="rounded-xl border border-dashed py-8 text-center">
                       <Plug className="mx-auto size-7 text-muted-foreground/60" />
                       <p className="mt-2 text-sm font-medium">
-                        Nessuna chiave MCP attiva
-                      </p>
+                        {t('user-settings-dialog.nessuna-chiave-mcp-attiva')}</p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Genera una chiave MCP dedicata (sw_mcp_...) per
-                        collegare assistenti AI e IDE compatibili con Model
-                        Context Protocol.
-                      </p>
+                        {t('user-settings-dialog.genera-una-chiave-mcp-dedicata-sw-mcp-per-colleg')}</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1809,8 +1781,7 @@ export function UserSettingsDialog({
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex items-center gap-1.5 text-xs font-semibold">
                       <Terminal className="size-3.5 text-primary" />
-                      Configurazione Client MCP (Streamable HTTP)
-                    </span>
+                      {t('user-settings-dialog.configurazione-client-mcp-streamable-http')}</span>
                     <Button
                       type="button"
                       variant="ghost"
@@ -1818,7 +1789,7 @@ export function UserSettingsDialog({
                       onClick={() =>
                         copyText(
                           mcpConfigSnippet,
-                          'Configurazione MCP',
+                          t('user-settings-dialog.configurazione-mcp'),
                           setCopiedMcpConfig,
                         )
                       }
@@ -1826,13 +1797,11 @@ export function UserSettingsDialog({
                       {copiedMcpConfig ? (
                         <>
                           <Check className="size-3 text-emerald-500" />
-                          Copiata
-                        </>
+                          {t('user-settings-dialog.copiata')}</>
                       ) : (
                         <>
                           <Copy className="size-3" />
-                          Copia config
-                        </>
+                          {t('user-settings-dialog.copia-config')}</>
                       )}
                     </Button>
                   </div>
@@ -1851,7 +1820,7 @@ export function UserSettingsDialog({
                       onClick={() =>
                         copyText(
                           mcpEndpoint,
-                          'Endpoint MCP',
+                          t('user-settings-dialog.endpoint-mcp'),
                           setCopiedMcpEndpoint,
                         )
                       }
@@ -1861,16 +1830,15 @@ export function UserSettingsDialog({
                       ) : (
                         <Copy className="size-3" />
                       )}
-                      Copia URL
-                    </Button>
+                      {t('user-settings-dialog.copia-url')}</Button>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-background p-0.5 text-xs">
                     {(
                       [
-                        { id: 'json', label: 'JSON (mcpServers)' },
+                        { id: 'json', label: t('user-settings-dialog.json-mcpservers') },
                         { id: 'claude-code', label: 'Claude Code' },
-                        { id: 'vscode', label: 'VS Code' },
+                        { id: 'vscode', label: t('user-settings-dialog.vs-code') },
                       ] as const
                     ).map((opt) => (
                       <button
@@ -1894,15 +1862,11 @@ export function UserSettingsDialog({
                   </pre>
 
                   <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    <strong className="text-foreground">Isolamento & Sicurezza:</strong>{' '}
-                    le chiavi MCP (<code className="font-mono">sw_mcp_...</code>)
-                    funzionano solo su <code className="font-mono">/api/mcp</code>{' '}
-                    (le chiavi REST <code className="font-mono">sw_live_...</code>{' '}
-                    vengono rifiutate). Liste e risorse espongono solo metadati;
-                    la decifratura avviene on-demand su{' '}
-                    <code className="font-mono">get_credential</code> con
-                    registrazione nell'Audit Log.
-                  </p>
+                    <strong className="text-foreground">{t('user-settings-dialog.isolamento-sicurezza')}</strong>{' '}
+                    {t('user-settings-dialog.le-chiavi-mcp')}<code className="font-mono">sw_mcp_...</code>{t('user-settings-dialog.funzionano-solo-su')} <code className="font-mono">/api/mcp</code>{' '}
+                    {t('user-settings-dialog.le-chiavi-rest')} <code className="font-mono">sw_live_...</code>{' '}
+                    {t('user-settings-dialog.vengono-rifiutate-liste-e-risorse-espongono-solo')}{' '}
+                    <code className="font-mono">get_credential</code> {t('user-settings-dialog.con-registrazione-nell-audit-log')}</p>
                 </div>
               </TabsContent>
               </div>
@@ -1924,25 +1888,22 @@ export function UserSettingsDialog({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revocare questa API Key?</AlertDialogTitle>
+            <AlertDialogTitle>{t('user-settings-dialog.revocare-questa-api-key')}</AlertDialogTitle>
             <AlertDialogDescription>
-              La chiave{' '}
+              {t('user-settings-dialog.la-chiave')}{' '}
               <strong className="text-foreground">
                 "{pendingRevokeKey?.name}"
               </strong>{' '}
               (<code className="font-mono">{pendingRevokeKey?.key_prefix}</code>
-              ) verrà disattivata immediatamente. Qualsiasi script o
-              integrazione che la utilizza perderà l'accesso.
-            </AlertDialogDescription>
+              {t('user-settings-dialog.verra-disattivata-immediatamente-qualsiasi-scrip')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('user-settings-dialog.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmRevokeApiKey}
             >
-              Revoca definitivamente
-            </AlertDialogAction>
+              {t('user-settings-dialog.revoca-definitivamente')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1956,9 +1917,9 @@ export function UserSettingsDialog({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revocare questa chiave MCP?</AlertDialogTitle>
+            <AlertDialogTitle>{t('user-settings-dialog.revocare-questa-chiave-mcp')}</AlertDialogTitle>
             <AlertDialogDescription>
-              La chiave MCP{' '}
+              {t('user-settings-dialog.la-chiave-mcp')}{' '}
               <strong className="text-foreground">
                 "{pendingRevokeMcpKey?.name}"
               </strong>{' '}
@@ -1966,19 +1927,17 @@ export function UserSettingsDialog({
               <code className="font-mono">
                 {pendingRevokeMcpKey?.key_prefix}
               </code>
-              ) verrà disattivata immediatamente. Il client AI o IDE collegato
-              non potrà più autenticarsi su{' '}
+              {t('user-settings-dialog.verra-disattivata-immediatamente-il-client-ai-o-')}{' '}
               <code className="font-mono">/api/mcp</code>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('user-settings-dialog.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmRevokeMcpKey}
             >
-              Revoca definitivamente
-            </AlertDialogAction>
+              {t('user-settings-dialog.revoca-definitivamente')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

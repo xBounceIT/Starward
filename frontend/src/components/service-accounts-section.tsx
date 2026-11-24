@@ -64,6 +64,7 @@ import {
   formatShortDate,
   getVaultColor,
 } from '@/lib/vault-utils'
+import { t } from '@/lib/i18n'
 
 interface ServiceAccountsSectionProps {
   onAccountsChanged?: (accounts: ServiceAccount[]) => void
@@ -135,7 +136,7 @@ export function ServiceAccountsSection({
         toast.error(
           err instanceof Error
             ? err.message
-            : 'Errore nel caricamento dei Service Account',
+            : t('service-accounts-section.errore-nel-caricamento-dei-service-account'),
         )
       } finally {
         setLoading(false)
@@ -224,14 +225,14 @@ export function ServiceAccountsSection({
       })
       toast.success(
         updated.is_active
-          ? `Service Account "${updated.name}" riattivato`
-          : `Service Account "${updated.name}" disabilitato`,
+          ? t('service-accounts-section.service-account-v0-riattivato', { v0: updated.name })
+          : t('service-accounts-section.service-account-v0-disabilitato', { v0: updated.name }),
       )
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante aggiornamento stato',
+          : t('service-accounts-section.errore-durante-aggiornamento-stato'),
       )
     } finally {
       setBusyAccountId(null)
@@ -243,7 +244,7 @@ export function ServiceAccountsSection({
     if (!keyDialogAccount) return
     const cleanName = newKeyName.trim()
     if (!cleanName) {
-      toast.error('Inserisci un nome per la chiave API')
+      toast.error(t('service-accounts-section.inserisci-un-nome-per-la-chiave-api'))
       return
     }
 
@@ -272,7 +273,7 @@ export function ServiceAccountsSection({
         key: created,
       })
       toast.success(
-        `Nuova chiave API "${created.key.name}" generata per ${keyDialogAccount.name}`,
+        t('service-accounts-section.nuova-chiave-api-v0-generata-per-v1', { v0: created.key.name, v1: keyDialogAccount.name }),
       )
       setKeyDialogAccount(null)
       setNewKeyName('')
@@ -281,7 +282,7 @@ export function ServiceAccountsSection({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore nella generazione della chiave API',
+          : t('service-accounts-section.errore-nella-generazione-della-chiave-api'),
       )
     } finally {
       setCreatingKey(false)
@@ -307,12 +308,12 @@ export function ServiceAccountsSection({
       if (revealedSecret?.key.key.id === key.id) {
         setRevealedSecret(null)
       }
-      toast.success(`Chiave API "${key.name}" revocata`)
+      toast.success(t('service-accounts-section.chiave-api-v0-revocata', { v0: key.name }))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Errore durante la revoca della chiave API',
+          : t('service-accounts-section.errore-durante-la-revoca-della-chiave-api'),
       )
     } finally {
       setBusyAccountId(null)
@@ -334,12 +335,12 @@ export function ServiceAccountsSection({
       if (revealedSecret?.accountName === target.name) {
         setRevealedSecret(null)
       }
-      toast.success(`Service Account "${target.name}" eliminato`)
+      toast.success(t('service-accounts-section.service-account-v0-eliminato', { v0: target.name }))
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Errore durante l'eliminazione del Service Account",
+          : t('service-accounts-section.errore-durante-l-eliminazione-del-service-accoun'),
       )
     } finally {
       setBusyAccountId(null)
@@ -356,7 +357,7 @@ export function ServiceAccountsSection({
       setTimeout(() => onFlag?.(false), 2000)
       toast.success(`${label} copiato negli appunti`)
     } else {
-      toast.error('Impossibile copiare negli appunti')
+      toast.error(t('service-accounts-section.impossibile-copiare-negli-appunti'))
     }
   }
 
@@ -375,7 +376,7 @@ export function ServiceAccountsSection({
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Cerca service account, cartella o credenziale..."
+            placeholder={t('service-accounts-section.cerca-service-account-cartella-o-credenziale')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="h-10 rounded-xl border-border/70 bg-card/50 pr-10 pl-10 text-sm"
@@ -387,7 +388,7 @@ export function ServiceAccountsSection({
               size="icon-xs"
               onClick={() => setSearchQuery('')}
               className="absolute top-1/2 right-2.5 size-6 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              aria-label="Cancella ricerca"
+              aria-label={t('service-accounts-section.cancella-ricerca')}
             >
               <X className="size-3.5" />
             </Button>
@@ -398,9 +399,9 @@ export function ServiceAccountsSection({
           <div className="flex items-center gap-1 rounded-xl border border-border/70 bg-card/50 p-1">
             {(
               [
-                { value: '', label: 'Tutti' },
-                { value: 'active', label: 'Attivi' },
-                { value: 'disabled', label: 'Disabilitati' },
+                { value: '', label: t('service-accounts-section.tutti') },
+                { value: 'active', label: t('service-accounts-section.attivi') },
+                { value: 'disabled', label: t('service-accounts-section.disabilitati') },
               ] as const
             ).map((pill) => {
               const active = statusFilter === pill.value
@@ -433,7 +434,7 @@ export function ServiceAccountsSection({
             <RefreshCw
               className={cn('size-3.5', refreshing && 'animate-spin')}
             />
-            <span className="hidden sm:inline">Aggiorna</span>
+            <span className="hidden sm:inline">{t('service-accounts-section.aggiorna')}</span>
           </Button>
 
           <Button
@@ -443,7 +444,7 @@ export function ServiceAccountsSection({
             className="h-10 gap-1.5 px-4 text-xs font-semibold"
           >
             <Plus className="size-4" />
-            <span>Nuovo Service Account</span>
+            <span>{t('service-accounts-section.nuovo-service-account')}</span>
           </Button>
         </div>
       </div>
@@ -457,7 +458,7 @@ export function ServiceAccountsSection({
                 <div className="flex items-center gap-2 text-sm font-semibold text-emerald-500 dark:text-emerald-400">
                   <AlertTriangle className="size-4 shrink-0" />
                   <span>
-                    Chiave API generata per "{revealedSecret.accountName}" —{' '}
+                    {t('service-accounts-section.chiave-api-generata-per')}{revealedSecret.accountName}" —{' '}
                     {revealedSecret.key.key.name}
                   </span>
                 </div>
@@ -467,15 +468,11 @@ export function ServiceAccountsSection({
                   size="xs"
                   onClick={() => setRevealedSecret(null)}
                 >
-                  Chiudi
-                </Button>
+                  {t('service-accounts-section.chiudi')}</Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Copia e salva subito questa chiave API: per motivi di sicurezza
-                viene mostrata{' '}
-                <strong className="text-foreground">una sola volta</strong> ed
-                è archiviata esclusivamente come hash SHA-256.
-              </p>
+                {t('service-accounts-section.copia-e-salva-subito-questa-chiave-api-per-motiv')}{' '}
+                <strong className="text-foreground">{t('service-accounts-section.una-sola-volta')}</strong> {t('service-accounts-section.ed-e-archiviata-esclusivamente-come-hash-sha-256')}</p>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <code className="flex-1 rounded-lg border bg-background px-3 py-2 font-mono text-xs break-all select-all">
                   {revealedSecret.key.secret_key}
@@ -486,7 +483,7 @@ export function ServiceAccountsSection({
                   onClick={() =>
                     copyText(
                       revealedSecret.key.secret_key,
-                      'Chiave API Service Account',
+                      t('service-accounts-section.chiave-api-service-account'),
                       setCopiedSecret,
                     )
                   }
@@ -494,13 +491,11 @@ export function ServiceAccountsSection({
                   {copiedSecret ? (
                     <>
                       <Check className="size-3.5" />
-                      Copiata
-                    </>
+                      {t('service-accounts-section.copiata')}</>
                   ) : (
                     <>
                       <Copy className="size-3.5" />
-                      Copia chiave
-                    </>
+                      {t('service-accounts-section.copia-chiave')}</>
                   )}
                 </Button>
               </div>
@@ -509,26 +504,23 @@ export function ServiceAccountsSection({
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
                     <Terminal className="size-3.5 text-emerald-400" />
-                    Esempio chiamata API (Authorization Bearer o X-API-Key)
-                  </span>
+                    {t('service-accounts-section.esempio-chiamata-api-authorization-bearer-o-x-ap')}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="xs"
                     onClick={() =>
-                      copyText(revealedCurl, 'Comando cURL', setCopiedCurl)
+                      copyText(revealedCurl, t('service-accounts-section.comando-curl'), setCopiedCurl)
                     }
                   >
                     {copiedCurl ? (
                       <>
                         <Check className="size-3 text-emerald-500" />
-                        Copiato
-                      </>
+                        {t('service-accounts-section.copiato')}</>
                     ) : (
                       <>
                         <Copy className="size-3" />
-                        Copia cURL
-                      </>
+                        {t('service-accounts-section.copia-curl')}</>
                     )}
                   </Button>
                 </div>
@@ -568,13 +560,13 @@ export function ServiceAccountsSection({
               </div>
               <p className="mt-3 text-sm font-semibold">
                 {accounts.length === 0
-                  ? 'Nessun Service Account configurato'
-                  : 'Nessun Service Account corrisponde ai filtri'}
+                  ? t('service-accounts-section.nessun-service-account-configurato')
+                  : t('service-accounts-section.nessun-service-account-corrisponde-ai-filtri')}
               </p>
               <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
                 {accounts.length === 0
-                  ? 'Crea un utente di sistema dedicato per CI/CD, script o microservizi e assegna l’accesso esclusivamente a cartelle e credenziali specifiche tramite chiave API.'
-                  : 'Prova a modificare i criteri di ricerca o il filtro di stato.'}
+                  ? t('service-accounts-section.crea-un-utente-di-sistema-dedicato-per-ci-cd-scr')
+                  : t('service-accounts-section.prova-a-modificare-i-criteri-di-ricerca-o-il-fil')}
               </p>
               {accounts.length === 0 && (
                 <Button
@@ -584,8 +576,7 @@ export function ServiceAccountsSection({
                   className="mt-4 gap-1.5"
                 >
                   <Plus className="size-4" />
-                  Crea il primo Service Account
-                </Button>
+                  {t('service-accounts-section.crea-il-primo-service-account')}</Button>
               )}
             </div>
           ) : (
@@ -626,15 +617,13 @@ export function ServiceAccountsSection({
                                 variant="secondary"
                                 className="border-emerald-500/30 bg-emerald-500/15 px-2 py-0 text-[10px] font-semibold text-emerald-400"
                               >
-                                Attivo
-                              </Badge>
+                                {t('service-accounts-section.attivo')}</Badge>
                             ) : (
                               <Badge
                                 variant="outline"
                                 className="border-amber-500/40 bg-amber-500/10 px-2 py-0 text-[10px] font-semibold text-amber-400"
                               >
-                                Disabilitato
-                              </Badge>
+                                {t('service-accounts-section.disabilitato')}</Badge>
                             )}
                             <Badge
                               variant={
@@ -645,8 +634,8 @@ export function ServiceAccountsSection({
                               className="px-2 py-0 text-[10px]"
                             >
                               {sa.permission === 'read_write'
-                                ? 'Lettura & Scrittura'
-                                : 'Sola lettura'}
+                                ? t('service-accounts-section.lettura-scrittura')
+                                : t('service-accounts-section.sola-lettura')}
                             </Badge>
                           </div>
 
@@ -666,8 +655,8 @@ export function ServiceAccountsSection({
                           className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/50 px-2.5 py-1 text-[11px] text-muted-foreground"
                           title={
                             sa.is_active
-                              ? 'Disabilita Service Account'
-                              : 'Riattiva Service Account'
+                              ? t('service-accounts-section.disabilita-service-account')
+                              : t('service-accounts-section.riattiva-service-account')
                           }
                         >
                           <span>{sa.is_active ? 'Attivo' : 'Sospeso'}</span>
@@ -687,7 +676,7 @@ export function ServiceAccountsSection({
                           className="h-8 gap-1 px-2.5 text-xs"
                         >
                           <Pencil className="size-3.5" />
-                          <span>Modifica scope</span>
+                          <span>{t('service-accounts-section.modifica-scope')}</span>
                         </Button>
 
                         <Button
@@ -703,7 +692,7 @@ export function ServiceAccountsSection({
                           className="h-8 gap-1 px-2.5 text-xs"
                         >
                           <Plus className="size-3.5" />
-                          <span>Chiave API</span>
+                          <span>{t('service-accounts-section.chiave-api')}</span>
                         </Button>
 
                         <Button
@@ -713,8 +702,8 @@ export function ServiceAccountsSection({
                           disabled={isBusy}
                           onClick={() => setPendingDeleteAccount(sa)}
                           className="size-8 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
-                          title={`Elimina ${sa.name}`}
-                          aria-label={`Elimina ${sa.name}`}
+                          title={t('service-accounts-section.elimina-v0', { v0: sa.name })}
+                          aria-label={t('service-accounts-section.elimina-v0', { v0: sa.name })}
                         >
                           <Trash2 className="size-4" />
                         </Button>
@@ -726,12 +715,11 @@ export function ServiceAccountsSection({
                       <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1.5 font-semibold tracking-wider uppercase">
                           <FolderLock className="size-3.5 text-primary sync-security:text-[#ff9c00]" />
-                          Accessi autorizzati
-                        </span>
+                          {t('service-accounts-section.accessi-autorizzati')}</span>
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="flex items-center gap-1">
                             <Calendar className="size-3" />
-                            Creato {formatShortDate(sa.created_at)}
+                            {t('service-accounts-section.creato')} {formatShortDate(sa.created_at)}
                             {sa.created_by_name
                               ? ` da ${sa.created_by_name}`
                               : ''}
@@ -739,17 +727,15 @@ export function ServiceAccountsSection({
                           <span className="flex items-center gap-1">
                             <Clock className="size-3 text-emerald-400" />
                             {sa.last_used_at
-                              ? `Ultimo uso ${formatRelativeDate(sa.last_used_at)}`
-                              : 'Mai utilizzato'}
+                              ? t('service-accounts-section.ultimo-uso-v0-1', { v0: formatRelativeDate(sa.last_used_at) })
+                              : t('service-accounts-section.mai-utilizzato')}
                           </span>
                         </div>
                       </div>
 
                       {sa.vaults.length === 0 && sa.credentials.length === 0 ? (
                         <p className="text-xs text-amber-400">
-                          Nessuna cartella o credenziale assegnata — usa
-                          "Modifica scope" per autorizzare risorse.
-                        </p>
+                          {t('service-accounts-section.nessuna-cartella-o-credenziale-assegnata-usa-mod')}</p>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
                           {sa.vaults.map((v) => {
@@ -765,7 +751,7 @@ export function ServiceAccountsSection({
                                   className={cn('size-3', palette.text)}
                                   style={palette.style}
                                 />
-                                <span>Cartella: {v.name}</span>
+                                <span>{t('service-accounts-section.cartella-colon')} {v.name}</span>
                                 <span className="text-[10px] text-muted-foreground">
                                   ({v.credential_count})
                                 </span>
@@ -793,14 +779,12 @@ export function ServiceAccountsSection({
                     {/* API Keys Sub-list */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                        <span>Chiavi API associate ({sa.keys.length})</span>
+                        <span>{t('service-accounts-section.chiavi-api-associate')}{sa.keys.length})</span>
                       </div>
 
                       {sa.keys.length === 0 ? (
                         <p className="rounded-lg border border-dashed border-border/60 px-3 py-2 text-xs text-muted-foreground">
-                          Nessuna chiave API attiva. Premi "+ Chiave API" per
-                          generarne una.
-                        </p>
+                          {t('service-accounts-section.nessuna-chiave-api-attiva-premi-chiave-api-per-g')}</p>
                       ) : (
                         <div className="space-y-1.5">
                           {sa.keys.map((key) => (
@@ -821,23 +805,22 @@ export function ServiceAccountsSection({
                                       variant="destructive"
                                       className="h-4 px-1.5 py-0 text-[9px]"
                                     >
-                                      Scaduta
-                                    </Badge>
+                                      {t('service-accounts-section.scaduta')}</Badge>
                                   )}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                                   <span>
-                                    Creata il {formatShortDate(key.created_at)}
+                                    {t('service-accounts-section.creata-il')} {formatShortDate(key.created_at)}
                                   </span>
                                   <span>
                                     {key.expires_at
-                                      ? `Scadenza: ${formatShortDate(key.expires_at)}`
-                                      : 'Nessuna scadenza'}
+                                      ? t('service-accounts-section.scadenza-v0', { v0: formatShortDate(key.expires_at) })
+                                      : t('service-accounts-section.nessuna-scadenza')}
                                   </span>
                                   <span>
                                     {key.last_used_at
-                                      ? `Ultimo uso: ${formatRelativeDate(key.last_used_at)}`
-                                      : 'Mai utilizzata'}
+                                      ? t('service-accounts-section.ultimo-uso-v0-2', { v0: formatRelativeDate(key.last_used_at) })
+                                      : t('service-accounts-section.mai-utilizzata')}
                                   </span>
                                 </div>
                               </div>
@@ -853,8 +836,7 @@ export function ServiceAccountsSection({
                                 className="shrink-0 self-end text-destructive hover:bg-destructive/10 hover:text-destructive sm:self-center"
                               >
                                 <Trash2 className="size-3.5" />
-                                Revoca
-                              </Button>
+                                {t('service-accounts-section.revoca')}</Button>
                             </div>
                           ))}
                         </div>
@@ -889,28 +871,25 @@ export function ServiceAccountsSection({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="size-4.5 text-primary sync-security:text-[#ff9c00]" />
-              Nuova chiave API
-            </DialogTitle>
+              {t('service-accounts-section.nuova-chiave-api')}</DialogTitle>
             <DialogDescription>
-              Genera una nuova chiave API (<code>sw_sa_...</code>) per{' '}
+              {t('service-accounts-section.genera-una-nuova-chiave-api')}<code>sw_sa_...</code>{t('service-accounts-section.per')}{' '}
               <strong className="text-foreground">
                 {keyDialogAccount?.name}
               </strong>
-              . Ideale per la rotazione a zero downtime.
-            </DialogDescription>
+              {t('service-accounts-section.ideale-per-la-rotazione-a-zero-downtime')}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateKey} className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="sa-new-key-name" className="text-xs">
-                  Nome chiave API *
-                </Label>
+                  {t('service-accounts-section.nome-chiave-api')}</Label>
                 <Input
                   id="sa-new-key-name"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
-                  placeholder="es. Rotazione Q4, Cluster EU-West"
+                  placeholder={t('service-accounts-section.es-rotazione-q4-cluster-eu-west')}
                   maxLength={80}
                   required
                 />
@@ -918,17 +897,16 @@ export function ServiceAccountsSection({
 
               <div className="space-y-1.5">
                 <Label htmlFor="sa-new-key-expiry" className="text-xs">
-                  Scadenza
-                </Label>
+                  {t('service-accounts-section.scadenza')}</Label>
                 <Select value={newKeyExpiry} onValueChange={setNewKeyExpiry}>
                   <SelectTrigger id="sa-new-key-expiry" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="30">30 giorni</SelectItem>
-                    <SelectItem value="90">90 giorni</SelectItem>
-                    <SelectItem value="365">1 anno</SelectItem>
-                    <SelectItem value="never">Nessuna scadenza</SelectItem>
+                    <SelectItem value="30">{t('service-accounts-section.30-giorni')}</SelectItem>
+                    <SelectItem value="90">{t('service-accounts-section.90-giorni')}</SelectItem>
+                    <SelectItem value="365">{t('service-accounts-section.1-anno')}</SelectItem>
+                    <SelectItem value="never">{t('service-accounts-section.nessuna-scadenza')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -941,10 +919,9 @@ export function ServiceAccountsSection({
                 onClick={() => setKeyDialogAccount(null)}
                 disabled={creatingKey}
               >
-                Annulla
-              </Button>
+                {t('service-accounts-section.annulla')}</Button>
               <Button type="submit" disabled={creatingKey}>
-                {creatingKey ? 'Generazione...' : 'Genera chiave API'}
+                {creatingKey ? 'Generazione...' : t('service-accounts-section.genera-chiave-api')}
               </Button>
             </DialogFooter>
           </form>
@@ -960,26 +937,21 @@ export function ServiceAccountsSection({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminare questo Service Account?</AlertDialogTitle>
+            <AlertDialogTitle>{t('service-accounts-section.eliminare-questo-service-account')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Il Service Account{' '}
+              {t('service-accounts-section.il-service-account')}{' '}
               <strong className="text-foreground">
                 "{pendingDeleteAccount?.name}"
               </strong>{' '}
-              e tutte le sue chiavi API verranno eliminati definitivamente. Le
-              credenziali esistenti nelle cartelle rimarranno intatte, ma tutti
-              i sistemi che usano queste chiavi perderanno immediatamente
-              l&apos;accesso.
-            </AlertDialogDescription>
+              {t('service-accounts-section.e-tutte-le-sue-chiavi-api-verranno-eliminati-def')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('service-accounts-section.annulla')}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               onClick={confirmDeleteAccount}
             >
-              Elimina Service Account
-            </AlertDialogAction>
+              {t('service-accounts-section.elimina-service-account')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -993,9 +965,9 @@ export function ServiceAccountsSection({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revocare questa chiave API?</AlertDialogTitle>
+            <AlertDialogTitle>{t('service-accounts-section.revocare-questa-chiave-api')}</AlertDialogTitle>
             <AlertDialogDescription>
-              La chiave{' '}
+              {t('service-accounts-section.la-chiave')}{' '}
               <strong className="text-foreground">
                 "{pendingRevokeKey?.key.name}"
               </strong>{' '}
@@ -1003,18 +975,16 @@ export function ServiceAccountsSection({
               <code className="font-mono">
                 {pendingRevokeKey?.key.key_prefix}
               </code>
-              ) del Service Account{' '}
+              {t('service-accounts-section.del-service-account')}{' '}
               <strong className="text-foreground">
                 {pendingRevokeKey?.account.name}
               </strong>{' '}
-              verrà disattivata immediatamente.
-            </AlertDialogDescription>
+              {t('service-accounts-section.verra-disattivata-immediatamente')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Annulla</AlertDialogCancel>
+            <AlertDialogCancel>{t('service-accounts-section.annulla')}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={confirmRevokeKey}>
-              Revoca chiave
-            </AlertDialogAction>
+              {t('service-accounts-section.revoca-chiave')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
