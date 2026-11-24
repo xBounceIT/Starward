@@ -39,10 +39,20 @@ import {
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
-import { vaultApi, type Credential, type Vault } from '@/lib/api'
+import {
+  vaultApi,
+  type Credential,
+  type CustomField,
+  type CustomFieldType,
+  type Vault,
+} from '@/lib/api'
 import {
   CREDENTIAL_CATEGORIES,
+  CUSTOM_FIELD_TYPE_OPTIONS,
+  LINKED_FIELD_OPTIONS,
+  LINKED_ID_USERNAME,
   getCategoryConfig,
+  getCustomFieldTypeOption,
   type CredentialFieldDef,
 } from '@/lib/credential-types'
 import {
@@ -111,6 +121,10 @@ export function CredentialDialog({
   const [showOptionalOtp, setShowOptionalOtp] = useState(false)
   const [otpPeriodDraft, setOtpPeriodDraft] = useState('30')
   const [submitting, setSubmitting] = useState(false)
+  const [customFields, setCustomFields] = useState<CustomField[]>([])
+  const [addFieldOpen, setAddFieldOpen] = useState(false)
+  const [addFieldType, setAddFieldType] = useState<CustomFieldType>('text')
+  const [addFieldLabel, setAddFieldLabel] = useState('')
 
   useEffect(() => {
     if (!open) return
@@ -125,6 +139,7 @@ export function CredentialDialog({
         notes: editingCredential.notes,
       })
       setExtraValues({ ...(editingCredential.fields ?? {}) })
+      setCustomFields((editingCredential.custom_fields ?? []).map((f) => ({ ...f })))
       setFavorite(editingCredential.favorite)
       setShowOptionalOtp(Boolean(editingCredential.fields?.totp?.trim()))
       const existingTotp = editingCredential.fields?.totp?.trim()
@@ -146,6 +161,7 @@ export function CredentialDialog({
       setCategory('login')
       setCoreValues(EMPTY_CORE_VALUES)
       setExtraValues({})
+      setCustomFields([])
       setFavorite(false)
       setShowOptionalOtp(false)
       setOtpPeriodDraft('30')
@@ -153,6 +169,9 @@ export function CredentialDialog({
     setRevealedFields({})
     setGenOpen(false)
     setOtpAdvancedOpen(false)
+    setAddFieldOpen(false)
+    setAddFieldType('text')
+    setAddFieldLabel('')
   }, [open, editingCredential, defaultVaultId])
 
   const categoryConfig = getCategoryConfig(category)
@@ -185,6 +204,85 @@ export function CredentialDialog({
   const toggleReveal = (key: string) => {
     setRevealedFields((prev) => ({ ...prev, [key]: !prev[key] }))
   }
+
+  const updateCustomField = (idx: number, patch: Partial<CustomField>) => {
+    setCustomFields((prev) =>
+      prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)),
+    )
+  }
+
+  const removeCustomField = (idx: number) => {
+    setCustomFields((prev) => prev.filter((_, i) => i !== idx))
+    setRevealedFields((prev) => {
+      const next = { ...prev }
+      delete next[`cf-${idx}`]
+      return next
+    })
+  }
+
+  const changeCustomFieldType = (idx: number, nextType: CustomFieldType) => {
+    setCustomFields((prev) =>
+      prev.map((f, i) => {
+        if (i !== idx) return f
+        const next: CustomField = { ...f, field_type: nextType }
+        if (nextType === 'linked') {
+          next.linked_id = f.linked_id ?? LINKED_ID_USERNAME
+          next.value = ''
+        } else {
+          next.linked_id = undefined
+        }
+        if (nextType === 'checkbox') {
+          next.value = f.value === 'true' ? 'true' : 'false'
+        }
+        return next
+      }),
+    )
+  }
+
+  const openAddFieldDialog = () => {
+    setAddFieldType('text')
+    setAddFieldLabel('')
+    setAddFieldOpen(true)
+  }
+
+  const confirmAddField = () => {
+    const label = addFieldLabel.trim()
+    if (!label) return
+    setCustomFields((prev) => [
+      ...prev,
+      {
+        field_type: addFieldType,
+        label,
+        value: addFieldType === 'checkbox' ? 'false' : '',
+        linked_id: addFieldType === 'linked' ? LINKED_ID_USERNAME : undefined,
+      },
+    ])
+    setAddFieldOpen(false)
+    setAddFieldLabel('')
+    setAddFieldType('text')
+  }
+
+  const buildPayloadCustomFields = (): CustomField[] =>
+    customFields
+      .map((f) => ({ ...f, label: f.label.trim() }))
+      .filter((f) => f.label.length > 0)
+      .map((f) => {
+        if (f.field_type === 'checkbox') {
+          return {
+            ...f,
+            value: f.value === 'true' ? 'true' : 'false',
+            linked_id: undefined,
+          }
+        }
+        if (f.field_type === 'linked') {
+          return {
+            ...f,
+            value: '',
+            linked_id: f.linked_id ?? LINKED_ID_USERNAME,
+          }
+        }
+        return { ...f, linked_id: undefined }
+      })
 
   const validateForCategory = (): boolean => {
     switch (categoryConfig.value) {
@@ -324,6 +422,7 @@ export function CredentialDialog({
       category: categoryConfig.value,
       notes: activeCoreKeys.has('notes') ? coreValues.notes.trim() : '',
       fields: payloadFields,
+      custom_fields: buildPayloadCustomFields(),
       favorite,
     }
 
@@ -855,6 +954,155 @@ export function CredentialDialog({
                 </label>
               </div>
             </div>
+
+            {/* Campi personalizzati */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-muted-foreground">
+                  Campi personalizzati
+                </Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={openAddFieldDialog}
+                >
+                  <Plus className="size-3" />
+                  Aggiungi campo
+                </Button>
+              </div>
+
+              {customFields.map((field, idx) => {
+                const revealKey = `cf-${idx}`
+                const isRevealed = Boolean(revealedFields[revealKey])
+                return (
+                  <div
+                    key={idx}
+                    className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={field.field_type}
+                        onValueChange={(v) =>
+                          changeCustomFieldType(idx, v as CustomFieldType)
+                        }
+                      >
+                        <SelectTrigger className="h-9 w-44 shrink-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CUSTOM_FIELD_TYPE_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <Input
+                        value={field.label}
+                        placeholder="Etichetta campo"
+                        onChange={(e) =>
+                          updateCustomField(idx, { label: e.target.value })
+                        }
+                        className="h-9 flex-1"
+                      />
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => removeCustomField(idx)}
+                        className="shrink-0 text-muted-foreground"
+                        tabIndex={-1}
+                        aria-label={`Rimuovi campo ${field.label || idx + 1}`}
+                        title="Rimuovi campo"
+                      >
+                        <X className="size-3.5" />
+                      </Button>
+                    </div>
+
+                    {field.field_type === 'checkbox' ? (
+                      <label className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 bg-background/60 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">
+                          {field.value === 'true' ? t('credential-dialog.si') : t('credential-dialog.no')}
+                        </span>
+                        <Switch
+                          checked={field.value === 'true'}
+                          onCheckedChange={(checked) =>
+                            updateCustomField(idx, {
+                              value: checked ? 'true' : 'false',
+                            })
+                          }
+                        />
+                      </label>
+                    ) : field.field_type === 'linked' ? (
+                      <Select
+                        value={String(field.linked_id ?? LINKED_ID_USERNAME)}
+                        onValueChange={(v) =>
+                          updateCustomField(idx, {
+                            linked_id: Number.parseInt(v, 10),
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-9 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LINKED_FIELD_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={String(opt.value)}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="relative">
+                        <Input
+                          type={
+                            field.field_type === 'hidden' && !isRevealed
+                              ? 'password'
+                              : 'text'
+                          }
+                          value={field.value}
+                          placeholder={
+                            field.field_type === 'hidden'
+                              ? 'Valore nascosto'
+                              : 'Valore'
+                          }
+                          onChange={(e) =>
+                            updateCustomField(idx, { value: e.target.value })
+                          }
+                          className={cn(
+                            'h-9',
+                            field.field_type === 'hidden' && 'pr-10',
+                          )}
+                        />
+                        {field.field_type === 'hidden' && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => toggleReveal(revealKey)}
+                            className="absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground"
+                            tabIndex={-1}
+                            aria-label={
+                              isRevealed ? 'Nascondi valore' : 'Mostra valore'
+                            }
+                          >
+                            {isRevealed ? (
+                              <EyeOff className="size-3.5" />
+                            ) : (
+                              <Eye className="size-3.5" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <DialogFooter className="border-t pt-3">
@@ -874,6 +1122,73 @@ export function CredentialDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <Dialog open={addFieldOpen} onOpenChange={setAddFieldOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Aggiungi campo</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Tipo campo</Label>
+              <Select
+                value={addFieldType}
+                onValueChange={(v) => setAddFieldType(v as CustomFieldType)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CUSTOM_FIELD_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {getCustomFieldTypeOption(addFieldType).description}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="add-custom-field-label">
+                Etichetta campo <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="add-custom-field-label"
+                value={addFieldLabel}
+                onChange={(e) => setAddFieldLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    confirmAddField()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="justify-start gap-2">
+            <Button
+              type="button"
+              disabled={!addFieldLabel.trim()}
+              onClick={confirmAddField}
+            >
+              Aggiungi
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAddFieldOpen(false)}
+            >
+              {t('credential-dialog.annulla')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

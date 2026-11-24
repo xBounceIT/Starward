@@ -12,7 +12,9 @@ use serde_json::{json, Map, Value};
 use crate::{
     auth::AuthenticatedMcpUser,
     error::AppError,
-    models::{CreateCredentialRequest, CreateVaultRequest, UpdateCredentialRequest, VaultDto},
+    models::{
+        CreateCredentialRequest, CreateVaultRequest, CustomField, UpdateCredentialRequest, VaultDto,
+    },
     routes::{
         credentials::{
             create_credential_for_user, delete_credential_for_user, get_credential_for_user,
@@ -184,6 +186,23 @@ fn vault_summary_json(vault: &VaultDto) -> Value {
     })
 }
 
+fn custom_fields_input_schema(description: &str) -> Value {
+    json!({
+        "type": "array",
+        "description": description,
+        "items": {
+            "type": "object",
+            "properties": {
+                "field_type": { "type": "string", "enum": ["text", "hidden", "checkbox", "linked"] },
+                "label": { "type": "string", "description": "Etichetta del campo (obbligatoria)" },
+                "value": { "type": "string", "description": "Valore (per checkbox: 'true'/'false')" },
+                "linked_id": { "type": "number", "description": "Solo per field_type=linked: 100=username, 101=password, 102=URL" }
+            },
+            "required": ["field_type", "label"]
+        }
+    })
+}
+
 fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
     let can_write = mcp_user.key.permission == "read_write";
     let can_create_vault = can_write && mcp_user.key.vault_ids.is_empty();
@@ -327,6 +346,9 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                         "additionalProperties": { "type": "string" },
                         "description": "Campi extra opzionali (es. totp [segreto Base32 o URI otpauth://totp/...], provider, environment, db_type, port, private_key, rp_id, credential_id, first_name, last_name, phone, address1)"
                     },
+                    "custom_fields": custom_fields_input_schema(
+                        "Campi personalizzati tipizzati stile Bitwarden",
+                    ),
                     "favorite": { "type": "boolean", "default": false }
                 },
                 "required": ["vault_id", "title"],
@@ -359,6 +381,9 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                         "additionalProperties": { "type": "string" },
                         "description": "Campi extra opzionali (es. totp; se fornito, sostituisce i campi extra esistenti; ometti per lasciarli invariati)"
                     },
+                    "custom_fields": custom_fields_input_schema(
+                        "Campi personalizzati tipizzati (se fornito, sostituisce l'elenco esistente; ometti per lasciarli invariati)",
+                    ),
                     "favorite": { "type": "boolean" }
                 },
                 "required": ["credential_id"],
@@ -507,6 +532,27 @@ fn optional_string_map(
         }
         Some(_) => Err(RpcError::invalid_params(format!(
             "Il parametro '{key}' deve essere un oggetto mappa stringa->stringa"
+        ))),
+    }
+}
+
+fn optional_custom_fields(
+    args: &Map<String, Value>,
+    key: &str,
+) -> Result<Option<Vec<CustomField>>, RpcError> {
+    match args.get(key) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value @ Value::Array(_)) => {
+            serde_json::from_value::<Vec<CustomField>>(value.clone())
+                .map(Some)
+                .map_err(|e| {
+                    RpcError::invalid_params(format!(
+                        "Il parametro '{key}' deve essere un array di campi personalizzati (field_type: text|hidden|checkbox|linked, label, value, linked_id opzionale): {e}"
+                    ))
+                })
+        }
+        Some(_) => Err(RpcError::invalid_params(format!(
+            "Il parametro '{key}' deve essere un array di oggetti"
         ))),
     }
 }
@@ -683,6 +729,7 @@ async fn handle_tools_call(
                 .unwrap_or_else(|| "login".to_string());
             let notes = optional_string(args, "notes")?.unwrap_or_default();
             let fields = optional_string_map(args, "fields")?.unwrap_or_default();
+            let custom_fields = optional_custom_fields(args, "custom_fields")?.unwrap_or_default();
             let favorite = optional_bool(args, "favorite")?.unwrap_or(false);
 
             if let Err(err) = mcp_user.user.require_write_permission() {
@@ -698,6 +745,7 @@ async fn handle_tools_call(
                 category,
                 notes,
                 fields,
+                custom_fields,
                 favorite,
             };
 
@@ -706,6 +754,8 @@ async fn handle_tools_call(
             {
                 Ok(dto) => {
                     let field_keys: Vec<String> = dto.fields.keys().cloned().collect();
+                    let custom_field_labels: Vec<String> =
+                        dto.custom_fields.iter().map(|f| f.label.clone()).collect();
                     Ok(tool_success(json!({
                         "id": dto.id,
                         "vault_id": dto.vault_id,
@@ -716,6 +766,7 @@ async fn handle_tools_call(
                         "category": dto.category,
                         "favorite": dto.favorite,
                         "field_keys": field_keys,
+                        "custom_field_labels": custom_field_labels,
                         "created_at": dto.created_at,
                         "updated_at": dto.updated_at
                     })))
@@ -734,6 +785,7 @@ async fn handle_tools_call(
             let category = optional_string(args, "category")?;
             let notes = optional_string(args, "notes")?;
             let fields = optional_string_map(args, "fields")?;
+            let custom_fields = optional_custom_fields(args, "custom_fields")?;
             let favorite = optional_bool(args, "favorite")?;
 
             if let Err(err) = mcp_user.user.require_write_permission() {
@@ -749,6 +801,7 @@ async fn handle_tools_call(
                 category,
                 notes,
                 fields,
+                custom_fields,
                 favorite,
             };
 
@@ -763,6 +816,8 @@ async fn handle_tools_call(
             {
                 Ok(dto) => {
                     let field_keys: Vec<String> = dto.fields.keys().cloned().collect();
+                    let custom_field_labels: Vec<String> =
+                        dto.custom_fields.iter().map(|f| f.label.clone()).collect();
                     Ok(tool_success(json!({
                         "id": dto.id,
                         "vault_id": dto.vault_id,
@@ -773,6 +828,7 @@ async fn handle_tools_call(
                         "category": dto.category,
                         "favorite": dto.favorite,
                         "field_keys": field_keys,
+                        "custom_field_labels": custom_field_labels,
                         "updated_at": dto.updated_at
                     })))
                 }
@@ -1326,6 +1382,7 @@ mod tests {
                 auth_secret: String::new(),
                 master_key: String::new(),
                 cors_origin: String::new(),
+                trust_proxy_headers: false,
                 admin_emails: vec![],
             },
             crypto: crate::crypto::VaultCrypto::from_master_key("test-key"),

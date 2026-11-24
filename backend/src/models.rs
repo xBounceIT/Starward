@@ -302,6 +302,8 @@ pub struct ServiceAccountDto {
     pub is_active: bool,
     pub vault_ids: Vec<String>,
     pub credential_ids: Vec<String>,
+    #[serde(default)]
+    pub allowed_ip_cidrs: Vec<String>,
     pub vaults: Vec<ServiceAccountScopedVaultDto>,
     pub credentials: Vec<ServiceAccountScopedCredentialDto>,
     pub keys: Vec<ServiceAccountKeyDto>,
@@ -329,6 +331,10 @@ pub struct CreateServiceAccountRequest {
     pub vault_ids: Vec<String>,
     #[serde(default)]
     pub credential_ids: Vec<String>,
+    /// Optional IP allowlist (plain IPs or CIDRs) for this Service Account.
+    /// Empty = reachable from any IP.
+    #[serde(default)]
+    pub allowed_ip_cidrs: Vec<String>,
     #[serde(default = "default_true")]
     pub generate_initial_key: bool,
     pub initial_key_name: Option<String>,
@@ -344,6 +350,9 @@ pub struct UpdateServiceAccountRequest {
     pub is_active: Option<bool>,
     pub vault_ids: Option<Vec<String>>,
     pub credential_ids: Option<Vec<String>>,
+    /// `Some(list)` replaces the allowlist (empty list = no restriction),
+    /// `None` leaves it unchanged.
+    pub allowed_ip_cidrs: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -428,7 +437,75 @@ pub struct UpdateMemberRoleRequest {
     pub role: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Tipo di campo personalizzato (compatibile con Bitwarden: 0=text, 1=hidden, 2=checkbox, 3=linked).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CustomFieldType {
+    Text,
+    Hidden,
+    Checkbox,
+    Linked,
+}
+
+/// ID di collegamento per i campi personalizzati di tipo "linked"
+/// (compatibili con Bitwarden LinkedIdType).
+pub const LINKED_ID_USERNAME: u32 = 100;
+pub const LINKED_ID_PASSWORD: u32 = 101;
+pub const LINKED_ID_URI: u32 = 102;
+
+pub fn is_valid_linked_id(linked_id: u32) -> bool {
+    matches!(
+        linked_id,
+        LINKED_ID_USERNAME | LINKED_ID_PASSWORD | LINKED_ID_URI
+    )
+}
+
+/// Accetta stringhe, booleani e numeri (in Bitwarden i campi checkbox hanno valore booleano).
+fn stringify_scalar_value<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    Ok(match value {
+        serde_json::Value::String(s) => s,
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Null => String::new(),
+        other => other.to_string(),
+    })
+}
+
+/// Placeholder printed instead of secret values in the manual `Debug` impls
+/// below: no code path (tracing, panic messages, assert_eq! in tests) can then
+/// ever write a plaintext password/notes/field value to the logs.
+const REDACTED: &str = "[REDACTED]";
+
+// NOTE: CustomField, CredentialDto and the credential request structs
+// intentionally do NOT derive Debug; see the manual redacting impls below.
+/// Campo personalizzato tipizzato di una credenziale (stile Bitwarden).
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CustomField {
+    pub field_type: CustomFieldType,
+    pub label: String,
+    #[serde(default, deserialize_with = "stringify_scalar_value")]
+    pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub linked_id: Option<u32>,
+}
+
+impl std::fmt::Debug for CustomField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `value` can hold a secret (hidden/checkbox/linked fields): redact it.
+        f.debug_struct("CustomField")
+            .field("field_type", &self.field_type)
+            .field("label", &self.label)
+            .field("value", &REDACTED)
+            .field("linked_id", &self.linked_id)
+            .finish()
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct CredentialDto {
     pub id: String,
     pub vault_id: String,
@@ -442,6 +519,8 @@ pub struct CredentialDto {
     pub category: String,
     pub notes: String,
     pub fields: BTreeMap<String, String>,
+    #[serde(default)]
+    pub custom_fields: Vec<CustomField>,
     pub favorite: bool,
     pub created_by: String,
     pub created_by_name: String,
@@ -449,6 +528,36 @@ pub struct CredentialDto {
     pub updated_by_name: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl std::fmt::Debug for CredentialDto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CredentialDto")
+            .field("id", &self.id)
+            .field("vault_id", &self.vault_id)
+            .field("vault_name", &self.vault_name)
+            .field("vault_color", &self.vault_color)
+            .field("vault_role", &self.vault_role)
+            .field("title", &self.title)
+            .field("username", &self.username)
+            .field("password", &REDACTED)
+            .field("url", &self.url)
+            .field("category", &self.category)
+            .field("notes", &REDACTED)
+            .field("fields", &REDACTED)
+            .field(
+                "custom_fields",
+                &format!("[REDACTED: {} field(s)]", self.custom_fields.len()),
+            )
+            .field("favorite", &self.favorite)
+            .field("created_by", &self.created_by)
+            .field("created_by_name", &self.created_by_name)
+            .field("updated_by", &self.updated_by)
+            .field("updated_by_name", &self.updated_by_name)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -471,7 +580,7 @@ pub struct CredentialMetadataDto {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct TotpCodeDto {
     pub credential_id: String,
     pub code: String,
@@ -482,7 +591,21 @@ pub struct TotpCodeDto {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+impl std::fmt::Debug for TotpCodeDto {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TotpCodeDto")
+            .field("credential_id", &self.credential_id)
+            .field("code", &REDACTED)
+            .field("remaining_seconds", &self.remaining_seconds)
+            .field("period", &self.period)
+            .field("digits", &self.digits)
+            .field("algorithm", &self.algorithm)
+            .field("expires_at", &self.expires_at)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize)]
 pub struct CreateCredentialRequest {
     pub vault_id: String,
     pub title: String,
@@ -499,10 +622,32 @@ pub struct CreateCredentialRequest {
     #[serde(default)]
     pub fields: BTreeMap<String, String>,
     #[serde(default)]
+    pub custom_fields: Vec<CustomField>,
+    #[serde(default)]
     pub favorite: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+impl std::fmt::Debug for CreateCredentialRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CreateCredentialRequest")
+            .field("vault_id", &self.vault_id)
+            .field("title", &self.title)
+            .field("username", &self.username)
+            .field("password", &REDACTED)
+            .field("url", &self.url)
+            .field("category", &self.category)
+            .field("notes", &REDACTED)
+            .field("fields", &REDACTED)
+            .field(
+                "custom_fields",
+                &format!("[REDACTED: {} field(s)]", self.custom_fields.len()),
+            )
+            .field("favorite", &self.favorite)
+            .finish()
+    }
+}
+
+#[derive(Clone, Deserialize)]
 pub struct UpdateCredentialRequest {
     pub vault_id: Option<String>,
     pub title: Option<String>,
@@ -512,7 +657,37 @@ pub struct UpdateCredentialRequest {
     pub category: Option<String>,
     pub notes: Option<String>,
     pub fields: Option<BTreeMap<String, String>>,
+    pub custom_fields: Option<Vec<CustomField>>,
     pub favorite: Option<bool>,
+}
+
+impl std::fmt::Debug for UpdateCredentialRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UpdateCredentialRequest")
+            .field("vault_id", &self.vault_id)
+            .field("title", &self.title)
+            .field("username", &self.username)
+            .field(
+                "password",
+                &self.password.as_ref().map(|_| "[REDACTED]".to_string()),
+            )
+            .field("url", &self.url)
+            .field("category", &self.category)
+            .field(
+                "notes",
+                &self.notes.as_ref().map(|_| "[REDACTED]".to_string()),
+            )
+            .field("fields", &self.fields.as_ref().map(|_| "[REDACTED]".to_string()))
+            .field(
+                "custom_fields",
+                &self
+                    .custom_fields
+                    .as_ref()
+                    .map(|cf| format!("[REDACTED: {} field(s)]", cf.len())),
+            )
+            .field("favorite", &self.favorite)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -639,4 +814,104 @@ fn default_group_member_role() -> String {
 
 fn default_true() -> bool {
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_credential_dto() -> CredentialDto {
+        let now = Utc::now();
+        CredentialDto {
+            id: "cred-1".to_string(),
+            vault_id: "vault-1".to_string(),
+            vault_name: "Produzione".to_string(),
+            vault_color: "red".to_string(),
+            vault_role: "editor".to_string(),
+            title: "DB admin".to_string(),
+            username: "admin".to_string(),
+            password: "SUPER-SECRET-PASSWORD".to_string(),
+            url: "https://db.example.com".to_string(),
+            category: "login".to_string(),
+            notes: "NOTA-SEGRETA".to_string(),
+            fields: BTreeMap::from([("pin".to_string(), "SECRETO-CAMPO".to_string())]),
+            custom_fields: vec![CustomField {
+                field_type: CustomFieldType::Hidden,
+                label: "API key".to_string(),
+                value: "VALORE-SEGRETO".to_string(),
+                linked_id: None,
+            }],
+            favorite: false,
+            created_by: "u1".to_string(),
+            created_by_name: "Alice".to_string(),
+            updated_by: "u1".to_string(),
+            updated_by_name: "Alice".to_string(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+
+    #[test]
+    fn credential_dto_debug_never_contains_secrets() {
+        let dto = sample_credential_dto();
+        let dbg = format!("{dto:?}");
+        for secret in ["SUPER-SECRET-PASSWORD", "NOTA-SEGRETA", "SECRETO-CAMPO", "VALORE-SEGRETO"] {
+            assert!(!dbg.contains(secret), "Debug leak: {dbg}");
+        }
+        assert!(dbg.contains("[REDACTED]"));
+        // Non-secret metadata is still visible for debugging.
+        assert!(dbg.contains("DB admin"));
+    }
+
+    #[test]
+    fn credential_request_debug_never_contains_secrets() {
+        let create = CreateCredentialRequest {
+            vault_id: "vault-1".to_string(),
+            title: "t".to_string(),
+            username: "u".to_string(),
+            password: "SUPER-SECRET-PASSWORD".to_string(),
+            url: String::new(),
+            category: "login".to_string(),
+            notes: "NOTA-SEGRETA".to_string(),
+            fields: BTreeMap::from([("k".to_string(), "SECRETO-CAMPO".to_string())]),
+            custom_fields: vec![],
+            favorite: false,
+        };
+        let dbg = format!("{create:?}");
+        assert!(!dbg.contains("SUPER-SECRET-PASSWORD"));
+        assert!(!dbg.contains("NOTA-SEGRETA"));
+        assert!(!dbg.contains("SECRETO-CAMPO"));
+
+        let update = UpdateCredentialRequest {
+            vault_id: None,
+            title: None,
+            username: None,
+            password: Some("SUPER-SECRET-PASSWORD".to_string()),
+            url: None,
+            category: None,
+            notes: Some("NOTA-SEGRETA".to_string()),
+            fields: None,
+            custom_fields: None,
+            favorite: None,
+        };
+        let dbg = format!("{update:?}");
+        assert!(!dbg.contains("SUPER-SECRET-PASSWORD"));
+        assert!(!dbg.contains("NOTA-SEGRETA"));
+    }
+
+    #[test]
+    fn totp_code_debug_is_redacted() {
+        let dto = TotpCodeDto {
+            credential_id: "cred-1".to_string(),
+            code: "123456".to_string(),
+            remaining_seconds: 20,
+            period: 30,
+            digits: 6,
+            algorithm: "SHA1".to_string(),
+            expires_at: Utc::now(),
+        };
+        let dbg = format!("{dto:?}");
+        assert!(!dbg.contains("123456"));
+        assert!(dbg.contains("[REDACTED]"));
+    }
 }

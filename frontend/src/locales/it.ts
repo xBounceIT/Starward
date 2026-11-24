@@ -297,7 +297,9 @@ export default {
     "cartella": "Cartella",
     "tipologia": "Tipologia",
     "titolo": "Titolo",
-    "annulla": "Annulla"
+    "annulla": "Annulla",
+    "si": "Sì",
+    "no": "No"
   },
   "credential-list": {
     "ultima-modifica": "Ultima modifica",
@@ -497,7 +499,16 @@ export default {
     "ssh-v0-v1": "ssh://{{v0}}{{v1}}",
     "licenza-software-2": "Licenza software",
     "scadenza-v0": "Scadenza: {{v0}}",
-    "nota-sicura-2": "Nota sicura"
+    "nota-sicura-2": "Nota sicura",
+    "cf-text-label": "Testo",
+    "cf-text-desc": "Usa i campi di testo per dati come domande di sicurezza",
+    "cf-hidden-label": "Nascosto",
+    "cf-hidden-desc": "Usa i campi nascosti per dati sensibili come una password",
+    "cf-checkbox-label": "Casella di controllo",
+    "cf-checkbox-desc": "Usa le caselle di controllo se vuoi riempire automaticamente la casella di controllo di un modulo, come una email da ricordare",
+    "cf-linked-label": "Collegato",
+    "cf-linked-desc": "Usa i campi collegati per riutilizzare il valore di un altro campo della credenziale, come username, password o URL",
+    "si": "Sì"
   },
   "group-detail-panel": {
     "v0-aggiunto-al-gruppo-v1": "{{v0}} aggiunto al gruppo \"{{v1}}\"",
@@ -790,7 +801,9 @@ export default {
     "cartella": "cartella",
     "cartelle": "cartelle",
     "annulla": "Annulla",
-    "proprietario-colon": "Proprietario:"
+    "proprietario-colon": "Proprietario:",
+    "ip-help-1": "Una riga per IP o CIDR (IPv4/IPv6). Lascia vuoto per permettere l'accesso da qualsiasi indirizzo. Le chiavi",
+    "ip-help-2": "verranno accettate solo da questi IP; i tentativi bloccati finiscono nell'audit di sistema."
   },
   "service-accounts-section": {
     "errore-nel-caricamento-dei-service-account": "Errore nel caricamento dei Service Account",

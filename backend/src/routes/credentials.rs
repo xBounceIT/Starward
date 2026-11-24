@@ -15,8 +15,8 @@ use crate::{
     crypto::VaultCrypto,
     error::{AppError, AppResult},
     models::{
-        CreateCredentialRequest, CredentialDto, CredentialMetadataDto, TotpCodeDto,
-        UpdateCredentialRequest,
+        CreateCredentialRequest, CredentialDto, CredentialMetadataDto, CustomField,
+        CustomFieldType, TotpCodeDto, UpdateCredentialRequest, is_valid_linked_id,
     },
     routes::{record_audit, require_vault_role},
     AppState,
@@ -54,6 +54,8 @@ struct CredentialRow {
     notes_nonce: String,
     extra_fields_ciphertext: String,
     extra_fields_nonce: String,
+    custom_fields_ciphertext: String,
+    custom_fields_nonce: String,
     favorite: bool,
     created_by: String,
     created_by_name: String,
@@ -63,6 +65,17 @@ struct CredentialRow {
     updated_at: DateTime<Utc>,
 }
 
+fn decrypt_json_blob<T>(crypto: &VaultCrypto, ciphertext: &str, nonce: &str) -> AppResult<T>
+where
+    T: serde::de::DeserializeOwned + Default,
+{
+    if ciphertext.is_empty() || nonce.is_empty() {
+        return Ok(T::default());
+    }
+    let json_str = crypto.decrypt(ciphertext, nonce)?;
+    Ok(serde_json::from_str(&json_str).unwrap_or_default())
+}
+
 fn decrypt_credential_row(state: &AppState, row: CredentialRow) -> AppResult<CredentialDto> {
     let password = state
         .crypto
@@ -70,15 +83,16 @@ fn decrypt_credential_row(state: &AppState, row: CredentialRow) -> AppResult<Cre
     let notes = state
         .crypto
         .decrypt(&row.notes_ciphertext, &row.notes_nonce)?;
-    let fields: BTreeMap<String, String> =
-        if row.extra_fields_ciphertext.is_empty() || row.extra_fields_nonce.is_empty() {
-            BTreeMap::new()
-        } else {
-            let json_str = state
-                .crypto
-                .decrypt(&row.extra_fields_ciphertext, &row.extra_fields_nonce)?;
-            serde_json::from_str(&json_str).unwrap_or_default()
-        };
+    let fields: BTreeMap<String, String> = decrypt_json_blob(
+        &state.crypto,
+        &row.extra_fields_ciphertext,
+        &row.extra_fields_nonce,
+    )?;
+    let custom_fields: Vec<CustomField> = decrypt_json_blob(
+        &state.crypto,
+        &row.custom_fields_ciphertext,
+        &row.custom_fields_nonce,
+    )?;
 
     Ok(CredentialDto {
         id: row.id,
@@ -93,6 +107,7 @@ fn decrypt_credential_row(state: &AppState, row: CredentialRow) -> AppResult<Cre
         category: row.category,
         notes,
         fields,
+        custom_fields,
         favorite: row.favorite,
         created_by: row.created_by,
         created_by_name: row.created_by_name,
@@ -127,6 +142,8 @@ async fn fetch_credential_dto(
                 c.notes_nonce,
                 c.extra_fields_ciphertext,
                 c.extra_fields_nonce,
+                c.custom_fields_ciphertext,
+                c.custom_fields_nonce,
                 c.favorite,
                 c.created_by,
                 cb.name AS created_by_name,
@@ -217,6 +234,8 @@ async fn fetch_credential_dto(
             c.notes_nonce,
             c.extra_fields_ciphertext,
             c.extra_fields_nonce,
+            c.custom_fields_ciphertext,
+            c.custom_fields_nonce,
             c.favorite,
             c.created_by,
             cb.name AS created_by_name,
@@ -301,6 +320,8 @@ pub async fn list_credentials(
                 c.notes_nonce,
                 c.extra_fields_ciphertext,
                 c.extra_fields_nonce,
+                c.custom_fields_ciphertext,
+                c.custom_fields_nonce,
                 c.favorite,
                 c.created_by,
                 cb.name AS created_by_name,
@@ -412,6 +433,8 @@ pub async fn list_credentials(
             c.notes_nonce,
             c.extra_fields_ciphertext,
             c.extra_fields_nonce,
+            c.custom_fields_ciphertext,
+            c.custom_fields_nonce,
             c.favorite,
             c.created_by,
             cb.name AS created_by_name,
@@ -684,11 +707,14 @@ pub(crate) async fn create_credential_for_user(
         &payload.notes,
         &fields,
     )?;
+    let custom_fields = clean_custom_fields(&payload.custom_fields)?;
 
     let enc_password = state.crypto.encrypt(&payload.password)?;
     let enc_notes = state.crypto.encrypt(payload.notes.trim())?;
     let (extra_fields_ciphertext, extra_fields_nonce) =
         encrypt_extra_fields(&state.crypto, &fields)?;
+    let (custom_fields_ciphertext, custom_fields_nonce) =
+        encrypt_custom_fields(&state.crypto, &custom_fields)?;
 
     let id = Uuid::new_v4().to_string();
     let now = Utc::now();
@@ -700,9 +726,10 @@ pub(crate) async fn create_credential_for_user(
             password_ciphertext, password_nonce,
             notes_ciphertext, notes_nonce,
             extra_fields_ciphertext, extra_fields_nonce,
+            custom_fields_ciphertext, custom_fields_nonce,
             favorite, created_by, updated_by, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $15)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16, $17, $17)
         "#,
     )
     .bind(&id)
@@ -717,6 +744,8 @@ pub(crate) async fn create_credential_for_user(
     .bind(&enc_notes.nonce)
     .bind(&extra_fields_ciphertext)
     .bind(&extra_fields_nonce)
+    .bind(&custom_fields_ciphertext)
+    .bind(&custom_fields_nonce)
     .bind(payload.favorite)
     .bind(&user.id)
     .bind(now)
@@ -816,6 +845,10 @@ pub(crate) async fn update_credential_for_user(
         }
         None => existing.fields.clone(),
     };
+    let custom_fields = match payload.custom_fields.as_ref() {
+        Some(raw_fields) => clean_custom_fields(raw_fields)?,
+        None => existing.custom_fields.clone(),
+    };
     let favorite = payload.favorite.unwrap_or(existing.favorite);
 
     validate_credential_fields(&category, username, password, notes, &fields)?;
@@ -824,6 +857,8 @@ pub(crate) async fn update_credential_for_user(
     let enc_notes = state.crypto.encrypt(notes)?;
     let (extra_fields_ciphertext, extra_fields_nonce) =
         encrypt_extra_fields(&state.crypto, &fields)?;
+    let (custom_fields_ciphertext, custom_fields_nonce) =
+        encrypt_custom_fields(&state.crypto, &custom_fields)?;
     let now = Utc::now();
 
     sqlx::query(
@@ -840,10 +875,12 @@ pub(crate) async fn update_credential_for_user(
             notes_nonce = $9,
             extra_fields_ciphertext = $10,
             extra_fields_nonce = $11,
-            favorite = $12,
-            updated_by = $13,
-            updated_at = $14
-        WHERE id = $15
+            custom_fields_ciphertext = $12,
+            custom_fields_nonce = $13,
+            favorite = $14,
+            updated_by = $15,
+            updated_at = $16
+        WHERE id = $17
         "#,
     )
     .bind(target_vault_id)
@@ -857,6 +894,8 @@ pub(crate) async fn update_credential_for_user(
     .bind(&enc_notes.nonce)
     .bind(&extra_fields_ciphertext)
     .bind(&extra_fields_nonce)
+    .bind(&custom_fields_ciphertext)
+    .bind(&custom_fields_nonce)
     .bind(favorite)
     .bind(&user.id)
     .bind(now)
@@ -978,17 +1017,103 @@ pub(crate) fn clean_extra_fields(fields: &BTreeMap<String, String>) -> BTreeMap<
         .collect()
 }
 
+fn encrypt_json_blob<T: serde::Serialize + ?Sized>(
+    crypto: &VaultCrypto,
+    payload: &T,
+    is_empty: bool,
+    what: &str,
+) -> AppResult<(String, String)> {
+    if is_empty {
+        return Ok((String::new(), String::new()));
+    }
+    let json = serde_json::to_string(payload)
+        .map_err(|e| AppError::Internal(format!("Errore serializzazione {what}: {e}")))?;
+    let encrypted = crypto.encrypt(&json)?;
+    Ok((encrypted.ciphertext, encrypted.nonce))
+}
+
 pub(crate) fn encrypt_extra_fields(
     crypto: &VaultCrypto,
     fields: &BTreeMap<String, String>,
 ) -> AppResult<(String, String)> {
-    if fields.is_empty() {
-        return Ok((String::new(), String::new()));
+    encrypt_json_blob(crypto, fields, fields.is_empty(), "campi extra")
+}
+
+const MAX_CUSTOM_FIELDS: usize = 50;
+const MAX_CUSTOM_FIELD_LABEL_LEN: usize = 100;
+const MAX_CUSTOM_FIELD_VALUE_LEN: usize = 10_000;
+
+/// Normalizza e valida i campi personalizzati tipizzati (stile Bitwarden).
+pub(crate) fn clean_custom_fields(raw: &[CustomField]) -> AppResult<Vec<CustomField>> {
+    if raw.len() > MAX_CUSTOM_FIELDS {
+        return Err(AppError::BadRequest(format!(
+            "Puoi aggiungere al massimo {MAX_CUSTOM_FIELDS} campi personalizzati"
+        )));
     }
-    let json = serde_json::to_string(fields)
-        .map_err(|e| AppError::Internal(format!("Errore serializzazione campi extra: {e}")))?;
-    let encrypted = crypto.encrypt(&json)?;
-    Ok((encrypted.ciphertext, encrypted.nonce))
+
+    let mut cleaned = Vec::with_capacity(raw.len());
+    for field in raw {
+        let label = field.label.trim();
+        if label.is_empty() {
+            return Err(AppError::BadRequest(
+                "Ogni campo personalizzato deve avere un'etichetta".to_string(),
+            ));
+        }
+        if label.chars().count() > MAX_CUSTOM_FIELD_LABEL_LEN {
+            return Err(AppError::BadRequest(format!(
+                "L'etichetta di un campo personalizzato non può superare {MAX_CUSTOM_FIELD_LABEL_LEN} caratteri"
+            )));
+        }
+        if field.value.chars().count() > MAX_CUSTOM_FIELD_VALUE_LEN {
+            return Err(AppError::BadRequest(format!(
+                "Il valore di un campo personalizzato non può superare {MAX_CUSTOM_FIELD_VALUE_LEN} caratteri"
+            )));
+        }
+
+        let (value, linked_id) = match field.field_type {
+            CustomFieldType::Checkbox => {
+                let raw = field.value.trim().to_lowercase();
+                let normalized = if matches!(raw.as_str(), "true" | "1" | "yes" | "on") {
+                    "true"
+                } else {
+                    "false"
+                };
+                (normalized.to_string(), None)
+            }
+            CustomFieldType::Linked => {
+                let linked_id = field.linked_id.ok_or_else(|| {
+                    AppError::BadRequest(
+                        "Un campo collegato deve indicare il campo di origine (username, password o URL)"
+                            .to_string(),
+                    )
+                })?;
+                if !is_valid_linked_id(linked_id) {
+                    return Err(AppError::BadRequest(
+                        "Collegamento non valido: usa username (100), password (101) o URL (102)"
+                            .to_string(),
+                    ));
+                }
+                (String::new(), Some(linked_id))
+            }
+            CustomFieldType::Text | CustomFieldType::Hidden => {
+                (field.value.trim().to_string(), None)
+            }
+        };
+        cleaned.push(CustomField {
+            field_type: field.field_type,
+            label: label.to_string(),
+            value,
+            linked_id,
+        });
+    }
+    Ok(cleaned)
+}
+
+pub(crate) fn encrypt_custom_fields(
+    crypto: &VaultCrypto,
+    fields: &[CustomField],
+) -> AppResult<(String, String)> {
+    encrypt_json_blob(crypto, fields, fields.is_empty(), "campi personalizzati")
 }
 
 pub(crate) fn validate_credential_fields(
@@ -1194,6 +1319,115 @@ mod tests {
         let decrypted = crypto.decrypt(&cipher, &nonce).unwrap();
         let parsed: BTreeMap<String, String> = serde_json::from_str(&decrypted).unwrap();
         assert_eq!(parsed, fields);
+    }
+
+    #[test]
+    fn clean_custom_fields_normalizes_and_validates() {
+        let raw = vec![
+            CustomField {
+                field_type: CustomFieldType::Text,
+                label: "  Domanda di sicurezza ".to_string(),
+                value: "  colore preferito  ".to_string(),
+                linked_id: None,
+            },
+            CustomField {
+                field_type: CustomFieldType::Hidden,
+                label: "PIN".to_string(),
+                value: "1234".to_string(),
+                linked_id: None,
+            },
+            CustomField {
+                field_type: CustomFieldType::Checkbox,
+                label: "Ricorda email".to_string(),
+                value: "TRUE".to_string(),
+                linked_id: None,
+            },
+            CustomField {
+                field_type: CustomFieldType::Checkbox,
+                label: "Accetta termini".to_string(),
+                value: "".to_string(),
+                linked_id: None,
+            },
+            CustomField {
+                field_type: CustomFieldType::Linked,
+                label: "Username alternativo".to_string(),
+                value: "ignorato".to_string(),
+                linked_id: Some(crate::models::LINKED_ID_USERNAME),
+            },
+        ];
+
+        let cleaned = clean_custom_fields(&raw).unwrap();
+        assert_eq!(cleaned.len(), 5);
+        assert_eq!(cleaned[0].label, "Domanda di sicurezza");
+        assert_eq!(cleaned[0].value, "colore preferito");
+        assert_eq!(cleaned[2].value, "true");
+        assert_eq!(cleaned[3].value, "false");
+        assert_eq!(cleaned[4].value, "");
+        assert_eq!(cleaned[4].linked_id, Some(100));
+
+        // etichetta vuota -> errore
+        let bad_label = vec![CustomField {
+            field_type: CustomFieldType::Text,
+            label: "   ".to_string(),
+            value: "x".to_string(),
+            linked_id: None,
+        }];
+        assert!(clean_custom_fields(&bad_label).is_err());
+
+        // linked senza linked_id -> errore
+        let bad_linked = vec![CustomField {
+            field_type: CustomFieldType::Linked,
+            label: "Campo".to_string(),
+            value: String::new(),
+            linked_id: None,
+        }];
+        assert!(clean_custom_fields(&bad_linked).is_err());
+
+        // linked_id non valido -> errore
+        let bad_linked_id = vec![CustomField {
+            field_type: CustomFieldType::Linked,
+            label: "Campo".to_string(),
+            value: String::new(),
+            linked_id: Some(999),
+        }];
+        assert!(clean_custom_fields(&bad_linked_id).is_err());
+
+        // troppi campi -> errore
+        let too_many = (0..51)
+            .map(|i| CustomField {
+                field_type: CustomFieldType::Text,
+                label: format!("campo {i}"),
+                value: String::new(),
+                linked_id: None,
+            })
+            .collect::<Vec<_>>();
+        assert!(clean_custom_fields(&too_many).is_err());
+    }
+
+    #[test]
+    fn encrypt_custom_fields_roundtrips_json() {
+        let crypto = VaultCrypto::from_master_key("test-master-key-for-custom-fields"); // codeql[trust/hard-coded-cryptographic-value]
+        assert_eq!(
+            encrypt_custom_fields(&crypto, &[]).unwrap(),
+            (String::new(), String::new())
+        );
+
+        let fields = clean_custom_fields(&[CustomField {
+            field_type: CustomFieldType::Hidden,
+            label: "PIN".to_string(),
+            value: "1234".to_string(),
+            linked_id: None,
+        }])
+        .unwrap();
+
+        let (cipher, nonce) = encrypt_custom_fields(&crypto, &fields).unwrap();
+        assert!(!cipher.contains("1234"));
+        let decrypted = crypto.decrypt(&cipher, &nonce).unwrap();
+        let parsed: Vec<CustomField> = serde_json::from_str(&decrypted).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].field_type, CustomFieldType::Hidden);
+        assert_eq!(parsed[0].label, "PIN");
+        assert_eq!(parsed[0].value, "1234");
     }
 
     #[test]

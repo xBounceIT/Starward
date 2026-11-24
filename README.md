@@ -19,11 +19,12 @@ Password manager full-stack con **backend Rust** (Axum + **PostgreSQL** + cifrat
    - Controllo degli accessi basato sui ruoli con ruoli globali **Admin** e **User** (il primo utente registrato diventa automaticamente **Admin**, con supporto opzionale per la variabile d'ambiente `ADMIN_EMAILS`).
    - **Pannello Admin** integrato nella sidebar (visibile esclusivamente agli utenti con ruolo **Admin**) con:
      - **Utenti**: visualizzazione dettagli utenti, statistiche cartelle/credenziali, modifica del ruolo (`Admin` / `User`) ed eliminazione utenti.
-     - **Service Account**: creazione e gestione (riservata agli **Admin**) di utenti di sistema con chiavi API dedicate (`sw_sa_...`), permessi `read` o `read_write`, rotazione/revoca chiavi, sospensione temporanea e selezione granulare di **cartelle specifiche** e **credenziali specifiche**.
+     - **Service Account**: creazione e gestione (riservata agli **Admin**) di utenti di sistema con chiavi API dedicate (`sw_sa_...`), permessi `read` o `read_write`, rotazione/revoca chiavi, sospensione temporanea, selezione granulare di **cartelle specifiche** e **credenziali specifiche** e **allowlist IP** (IP singoli o CIDR IPv4/IPv6, configurabile dal pannello admin): le chiavi `sw_sa_...` vengono accettate solo dagli IP elencati (vuoto = qualsiasi IP) e ogni tentativo bloccato viene registrato nell'audit di sistema (`auth.service_account_ip_blocked`). Per usare l'IP reale del client dietro reverse proxy: `STARWARD_TRUST_PROXY_HEADERS=true` sul backend (da attivare solo se il proxy sovrascrive `X-Forwarded-For`/`X-Real-IP`).
      - **Audit di sistema**: registro globale degli eventi di sicurezza e amministrazione (*chi ha fatto cosa e quando*) con filtri per attore/ruolo, categoria risorsa, codice azione e intervallo temporale.
 
 4. **Sicurezza & UI Intuitiva**
    - Password e note cifrate a riposo in Rust con **AES-256-GCM**, nonce casuali a 96-bit per ogni salvataggio e derivazione chiave **HKDF-SHA256**.
+   - Hardening delle risposte API: ogni risposta del backend (inclusi errori) è marcata `Cache-Control: no-store`, così i segreti decifrati non finiscono mai in cache di browser/proxy; i log SQL di sqlx sono disabilitati e i `Debug` dei DTO credenziali redattano i campi sensibili (`[REDACTED]`), così il plaintext non può leakare nei log nemmeno via `tracing`/`panic`.
    - Interfaccia master-detail ispirata ai moderni password manager: ricerca istantanea (`Ctrl+K`), filtri per categoria, copia rapida in un clic, generatore di password con indicatore di robustezza, tema chiaro/scuro e layout responsive.
 
 5. **Impostazioni Utente & API Key Personali (`sw_live_...`)**

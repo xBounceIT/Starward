@@ -138,6 +138,15 @@ export interface Vault {
   updated_at: string
 }
 
+export type CustomFieldType = 'text' | 'hidden' | 'checkbox' | 'linked'
+
+export interface CustomField {
+  field_type: CustomFieldType
+  label: string
+  value: string
+  linked_id?: number
+}
+
 export interface Credential {
   id: string
   vault_id: string
@@ -151,6 +160,7 @@ export interface Credential {
   category: string
   notes: string
   fields: Record<string, string>
+  custom_fields: CustomField[]
   favorite: boolean
   created_by: string
   created_by_name: string
@@ -354,6 +364,7 @@ export interface ServiceAccount {
   is_active: boolean
   vault_ids: string[]
   credential_ids: string[]
+  allowed_ip_cidrs: string[]
   vaults: ServiceAccountScopedVault[]
   credentials: ServiceAccountScopedCredential[]
   keys: ServiceAccountKey[]
@@ -591,6 +602,7 @@ export const vaultApi = {
     permission: ApiKeyPermission
     vault_ids: string[]
     credential_ids: string[]
+    allowed_ip_cidrs?: string[]
     generate_initial_key?: boolean
     initial_key_name?: string
     initial_key_expires_in_days?: number | null
@@ -609,6 +621,7 @@ export const vaultApi = {
       is_active?: boolean
       vault_ids?: string[]
       credential_ids?: string[]
+      allowed_ip_cidrs?: string[]
     },
   ) =>
     request<ServiceAccount>(`/admin/service-accounts/${saId}`, {
@@ -762,6 +775,7 @@ export const vaultApi = {
     category?: string
     notes?: string
     fields?: Record<string, string>
+    custom_fields?: CustomField[]
     favorite?: boolean
   }) =>
     request<Credential>('/credentials', {
@@ -780,6 +794,7 @@ export const vaultApi = {
       category?: string
       notes?: string
       fields?: Record<string, string>
+      custom_fields?: CustomField[]
       favorite?: boolean
     },
   ) =>

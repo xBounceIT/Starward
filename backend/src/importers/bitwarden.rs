@@ -12,6 +12,7 @@ use crate::{
         detect_provider_hint_from_headers, host_from_url, parse_bool_flag,
         parse_import_timestamp, RawImportItem,
     },
+    models::{is_valid_linked_id, CustomField, CustomFieldType},
 };
 
 #[derive(Debug, Deserialize)]
@@ -77,6 +78,56 @@ struct BitwardenField {
     name: Option<String>,
     #[serde(default)]
     value: Option<Value>,
+    /// Bitwarden FieldType: 0=text, 1=hidden, 2=boolean(checkbox), 3=linked
+    #[serde(default, rename = "type")]
+    field_type: Option<u8>,
+    /// Bitwarden LinkedIdType: 100=username, 101=password, 102=uri
+    #[serde(default, rename = "linkedId")]
+    linked_id: Option<u32>,
+}
+
+/// Converte un campo personalizzato Bitwarden (con nome) nel modello tipizzato interno.
+/// Un campo "linked" con linkedId mancante/non valido degrada a testo per non perdere il valore.
+fn map_bitwarden_custom_field(cf: BitwardenField, label: String) -> CustomField {
+    let raw_value = json_val_to_string(cf.value.as_ref());
+    let linked = match cf.field_type.unwrap_or(0) {
+        3 => cf.linked_id.filter(|id| is_valid_linked_id(*id)),
+        _ => None,
+    };
+    match cf.field_type.unwrap_or(0) {
+        1 => CustomField {
+            field_type: CustomFieldType::Hidden,
+            label,
+            value: raw_value,
+            linked_id: None,
+        },
+        2 => CustomField {
+            field_type: CustomFieldType::Checkbox,
+            label,
+            value: raw_value,
+            linked_id: None,
+        },
+        3 => match linked {
+            Some(linked_id) => CustomField {
+                field_type: CustomFieldType::Linked,
+                label,
+                value: String::new(),
+                linked_id: Some(linked_id),
+            },
+            None => CustomField {
+                field_type: CustomFieldType::Text,
+                label,
+                value: raw_value,
+                linked_id: None,
+            },
+        },
+        _ => CustomField {
+            field_type: CustomFieldType::Text,
+            label,
+            value: raw_value,
+            linked_id: None,
+        },
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -371,6 +422,7 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                 category: "login".to_string(),
                 notes: String::new(),
                 fields: BTreeMap::new(),
+                custom_fields: Vec::new(),
                 favorite,
                 source_folder,
                 folder_tags,
@@ -394,18 +446,19 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
         let mut notes = item.notes.unwrap_or_default().trim().to_string();
 
         let mut custom_field_lines = Vec::new();
-        if let Some(custom_fields) = item.fields {
-            for cf in custom_fields {
-                let fname = cf.name.unwrap_or_default().trim().to_string();
-                let fval = json_val_to_string(cf.value.as_ref());
-                if fval.is_empty() && fname.is_empty() {
+        let mut custom_fields: Vec<CustomField> = Vec::new();
+        if let Some(raw_fields) = item.fields {
+            for cf in raw_fields {
+                let fname = cf.name.as_deref().unwrap_or_default().trim().to_string();
+                if fname.is_empty() {
+                    // senza nome non può diventare campo tipizzato: resta come riga di nota
+                    let fval = json_val_to_string(cf.value.as_ref());
+                    if !fval.is_empty() {
+                        custom_field_lines.push(fval);
+                    }
                     continue;
                 }
-                if fname.is_empty() {
-                    custom_field_lines.push(fval);
-                } else if !fval.is_empty() {
-                    custom_field_lines.push(format!("{fname}: {fval}"));
-                }
+                custom_fields.push(map_bitwarden_custom_field(cf, fname));
             }
         }
 
@@ -486,6 +539,7 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                                 false,
                                 created_at,
                                 updated_at,
+                                custom_fields.clone(),
                             );
                             if let Some(totp_val) = fields.get("totp") {
                                 pk_item.fields.insert("totp".to_string(), totp_val.clone());
@@ -508,6 +562,7 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                                 true,
                                 created_at,
                                 updated_at,
+                                custom_fields.clone(),
                             ));
                         }
                     }
@@ -617,6 +672,7 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
                 category,
                 notes,
                 fields,
+                custom_fields,
                 favorite,
                 source_folder,
                 folder_tags,
@@ -708,6 +764,7 @@ fn build_passkey_raw_item(
     is_companion: bool,
     parent_created_at: Option<DateTime<Utc>>,
     parent_updated_at: Option<DateTime<Utc>>,
+    custom_fields: Vec<CustomField>,
 ) -> RawImportItem {
     let rp_id = fido2.rp_id.as_deref().unwrap_or("").trim().to_string();
     let rp_name = fido2.rp_name.as_deref().unwrap_or("").trim().to_string();
@@ -800,6 +857,7 @@ fn build_passkey_raw_item(
         category: "passkey".to_string(),
         notes,
         fields,
+        custom_fields,
         favorite,
         source_folder,
         folder_tags,
@@ -1112,6 +1170,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
                 category: "identity".to_string(),
                 notes,
                 fields,
+                custom_fields: Vec::new(),
                 favorite,
                 source_folder,
                 folder_tags,
@@ -1143,6 +1202,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
                     category: "passkey".to_string(),
                     notes,
                     fields,
+                    custom_fields: Vec::new(),
                     favorite,
                     source_folder,
                     folder_tags,
@@ -1169,6 +1229,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
                         false,
                         created_at,
                         updated_at,
+                        Vec::new(),
                     );
                     if let Some(totp_val) = base_fields.get("totp") {
                         pk_item.fields.insert("totp".to_string(), totp_val.clone());
@@ -1197,6 +1258,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
                         false,
                         created_at,
                         updated_at,
+                        Vec::new(),
                     );
                     if let Some(totp_val) = base_fields.get("totp") {
                         pk_item.fields.insert("totp".to_string(), totp_val.clone());
@@ -1212,6 +1274,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
                     category: "login".to_string(),
                     notes,
                     fields: base_fields,
+                    custom_fields: Vec::new(),
                     favorite,
                     source_folder: source_folder.clone(),
                     folder_tags: folder_tags.clone(),
@@ -1236,6 +1299,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
                         true,
                         created_at,
                         updated_at,
+                        Vec::new(),
                     ));
                 }
             }
@@ -1257,6 +1321,7 @@ fn parse_bitwarden_csv(content: &str) -> AppResult<Vec<RawImportItem>> {
             category: category.to_string(),
             notes,
             fields: base_fields,
+            custom_fields: Vec::new(),
             favorite,
             source_folder,
             folder_tags,

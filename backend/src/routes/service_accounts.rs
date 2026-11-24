@@ -12,6 +12,7 @@ use crate::{
     auth::AuthenticatedUser,
     crypto::generate_service_account_api_key,
     error::{AppError, AppResult},
+    ip::validate_ip_allowlist,
     models::{
         CreateServiceAccountKeyRequest, CreateServiceAccountRequest, CreatedServiceAccountDto,
         CreatedServiceAccountKeyDto, ServiceAccountDto, ServiceAccountKeyDto,
@@ -37,6 +38,7 @@ struct ServiceAccountRow {
     is_active: bool,
     vault_ids: Vec<String>,
     credential_ids: Vec<String>,
+    allowed_ip_cidrs: Vec<String>,
     created_by: Option<String>,
     created_by_name: Option<String>,
     created_at: DateTime<Utc>,
@@ -308,6 +310,7 @@ async fn hydrate_service_account(
         is_active: row.is_active,
         vault_ids: row.vault_ids,
         credential_ids: row.credential_ids,
+        allowed_ip_cidrs: row.allowed_ip_cidrs,
         vaults,
         credentials,
         keys,
@@ -331,6 +334,7 @@ async fn fetch_service_account_dto(db: &PgPool, sa_id: &str) -> AppResult<Option
             sa.is_active,
             sa.vault_ids,
             sa.credential_ids,
+            sa.allowed_ip_cidrs,
             sa.created_by,
             creator.name AS created_by_name,
             sa.created_at,
@@ -449,6 +453,7 @@ pub async fn list_service_accounts(
             sa.is_active,
             sa.vault_ids,
             sa.credential_ids,
+            sa.allowed_ip_cidrs,
             sa.created_by,
             creator.name AS created_by_name,
             sa.created_at,
@@ -512,6 +517,8 @@ pub async fn create_service_account(
         validate_selectable_vault_ids(&state.db, &user, &payload.vault_ids).await?;
     let clean_credential_ids =
         validate_selectable_credential_ids(&state.db, &user, &payload.credential_ids).await?;
+    let clean_ip_cidrs = validate_ip_allowlist(&payload.allowed_ip_cidrs)
+        .map_err(AppError::BadRequest)?;
 
     let now = Utc::now();
 
@@ -559,9 +566,9 @@ pub async fn create_service_account(
     sqlx::query(
         r#"
         INSERT INTO service_accounts (
-            id, description, permission, vault_ids, credential_ids, is_active, created_by, created_at, updated_at
+            id, description, permission, vault_ids, credential_ids, allowed_ip_cidrs, is_active, created_by, created_at, updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8, $8)
         "#,
     )
     .bind(&sa_id)
@@ -569,6 +576,7 @@ pub async fn create_service_account(
     .bind(&permission)
     .bind(&clean_vault_ids)
     .bind(&clean_credential_ids)
+    .bind(&clean_ip_cidrs)
     .bind(&user.id)
     .bind(now)
     .execute(&mut *tx)
@@ -619,11 +627,12 @@ pub async fn create_service_account(
         "service_account",
         Some(&sa_id),
         &format!(
-            "Service Account '{}' creato (permessi: {}, {} cartelle, {} credenziali specifiche)",
+            "Service Account '{}' creato (permessi: {}, {} cartelle, {} credenziali specifiche, {} regole IP)",
             dto.name,
             dto.permission,
             dto.vault_ids.len(),
-            dto.credential_ids.len()
+            dto.credential_ids.len(),
+            dto.allowed_ip_cidrs.len()
         ),
     )
     .await?;
@@ -697,6 +706,11 @@ pub async fn update_service_account(
         None => existing.credential_ids,
     };
 
+    let new_allowed_ip_cidrs = match payload.allowed_ip_cidrs {
+        Some(list) => validate_ip_allowlist(&list).map_err(AppError::BadRequest)?,
+        None => existing.allowed_ip_cidrs,
+    };
+
     let now = Utc::now();
     let mut tx = state.db.begin().await?;
 
@@ -714,8 +728,9 @@ pub async fn update_service_account(
             is_active = $3,
             vault_ids = $4,
             credential_ids = $5,
-            updated_at = $6
-        WHERE id = $7
+            allowed_ip_cidrs = $6,
+            updated_at = $7
+        WHERE id = $8
         "#,
     )
     .bind(&new_description)
@@ -723,6 +738,7 @@ pub async fn update_service_account(
     .bind(new_is_active)
     .bind(&new_vault_ids)
     .bind(&new_credential_ids)
+    .bind(&new_allowed_ip_cidrs)
     .bind(now)
     .bind(&sa_id)
     .execute(&mut *tx)
@@ -741,12 +757,13 @@ pub async fn update_service_account(
         "service_account",
         Some(&sa_id),
         &format!(
-            "Service Account '{}' aggiornato (stato: {}, permessi: {}, {} cartelle, {} credenziali specifiche)",
+            "Service Account '{}' aggiornato (stato: {}, permessi: {}, {} cartelle, {} credenziali specifiche, {} regole IP)",
             updated.name,
             if updated.is_active { "attivo" } else { "disabilitato" },
             updated.permission,
             updated.vault_ids.len(),
-            updated.credential_ids.len()
+            updated.credential_ids.len(),
+            updated.allowed_ip_cidrs.len()
         ),
     )
     .await?;

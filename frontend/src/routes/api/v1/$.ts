@@ -51,7 +51,10 @@ async function resolveUpstreamAuthHeader(
             getRequestT(request)('api-routes.session-invalid'),
         },
       },
-      { status: 401 },
+      {
+        status: 401,
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      },
     )
   }
 
@@ -90,6 +93,17 @@ async function proxyToRust(request: Request, splat: string) {
   }
   headers.set('Accept', 'application/json')
 
+  // Forward the client IP chain so the Rust backend can enforce Service
+  // Account IP allowlists. The backend only trusts these headers when
+  // STARWARD_TRUST_PROXY_HEADERS=true (i.e. when this frontend is itself
+  // reachable only through a proxy that overwrites them).
+  for (const name of ['x-forwarded-for', 'x-real-ip'] as const) {
+    const value = request.headers.get(name)
+    if (value) {
+      headers.set(name, value)
+    }
+  }
+
   const hasBody = !['GET', 'HEAD'].includes(request.method.toUpperCase())
   const body = hasBody ? await request.arrayBuffer() : undefined
 
@@ -105,6 +119,10 @@ async function proxyToRust(request: Request, splat: string) {
     if (upstreamContentType) {
       responseHeaders.set('Content-Type', upstreamContentType)
     }
+    // These endpoints can return decrypted secrets: never let browsers or
+    // intermediaries cache the responses.
+    responseHeaders.set('Cache-Control', 'no-store')
+    responseHeaders.set('Pragma', 'no-cache')
 
     if (upstream.status === 204) {
       return new Response(null, { status: 204, headers: responseHeaders })
@@ -125,7 +143,10 @@ async function proxyToRust(request: Request, splat: string) {
             getRequestT(request)('api-routes.backend-unreachable'),
         },
       },
-      { status: 502 },
+      {
+        status: 502,
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      },
     )
   }
 }

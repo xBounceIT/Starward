@@ -297,7 +297,9 @@ export default {
     "cartella": "Vault",
     "tipologia": "Type",
     "titolo": "Title",
-    "annulla": "Cancel"
+    "annulla": "Cancel",
+    "si": "Yes",
+    "no": "No"
   },
   "credential-list": {
     "ultima-modifica": "Last modified",
@@ -497,7 +499,16 @@ export default {
     "ssh-v0-v1": "ssh://{{v0}}{{v1}}",
     "licenza-software-2": "Software license",
     "scadenza-v0": "Expires: {{v0}}",
-    "nota-sicura-2": "Secure note"
+    "nota-sicura-2": "Secure note",
+    "cf-text-label": "Text",
+    "cf-text-desc": "Use text fields for data such as security questions",
+    "cf-hidden-label": "Hidden",
+    "cf-hidden-desc": "Use hidden fields for sensitive data such as a password",
+    "cf-checkbox-label": "Checkbox",
+    "cf-checkbox-desc": "Use checkboxes to automatically fill a form checkbox, such as a remember-me email",
+    "cf-linked-label": "Linked",
+    "cf-linked-desc": "Use linked fields to reuse the value of another credential field, such as username, password or URL",
+    "si": "Yes"
   },
   "group-detail-panel": {
     "v0-aggiunto-al-gruppo-v1": "{{v0}} added to group \"{{v1}}\"",
@@ -790,7 +801,9 @@ export default {
     "cartella": "vault",
     "cartelle": "vaults",
     "annulla": "Cancel",
-    "proprietario-colon": "Owner:"
+    "proprietario-colon": "Owner:",
+    "ip-help-1": "One IP or CIDR per line (IPv4/IPv6). Leave empty to allow access from any address. Keys",
+    "ip-help-2": "will only be accepted from these IPs; blocked attempts are recorded in the system audit log."
   },
   "service-accounts-section": {
     "errore-nel-caricamento-dei-service-account": "Error loading Service Accounts",

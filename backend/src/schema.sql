@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS credentials (
     notes_nonce TEXT NOT NULL,
     extra_fields_ciphertext TEXT NOT NULL DEFAULT '',
     extra_fields_nonce TEXT NOT NULL DEFAULT '',
+    custom_fields_ciphertext TEXT NOT NULL DEFAULT '',
+    custom_fields_nonce TEXT NOT NULL DEFAULT '',
     favorite BOOLEAN NOT NULL DEFAULT FALSE,
     created_by TEXT NOT NULL REFERENCES users(id),
     updated_by TEXT NOT NULL REFERENCES users(id),
@@ -179,12 +181,16 @@ CREATE TABLE IF NOT EXISTS service_accounts (
     permission TEXT NOT NULL DEFAULT 'read' CHECK (permission IN ('read', 'read_write')),
     vault_ids TEXT[] NOT NULL DEFAULT '{}',
     credential_ids TEXT[] NOT NULL DEFAULT '{}',
+    allowed_ip_cidrs TEXT[] NOT NULL DEFAULT '{}',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_used_at TIMESTAMPTZ
 );
+
+-- Migration for databases created before the IP allowlist existed.
+ALTER TABLE service_accounts ADD COLUMN IF NOT EXISTS allowed_ip_cidrs TEXT[] NOT NULL DEFAULT '{}';
 
 CREATE INDEX IF NOT EXISTS idx_service_accounts_is_active ON service_accounts (is_active);
 CREATE INDEX IF NOT EXISTS idx_service_accounts_created_by ON service_accounts (created_by);

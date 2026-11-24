@@ -29,14 +29,19 @@ import {
 import { OtpCodeCard } from '@/components/otp-code-card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { CredentialBrandIcon } from '@/components/vault-icon'
-import type { Credential } from '@/lib/api'
+import type { Credential, CustomField } from '@/lib/api'
 import {
   getCategoryConfig,
   getCategoryLabel,
   getCredentialQuickCopy,
+  getCustomFieldDisplayValue,
+  getCustomFieldTypeOption,
+  getLinkedFieldLabel,
   getSelectOptionLabel,
+  isLinkedFieldSecret,
   maskSecretValue,
   parseCredentialTags,
+  resolveLinkedFieldValue,
   type CredentialFieldDef,
 } from '@/lib/credential-types'
 import { generateTotpFromRaw } from '@/lib/otp'
@@ -246,6 +251,94 @@ export function CredentialDetail({
     onUpdateTags(
       credential,
       tags.filter((t) => t !== tagToRemove),
+    )
+  }
+
+  const renderCustomFieldBox = (field: CustomField, idx: number) => {
+    const revealKey = `cf-${idx}`
+    const isRevealed = Boolean(revealedFields[revealKey])
+    const isSecret =
+      field.field_type === 'hidden' || isLinkedFieldSecret(field.linked_id)
+    const rawValue =
+      field.field_type === 'linked'
+        ? resolveLinkedFieldValue(credential, field.linked_id)
+        : field.value
+    const displayValue = getCustomFieldDisplayValue(credential, field)
+    const copyValue = field.field_type === 'checkbox' ? displayValue : rawValue
+    const typeOption = getCustomFieldTypeOption(field.field_type)
+
+    return (
+      <div key={revealKey} className="min-w-0 space-y-1.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-muted-foreground text-[11px] font-bold tracking-wider sync-security:text-[#ff9c00] uppercase">
+            {field.label}
+          </p>
+          <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+            {typeOption.label}
+            {field.field_type === 'linked'
+              ? ` · ${getLinkedFieldLabel(field.linked_id)}`
+              : ''}
+          </Badge>
+        </div>
+
+        <div className="flex min-w-0 items-center justify-between gap-2 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]">
+          <div className="min-w-0 flex-1 overflow-hidden">
+            {field.field_type === 'checkbox' ? (
+              <span className="inline-flex items-center gap-1.5 text-sm text-foreground select-all">
+                {field.value === 'true' && (
+                  <Check className="size-3.5 text-emerald-400" />
+                )}
+                {displayValue}
+              </span>
+            ) : !rawValue ? (
+              <span className="text-xs italic text-muted-foreground">
+                Non specificato
+              </span>
+            ) : isSecret && !isRevealed ? (
+              <span className="block truncate font-mono text-sm tracking-widest text-foreground select-none">
+                {maskSecretValue(rawValue)}
+              </span>
+            ) : (
+              <span
+                title={isSecret ? undefined : displayValue}
+                className="block truncate text-sm text-foreground select-all"
+              >
+                {displayValue}
+              </span>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1">
+            {isSecret && rawValue && (
+              <button
+                type="button"
+                onClick={() => toggleReveal(revealKey)}
+                className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                title={isRevealed ? 'Nascondi' : 'Mostra'}
+              >
+                {isRevealed ? (
+                  <EyeOff className="size-3.5" />
+                ) : (
+                  <Eye className="size-3.5" />
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => copyField(revealKey, copyValue, field.label)}
+              className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              title={`Copia ${field.label.toLowerCase()}`}
+            >
+              {copiedField === revealKey ? (
+                <Check className="size-3.5 text-emerald-400" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -595,6 +688,11 @@ export function CredentialDetail({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Custom Fields Section */}
+          {(credential.custom_fields ?? []).map((field, idx) =>
+            renderCustomFieldBox(field, idx),
           )}
 
           {/* Tag Section */}

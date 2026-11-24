@@ -20,7 +20,8 @@ use crate::{
         ImportVaultRequest,
     },
     routes::{
-        credentials::encrypt_extra_fields, record_audit, require_vault_role,
+        credentials::{encrypt_custom_fields, encrypt_extra_fields},
+        record_audit, require_vault_role,
     },
     AppState,
 };
@@ -271,6 +272,8 @@ pub async fn import_vault(
         let enc_notes = state.crypto.encrypt(&item.notes)?;
         let (extra_fields_ciphertext, extra_fields_nonce) =
             encrypt_extra_fields(&state.crypto, &item.fields)?;
+        let (custom_fields_ciphertext, custom_fields_nonce) =
+            encrypt_custom_fields(&state.crypto, &item.custom_fields)?;
 
         let cred_id = Uuid::new_v4().to_string();
         let created_at = item.created_at.or(item.updated_at).unwrap_or(now);
@@ -286,9 +289,10 @@ pub async fn import_vault(
                 password_ciphertext, password_nonce,
                 notes_ciphertext, notes_nonce,
                 extra_fields_ciphertext, extra_fields_nonce,
+                custom_fields_ciphertext, custom_fields_nonce,
                 favorite, created_by, updated_by, created_at, updated_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15, $16)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $16, $17, $18)
             "#,
         )
         .bind(&cred_id)
@@ -303,6 +307,8 @@ pub async fn import_vault(
         .bind(&enc_notes.nonce)
         .bind(&extra_fields_ciphertext)
         .bind(&extra_fields_nonce)
+        .bind(&custom_fields_ciphertext)
+        .bind(&custom_fields_nonce)
         .bind(item.favorite)
         .bind(&user.id)
         .bind(created_at)
@@ -380,6 +386,7 @@ mod tests {
             category: "login".to_string(),
             notes: String::new(),
             fields: BTreeMap::new(),
+            custom_fields: Vec::new(),
             favorite: false,
             source_folder: source_folder.map(str::to_string),
             tags: Vec::new(),

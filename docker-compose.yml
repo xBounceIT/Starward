@@ -43,6 +43,9 @@ services:
       CORS_ORIGIN: ${BETTER_AUTH_URL:-http://0.0.0.0:3000}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       RUST_LOG: ${RUST_LOG:-starward_backend=info,tower_http=info}
+      # Only behind a reverse proxy that overwrites X-Forwarded-For (real client
+      # IP for Service Account IP allowlists):
+      STARWARD_TRUST_PROXY_HEADERS: ${STARWARD_TRUST_PROXY_HEADERS:-false}
     ports:
       - "0.0.0.0:${BACKEND_PORT:-8080}:8080"
     networks:

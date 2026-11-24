@@ -39,6 +39,12 @@ pub struct Config {
     pub master_key: String,
     pub cors_origin: String,
     pub admin_emails: Vec<String>,
+    /// When true, the client IP is taken from `X-Forwarded-For` (leftmost
+    /// entry) or `X-Real-IP` instead of the peer socket address. Enable ONLY
+    /// when the backend is reachable exclusively through a reverse proxy that
+    /// overwrites those headers (otherwise clients could spoof their IP, e.g.
+    /// to bypass Service Account IP allowlists).
+    pub trust_proxy_headers: bool,
 }
 
 impl Config {
@@ -57,6 +63,10 @@ impl Config {
             .or_else(|_| env::var("STARWARD_ADMIN_EMAILS"))
             .unwrap_or_default();
         let admin_emails = parse_admin_emails(&raw_admin_emails);
+        let trust_proxy_headers = matches!(
+            env::var("STARWARD_TRUST_PROXY_HEADERS").as_deref(),
+            Ok("true") | Ok("1") | Ok("yes")
+        );
 
         Self {
             host,
@@ -66,6 +76,7 @@ impl Config {
             master_key,
             cors_origin,
             admin_emails,
+            trust_proxy_headers,
         }
     }
 

@@ -3,6 +3,7 @@ mod config;
 mod crypto;
 mod error;
 mod importers;
+mod ip;
 mod models;
 mod otp;
 mod routes;
@@ -10,9 +11,11 @@ mod routes;
 use std::net::SocketAddr;
 
 use axum::{
-    extract::DefaultBodyLimit,
+    extract::{DefaultBodyLimit, Request},
     http::{header, HeaderName, HeaderValue, Method},
+    middleware::{self, Next},
     routing::{delete, get, patch, post},
+    response::Response,
     Router,
 };
 use sqlx::{postgres::PgPoolOptions, PgPool};
@@ -36,9 +39,17 @@ pub struct AppState {
 const SCHEMA_SQL: &str = include_str!("schema.sql");
 
 pub async fn init_db(database_url: &str) -> Result<PgPool, sqlx::Error> {
+    use std::str::FromStr;
+
+    use sqlx::{postgres::PgConnectOptions, ConnectOptions};
+
+    // Never log SQL statements/binds: even though only ciphertext is bound
+    // for credentials, disabling statement logging removes any chance of
+    // sensitive bind values (emails, key material) reaching the logs.
+    let options = PgConnectOptions::from_str(database_url)?.disable_statement_logging();
     let pool = PgPoolOptions::new()
         .max_connections(15)
-        .connect(database_url)
+        .connect_with(options)
         .await?;
 
     sqlx::raw_sql(SCHEMA_SQL).execute(&pool).await?;
@@ -93,6 +104,21 @@ fn build_cors_origin(raw: &str) -> AllowOrigin {
     } else {
         AllowOrigin::list(origins)
     }
+}
+
+/// Forces `Cache-Control: no-store` (plus `Pragma: no-cache`) on every
+/// response. Several endpoints return decrypted secrets (credential DTOs,
+/// OTP codes, MCP tool results); those must never be stored by browsers,
+/// intermediaries or proxies.
+async fn no_store_headers(req: Request, next: Next) -> Response {
+    let mut res = next.run(req).await;
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store"),
+    );
+    res.headers_mut()
+        .insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    res
 }
 
 pub fn build_app(state: AppState) -> Router {
@@ -264,6 +290,8 @@ pub fn build_app(state: AppState) -> Router {
         )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        // Outermost layer: guarantees no-store even on error/CORS responses.
+        .layer(middleware::from_fn(no_store_headers))
         .with_state(state)
 }
 
@@ -311,9 +339,14 @@ async fn main() {
         .await
         .expect("Failed to bind TCP listener");
 
-    axum::serve(listener, app)
-        .await
-        .expect("Server error");
+    // ConnectInfo is injected into request extensions so the auth layer can
+    // resolve the real peer IP (used for Service Account IP allowlists).
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await
+    .expect("Server error");
 }
 
 #[cfg(test)]
@@ -382,6 +415,7 @@ mod tests {
             auth_secret: String::new(),
             master_key: String::new(),
             cors_origin: String::new(),
+            trust_proxy_headers: false,
             admin_emails: parsed,
         };
         assert!(cfg.is_admin_email("ADMIN@starward.io"));
@@ -425,6 +459,7 @@ mod tests {
             auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
+            trust_proxy_headers: false,
             admin_emails: vec![alice_email.clone()],
         };
 
@@ -660,7 +695,13 @@ mod tests {
                                 "db_type": "postgresql",
                                 "port": "5432",
                                 "database_name": "starward_prod"
-                            }
+                            },
+                            "custom_fields": [
+                                { "field_type": "text", "label": "Domanda di sicurezza", "value": "Colore preferito?" },
+                                { "field_type": "hidden", "label": "PIN admin", "value": "9876" },
+                                { "field_type": "checkbox", "label": "Ricorda dispositivo", "value": true },
+                                { "field_type": "linked", "label": "Username DB", "linked_id": 100 }
+                            ]
                         })
                         .to_string(),
                     ))
@@ -673,6 +714,15 @@ mod tests {
         let db_cred_id = db_cred["id"].as_str().unwrap().to_string();
         assert_eq!(db_cred["fields"]["port"], "5432");
         assert_eq!(db_cred["fields"]["db_type"], "postgresql");
+        assert_eq!(db_cred["custom_fields"].as_array().unwrap().len(), 4);
+        assert_eq!(db_cred["custom_fields"][0]["field_type"], "text");
+        assert_eq!(db_cred["custom_fields"][0]["label"], "Domanda di sicurezza");
+        assert_eq!(db_cred["custom_fields"][1]["field_type"], "hidden");
+        assert_eq!(db_cred["custom_fields"][1]["value"], "9876");
+        assert_eq!(db_cred["custom_fields"][2]["field_type"], "checkbox");
+        assert_eq!(db_cred["custom_fields"][2]["value"], "true");
+        assert_eq!(db_cred["custom_fields"][3]["field_type"], "linked");
+        assert_eq!(db_cred["custom_fields"][3]["linked_id"], 100);
 
         let raw_extra: (String,) =
             sqlx::query_as("SELECT extra_fields_ciphertext FROM credentials WHERE id = $1")
@@ -682,6 +732,62 @@ mod tests {
                 .unwrap();
         assert!(!raw_extra.0.is_empty());
         assert!(!raw_extra.0.contains("starward_prod"));
+
+        // custom fields are encrypted at rest too
+        let raw_custom: (String,) =
+            sqlx::query_as("SELECT custom_fields_ciphertext FROM credentials WHERE id = $1")
+                .bind(&db_cred_id)
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert!(!raw_custom.0.is_empty());
+        assert!(!raw_custom.0.contains("9876"));
+        assert!(!raw_custom.0.contains("Domanda di sicurezza"));
+
+        // PATCH updates custom fields (and rejects invalid ones)
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{db_cred_id}"))
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "custom_fields": [
+                                { "field_type": "hidden", "label": "PIN admin", "value": "1111" }
+                            ]
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let patched = read_json(res).await;
+        assert_eq!(patched["custom_fields"].as_array().unwrap().len(), 1);
+        assert_eq!(patched["custom_fields"][0]["value"], "1111");
+        assert_eq!(patched["fields"]["port"], "5432");
+
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/credentials/{db_cred_id}"))
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({ "custom_fields": [{ "field_type": "linked", "label": "X" }] })
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
 
         // 9. Secure note allows empty password and supports PATCH favorite toggle
         let res = app
@@ -1410,6 +1516,7 @@ mod tests {
             auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
+            trust_proxy_headers: false,
             admin_emails: vec![admin_email.clone()],
         };
 
@@ -2005,6 +2112,7 @@ mod tests {
             auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
+            trust_proxy_headers: false,
             admin_emails: vec![owner_email.clone()],
         };
 
@@ -2401,6 +2509,7 @@ mod tests {
             auth_secret: "test-secret-key-for-jwt-validation-32".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             master_key: "test-master-key-for-aes-256-gcm-enc".to_string(), // codeql[trust/hard-coded-cryptographic-value]
             cors_origin: "http://localhost:3000".to_string(),
+            trust_proxy_headers: false,
             admin_emails: vec![alice_email.clone()],
         };
 
@@ -3222,6 +3331,332 @@ mod tests {
         let _ = sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
             .bind(&alice_id)
             .bind(&bob_id)
+            .execute(&db)
+            .await;
+    }
+
+    fn test_app_no_db() -> Router {
+        // A lazy pool never opens a connection: enough to exercise layers and
+        // extractors that fail before touching the database.
+        let db = PgPoolOptions::new()
+            .connect_lazy("postgres://127.0.0.1:1/starward_test")
+            .unwrap();
+        let config = Config {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            database_url: String::new(),
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            cors_origin: "http://localhost:3000".to_string(),
+            trust_proxy_headers: false,
+            admin_emails: vec![],
+        };
+        let crypto = VaultCrypto::from_master_key(&config.master_key);
+        build_app(AppState { db, config, crypto })
+    }
+
+    #[tokio::test]
+    async fn no_store_headers_set_on_error_responses() {
+        let app = test_app_no_db();
+        // Unauthenticated request: the extractor rejects with 401 before any
+        // DB access; the no-store middleware must still mark the response.
+        let res = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            res.headers().get(header::CACHE_CONTROL).unwrap(),
+            "no-store"
+        );
+        assert_eq!(res.headers().get(header::PRAGMA).unwrap(), "no-cache");
+    }
+
+    #[tokio::test]
+    async fn service_account_key_blocked_without_peer_ip_when_allowlist_set() {
+        // Pure unit-level check of the decision logic: an allowlist that is
+        // non-empty must reject a missing/unknown client IP.
+        use std::net::IpAddr;
+        use std::str::FromStr;
+
+        let allowlist = crate::ip::validate_ip_allowlist(&["10.0.0.0/8".to_string()]).unwrap();
+        assert!(!crate::ip::ip_allowed(&allowlist, IpAddr::from_str("192.168.1.1").unwrap()));
+        assert!(crate::ip::ip_allowed(&allowlist, IpAddr::from_str("10.1.2.3").unwrap()));
+    }
+
+    #[tokio::test]
+    async fn service_account_ip_allowlist_postgres() {
+        use axum::extract::ConnectInfo;
+
+        let Ok(database_url) = std::env::var("TEST_DATABASE_URL") else {
+            eprintln!("Skipping PostgreSQL IP allowlist integration test: TEST_DATABASE_URL not set");
+            return;
+        };
+
+        let suffix = Uuid::new_v4().simple().to_string();
+        let admin_id = format!("test-ip-admin-{suffix}");
+        let admin_email = format!("ip-admin-{suffix}@starward.io");
+
+        let config = Config {
+            host: "127.0.0.1".to_string(),
+            port: 0,
+            database_url,
+            auth_secret: "test-secret-key-for-jwt-validation-32".to_string(),
+            master_key: "test-master-key-for-aes-256-gcm-enc".to_string(),
+            cors_origin: "http://localhost:3000".to_string(),
+            trust_proxy_headers: false,
+            admin_emails: vec![admin_email.clone()],
+        };
+
+        let db = init_db(&config.database_url).await.unwrap();
+        let crypto = VaultCrypto::from_master_key(&config.master_key);
+        let app = build_app(AppState {
+            db: db.clone(),
+            config: config.clone(),
+            crypto,
+        });
+
+        let admin_token = make_token(&config.auth_secret, &admin_id, &admin_email, "Admin");
+
+        // Bootstrap admin user
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/me")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Create a Service Account restricted to 10.0.0.0/8 + 192.168.1.10
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/admin/service-accounts")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::json!({
+                            "name": "ci-bot",
+                            "permission": "read",
+                            "vault_ids": [],
+                            "credential_ids": [],
+                            "allowed_ip_cidrs": ["10.0.0.0/8", "192.168.1.10"],
+                            "generate_initial_key": true,
+                            "initial_key_name": "Chiave primaria",
+                            "initial_key_expires_in_days": 90
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let created = read_json(res).await;
+        let sa_id = created["service_account"]["id"].as_str().unwrap().to_string();
+        assert_eq!(
+            created["service_account"]["allowed_ip_cidrs"],
+            serde_json::json!(["10.0.0.0/8", "192.168.1.10"])
+        );
+        let sa_key = created["initial_key"]["secret_key"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(sa_key.starts_with("sw_sa_"));
+
+        let sa_request = |ip: Option<SocketAddr>| {
+            let mut builder = Request::builder()
+                .method("GET")
+                .uri("/api/vaults")
+                .header("Authorization", format!("Bearer {sa_key}"));
+            if let Some(addr) = ip {
+                builder = builder.extension(ConnectInfo(addr));
+            }
+            builder.body(Body::empty()).unwrap()
+        };
+
+        // No peer IP available (e.g. in-process test) + non-empty allowlist => denied
+        let res = app.clone().oneshot(sa_request(None)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // IP outside the allowlist => denied
+        let res = app
+            .clone()
+            .oneshot(sa_request(Some("203.0.113.5:5555".parse().unwrap())))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // IP inside the CIDR => allowed
+        let res = app
+            .clone()
+            .oneshot(sa_request(Some("10.1.2.3:5555".parse().unwrap())))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Plain IP entry => allowed
+        let res = app
+            .clone()
+            .oneshot(sa_request(Some("192.168.1.10:5555".parse().unwrap())))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Behind a trusted proxy (STARWARD_TRUST_PROXY_HEADERS=true) the client
+        // IP comes from X-Forwarded-For / X-Real-IP, not from the peer socket.
+        let trusted_config = Config {
+            trust_proxy_headers: true,
+            ..config.clone()
+        };
+        let trusted_app = build_app(AppState {
+            db: db.clone(),
+            crypto: VaultCrypto::from_master_key(&config.master_key),
+            config: trusted_config,
+        });
+        let xff_request = |xff: &str| {
+            Request::builder()
+                .method("GET")
+                .uri("/api/vaults")
+                .header("Authorization", format!("Bearer {sa_key}"))
+                .header("x-forwarded-for", xff)
+                .body(Body::empty())
+                .unwrap()
+        };
+        let res = trusted_app
+            .clone()
+            .oneshot(xff_request("10.5.5.5, 192.0.2.1"))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let res = trusted_app
+            .clone()
+            .oneshot(xff_request("8.8.8.8"))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+
+        // Blocked attempts are recorded in the system audit
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/admin/audit")
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let audit = read_json(res).await;
+        let actions: Vec<&str> = audit
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|e| e["action"].as_str())
+            .collect();
+        assert!(
+            actions.contains(&"auth.service_account_ip_blocked"),
+            "missing IP-blocked audit entries: {actions:?}"
+        );
+
+        // Invalid CIDR is rejected with 400
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::json!({ "allowed_ip_cidrs": ["not-an-ip"] }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+
+        // Narrow the allowlist to 192.168.1.0/24: 10.x now blocked, 192.168.1.10 still allowed
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::json!({ "allowed_ip_cidrs": ["192.168.1.0/24"] }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let updated = read_json(res).await;
+        assert_eq!(
+            updated["allowed_ip_cidrs"],
+            serde_json::json!(["192.168.1.0/24"])
+        );
+
+        let res = app
+            .clone()
+            .oneshot(sa_request(Some("10.1.2.3:5555".parse().unwrap())))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::FORBIDDEN);
+        let res = app
+            .clone()
+            .oneshot(sa_request(Some("192.168.1.10:5555".parse().unwrap())))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Empty allowlist => any IP allowed again
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri(format!("/api/admin/service-accounts/{sa_id}"))
+                    .header("Authorization", format!("Bearer {admin_token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::json!({ "allowed_ip_cidrs": [] }).to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+        let res = app
+            .clone()
+            .oneshot(sa_request(Some("203.0.113.5:5555".parse().unwrap())))
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        // Clean up
+        let _ = sqlx::query("DELETE FROM users WHERE id = $1")
+            .bind(&admin_id)
             .execute(&db)
             .await;
     }

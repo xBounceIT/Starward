@@ -8,8 +8,10 @@ use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, Utc};
 
 use crate::{
     error::{AppError, AppResult},
-    models::{ImportPreviewItemDto, ImportPreviewResponseDto, ImportProviderDto},
-    routes::credentials::{clean_extra_fields, normalize_category, validate_credential_fields},
+    models::{CustomField, ImportPreviewItemDto, ImportPreviewResponseDto, ImportProviderDto},
+    routes::credentials::{
+        clean_custom_fields, clean_extra_fields, normalize_category, validate_credential_fields,
+    },
 };
 
 pub(crate) type DedupKey = (String, String, String, String);
@@ -212,6 +214,7 @@ pub(crate) struct RawImportItem {
     pub category: String,
     pub notes: String,
     pub fields: BTreeMap<String, String>,
+    pub custom_fields: Vec<CustomField>,
     pub favorite: bool,
     pub source_folder: Option<String>,
     pub folder_tags: Vec<String>,
@@ -232,6 +235,7 @@ pub struct EvaluatedImportItem {
     pub category: String,
     pub notes: String,
     pub fields: BTreeMap<String, String>,
+    pub custom_fields: Vec<CustomField>,
     pub favorite: bool,
     pub source_folder: Option<String>,
     pub tags: Vec<String>,
@@ -245,7 +249,8 @@ pub struct EvaluatedImportItem {
 
 impl EvaluatedImportItem {
     pub fn to_preview_dto(&self) -> ImportPreviewItemDto {
-        let extra_field_count = self.fields.keys().filter(|k| k.as_str() != "tags").count();
+        let extra_field_count = self.fields.keys().filter(|k| k.as_str() != "tags").count()
+            + self.custom_fields.len();
         ImportPreviewItemDto {
             index: self.index,
             title: self.title.clone(),
@@ -413,6 +418,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             category: normalize_category(&raw.category),
             notes: String::new(),
             fields: BTreeMap::new(),
+            custom_fields: Vec::new(),
             favorite: raw.favorite,
             source_folder,
             tags: Vec::new(),
@@ -433,6 +439,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
     let url = raw.url.trim().to_string();
     let mut notes = raw.notes.trim().to_string();
     let mut fields = clean_extra_fields(&raw.fields);
+    let custom_fields = clean_custom_fields(&raw.custom_fields).unwrap_or_default();
     let mut warning = raw.warning;
 
     let identity_fallback_title = if category == "identity" {
@@ -518,6 +525,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             category,
             notes,
             fields,
+            custom_fields: Vec::new(),
             favorite: raw.favorite,
             source_folder,
             tags: Vec::new(),
@@ -599,6 +607,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
                 category,
                 notes: String::new(),
                 fields,
+                custom_fields,
                 favorite: raw.favorite,
                 source_folder,
                 tags,
@@ -659,6 +668,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
         category,
         notes,
         fields,
+        custom_fields,
         favorite: raw.favorite,
         source_folder,
         tags,
@@ -894,6 +904,7 @@ pub(crate) fn detect_provider_hint_from_headers(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::CustomFieldType;
 
     #[test]
     fn csv_parser_handles_bom_semicolons_multiline_and_escaped_quotes() {
@@ -934,6 +945,9 @@ mod tests {
                     "deletedDate": null,
                     "fields": [
                         { "name": "Recovery", "value": 987654, "type": 0 },
+                        { "name": "PIN", "value": "1234", "type": 1 },
+                        { "name": "Ricorda dispositivo", "value": true, "type": 2 },
+                        { "name": "Username alternativo", "value": "", "type": 3, "linkedId": 100 },
                         { "name": null, "value": null, "type": 0 }
                     ],
                     "login": {
@@ -1014,7 +1028,32 @@ mod tests {
         assert!(login.favorite);
         assert!(login.notes.contains("https://api.github.com"));
         assert!(login.notes.contains("TOTP: otpauth://totp/GitHub"));
-        assert!(login.notes.contains("Recovery: 987654"));
+        assert!(!login.notes.contains("Recovery"));
+        assert_eq!(login.custom_fields.len(), 4);
+        let recovery = login
+            .custom_fields
+            .iter()
+            .find(|f| f.label == "Recovery")
+            .unwrap();
+        assert_eq!(recovery.field_type, CustomFieldType::Text);
+        assert_eq!(recovery.value, "987654");
+        let pin = login.custom_fields.iter().find(|f| f.label == "PIN").unwrap();
+        assert_eq!(pin.field_type, CustomFieldType::Hidden);
+        assert_eq!(pin.value, "1234");
+        let remember = login
+            .custom_fields
+            .iter()
+            .find(|f| f.label == "Ricorda dispositivo")
+            .unwrap();
+        assert_eq!(remember.field_type, CustomFieldType::Checkbox);
+        assert_eq!(remember.value, "true");
+        let linked = login
+            .custom_fields
+            .iter()
+            .find(|f| f.label == "Username alternativo")
+            .unwrap();
+        assert_eq!(linked.field_type, CustomFieldType::Linked);
+        assert_eq!(linked.linked_id, Some(100));
         assert_eq!(login.tags, vec!["Infrastruttura", "Team DevOps"]);
 
         // Secure Note
@@ -1165,7 +1204,11 @@ mod tests {
         assert!(pk_only.favorite);
         assert_eq!(pk_only.source_folder.as_deref(), Some("Sicurezza"));
         assert!(pk_only.notes.contains("Passkey principale"));
-        assert!(pk_only.notes.contains("Env: prod"));
+        assert!(!pk_only.notes.contains("Env: prod"));
+        assert_eq!(pk_only.custom_fields.len(), 1);
+        assert_eq!(pk_only.custom_fields[0].label, "Env");
+        assert_eq!(pk_only.custom_fields[0].field_type, CustomFieldType::Text);
+        assert_eq!(pk_only.custom_fields[0].value, "prod");
         assert_eq!(pk_only.fields.get("rp_id").map(String::as_str), Some("github.com"));
         assert_eq!(pk_only.fields.get("rp_name").map(String::as_str), Some("GitHub"));
         assert_eq!(pk_only.fields.get("credential_id").map(String::as_str), Some("76c3b5c8-d880-46e6-9f57-ced060607557"));
