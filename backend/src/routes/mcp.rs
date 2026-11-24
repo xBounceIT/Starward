@@ -1382,6 +1382,7 @@ mod tests {
                 auth_secret: String::new(),
                 master_key: String::new(),
                 cors_origin: String::new(),
+                trust_proxy_headers: false,
                 admin_emails: vec![],
             },
             crypto: crate::crypto::VaultCrypto::from_master_key("test-key"),

@@ -363,6 +363,7 @@ export interface ServiceAccount {
   is_active: boolean
   vault_ids: string[]
   credential_ids: string[]
+  allowed_ip_cidrs: string[]
   vaults: ServiceAccountScopedVault[]
   credentials: ServiceAccountScopedCredential[]
   keys: ServiceAccountKey[]
@@ -600,6 +601,7 @@ export const vaultApi = {
     permission: ApiKeyPermission
     vault_ids: string[]
     credential_ids: string[]
+    allowed_ip_cidrs?: string[]
     generate_initial_key?: boolean
     initial_key_name?: string
     initial_key_expires_in_days?: number | null
@@ -618,6 +620,7 @@ export const vaultApi = {
       is_active?: boolean
       vault_ids?: string[]
       credential_ids?: string[]
+      allowed_ip_cidrs?: string[]
     },
   ) =>
     request<ServiceAccount>(`/admin/service-accounts/${saId}`, {

@@ -14,6 +14,10 @@ const FORWARDED_REQUEST_HEADERS = [
   'origin',
   'access-control-request-method',
   'access-control-request-headers',
+  // Client IP chain, used by the backend for Service Account IP allowlists
+  // (trusted only when STARWARD_TRUST_PROXY_HEADERS=true on the backend).
+  'x-forwarded-for',
+  'x-real-ip',
 ] as const
 
 const PRESERVED_RESPONSE_HEADERS = new Set([
@@ -62,6 +66,10 @@ async function proxyMcpToRust(request: Request): Promise<Response> {
         responseHeaders.set(key, value)
       }
     })
+    // MCP tools/resources can return decrypted secrets: never cache responses.
+    if (!responseHeaders.has('cache-control')) {
+      responseHeaders.set('cache-control', 'no-store')
+    }
 
     if (upstream.status === 202 || upstream.status === 204) {
       return new Response(null, {
@@ -85,7 +93,10 @@ async function proxyMcpToRust(request: Request): Promise<Response> {
             'Backend Rust non raggiungibile. Assicurati che sia avviato sulla porta 8080.',
         },
       },
-      { status: 502 },
+      {
+        status: 502,
+        headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' },
+      },
     )
   }
 }

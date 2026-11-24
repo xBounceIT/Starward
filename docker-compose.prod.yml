@@ -35,6 +35,10 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required in production (set it to the public frontend URL, e.g. https://vault.example.com)}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       RUST_LOG: ${RUST_LOG:-starward_backend=info,tower_http=info}
+      # Only when the backend is reachable exclusively through a reverse proxy
+      # that overwrites X-Forwarded-For (enables Service Account IP allowlists
+      # based on the real client IP instead of the proxy IP):
+      STARWARD_TRUST_PROXY_HEADERS: ${STARWARD_TRUST_PROXY_HEADERS:-false}
     ports:
       - "0.0.0.0:${BACKEND_PORT:-8080}:8080"
     networks:

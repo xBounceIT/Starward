@@ -1,5 +1,7 @@
+use std::net::{IpAddr, SocketAddr};
+
 use axum::{
-    extract::FromRequestParts,
+    extract::{ConnectInfo, FromRequestParts},
     http::{
         header::{AUTHORIZATION, WWW_AUTHENTICATE},
         request::Parts,
@@ -13,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
-use crate::{crypto::hash_api_key, error::AppError, AppState};
+use crate::{crypto::hash_api_key, error::AppError, ip, AppState};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthClaims {
@@ -232,6 +234,7 @@ struct ServiceAccountKeyAuthRow {
     permission: String,
     vault_ids: Vec<String>,
     credential_ids: Vec<String>,
+    allowed_ip_cidrs: Vec<String>,
     is_active: bool,
     email: String,
     name: String,
@@ -241,6 +244,7 @@ struct ServiceAccountKeyAuthRow {
 async fn authenticate_service_account_key(
     raw_key: &str,
     state: &AppState,
+    client_ip: Option<IpAddr>,
 ) -> Result<AuthenticatedUser, AppError> {
     let key_hash = hash_api_key(raw_key);
     let row: Option<ServiceAccountKeyAuthRow> = sqlx::query_as(
@@ -255,6 +259,7 @@ async fn authenticate_service_account_key(
             sa.permission,
             sa.vault_ids,
             sa.credential_ids,
+            sa.allowed_ip_cidrs,
             sa.is_active,
             u.email,
             u.name,
@@ -289,6 +294,50 @@ async fn authenticate_service_account_key(
             ));
         }
 
+    let auth_user = AuthenticatedUser {
+        id: row.service_account_id.clone(),
+        email: row.email.clone(),
+        name: row.name.clone(),
+        image: row.image.clone(),
+        role: "user".to_string(),
+        is_service_account: true,
+        api_key: None,
+        service_account: Some(ServiceAccountAuthContext {
+            permission: row.permission.clone(),
+            vault_ids: row.vault_ids.clone(),
+            credential_ids: row.credential_ids.clone(),
+        }),
+        mcp_key: None,
+    };
+
+    // IP allowlist enforcement (empty list = any IP allowed). The check runs
+    // before any state mutation (last_used_at) and is audited on rejection.
+    if !row.allowed_ip_cidrs.is_empty()
+        && !client_ip.is_some_and(|ip| ip::ip_allowed(&row.allowed_ip_cidrs, ip))
+    {
+        let _ = crate::routes::record_system_audit(
+            &state.db,
+            &auth_user,
+            "auth.service_account_ip_blocked",
+            "service_account",
+            Some(&row.service_account_id),
+            &format!(
+                "Accesso bloccato dall'allowlist IP tramite chiave '{}' ({}...): IP {} non autorizzato ({} regole configurate)",
+                row.key_name,
+                row.key_prefix,
+                client_ip
+                    .map(|ip| ip.to_string())
+                    .unwrap_or_else(|| "sconosciuto".to_string()),
+                row.allowed_ip_cidrs.len()
+            ),
+        )
+        .await;
+        return Err(AppError::Forbidden(
+            "Indirizzo IP non autorizzato per questo Service Account (allowlist IP attiva)"
+                .to_string(),
+        ));
+    }
+
     let is_first_use = row.last_used_at.is_none();
 
     sqlx::query("UPDATE service_account_keys SET last_used_at = $1 WHERE id = $2")
@@ -308,22 +357,6 @@ async fn authenticate_service_account_key(
         .bind(&row.service_account_id)
         .execute(&state.db)
         .await?;
-
-    let auth_user = AuthenticatedUser {
-        id: row.service_account_id,
-        email: row.email,
-        name: row.name,
-        image: row.image,
-        role: "user".to_string(),
-        is_service_account: true,
-        api_key: None,
-        service_account: Some(ServiceAccountAuthContext {
-            permission: row.permission,
-            vault_ids: row.vault_ids,
-            credential_ids: row.credential_ids,
-        }),
-        mcp_key: None,
-    };
 
     if is_first_use {
         let _ = crate::routes::record_system_audit(
@@ -346,6 +379,7 @@ async fn authenticate_service_account_key(
 async fn authenticate_api_key(
     raw_key: &str,
     state: &AppState,
+    client_ip: Option<IpAddr>,
 ) -> Result<AuthenticatedUser, AppError> {
     if raw_key.starts_with("sw_mcp_") {
         return Err(AppError::Unauthorized(
@@ -354,7 +388,7 @@ async fn authenticate_api_key(
         ));
     }
     if raw_key.starts_with("sw_sa_") {
-        return authenticate_service_account_key(raw_key, state).await;
+        return authenticate_service_account_key(raw_key, state, client_ip).await;
     }
 
     let key_hash = hash_api_key(raw_key);
@@ -447,6 +481,28 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
+        // Resolve the client IP once: peer socket address by default, or the
+        // leftmost X-Forwarded-For entry when running behind a trusted proxy
+        // (STARWARD_TRUST_PROXY_HEADERS=true). Used for SA IP allowlists.
+        let peer_ip = parts
+            .extensions
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|connect_info| connect_info.0.ip());
+        let xff = parts
+            .headers
+            .get("x-forwarded-for")
+            .and_then(|v| v.to_str().ok());
+        let x_real_ip = parts
+            .headers
+            .get("x-real-ip")
+            .and_then(|v| v.to_str().ok());
+        let client_ip = ip::resolve_client_ip(
+            peer_ip,
+            xff,
+            x_real_ip,
+            state.config.trust_proxy_headers,
+        );
+
         if let Some(raw_api_key) = parts
             .headers
             .get("x-api-key")
@@ -454,7 +510,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .map(str::trim)
             .filter(|s| !s.is_empty())
         {
-            return authenticate_api_key(raw_api_key, state).await;
+            return authenticate_api_key(raw_api_key, state, client_ip).await;
         }
 
         let auth_header = parts
@@ -470,7 +526,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
             .ok_or_else(|| AppError::Unauthorized("Schema Bearer non valido".to_string()))?;
 
         if token.starts_with("sw_") {
-            return authenticate_api_key(token, state).await;
+            return authenticate_api_key(token, state, client_ip).await;
         }
 
         let mut validation = Validation::new(Algorithm::HS256);

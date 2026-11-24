@@ -4,6 +4,7 @@ import {
   Bot,
   Check,
   Folder,
+  Globe,
   KeyRound,
   Search,
   Shield,
@@ -77,6 +78,8 @@ export function ServiceAccountDialog({
   const [selectedCredentialIds, setSelectedCredentialIds] = useState<string[]>(
     [],
   )
+  // IP allowlist, one entry (IP or CIDR) per line. Empty = any IP allowed.
+  const [ipAllowlist, setIpAllowlist] = useState('')
 
   // Initial key options (create mode only)
   const [generateInitialKey, setGenerateInitialKey] = useState(true)
@@ -100,6 +103,7 @@ export function ServiceAccountDialog({
       setIsActive(editingAccount.is_active)
       setSelectedVaultIds(editingAccount.vault_ids)
       setSelectedCredentialIds(editingAccount.credential_ids)
+      setIpAllowlist(editingAccount.allowed_ip_cidrs.join('\n'))
     } else {
       setName('')
       setDescription('')
@@ -107,6 +111,7 @@ export function ServiceAccountDialog({
       setIsActive(true)
       setSelectedVaultIds([])
       setSelectedCredentialIds([])
+      setIpAllowlist('')
       setGenerateInitialKey(true)
       setInitialKeyName('Chiave primaria')
       setInitialKeyExpiry('90')
@@ -178,6 +183,11 @@ export function ServiceAccountDialog({
       toast.error('Inserisci un nome per la chiave API iniziale')
       return
     }
+    // One entry per line; the backend validates IP/CIDR format (400 on error).
+    const allowedIpCidrs = ipAllowlist
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
 
     setSubmitting(true)
     try {
@@ -189,6 +199,7 @@ export function ServiceAccountDialog({
           is_active: isActive,
           vault_ids: selectedVaultIds,
           credential_ids: selectedCredentialIds,
+          allowed_ip_cidrs: allowedIpCidrs,
         })
         toast.success(`Service Account "${updated.name}" aggiornato`)
         onSaved(updated, null)
@@ -204,6 +215,7 @@ export function ServiceAccountDialog({
           permission,
           vault_ids: selectedVaultIds,
           credential_ids: selectedCredentialIds,
+          allowed_ip_cidrs: allowedIpCidrs,
           generate_initial_key: generateInitialKey,
           initial_key_name: generateInitialKey
             ? initialKeyName.trim()
@@ -324,6 +336,33 @@ export function ServiceAccountDialog({
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
               </label>
             )}
+
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="sa-ip-allowlist"
+                className="flex items-center gap-1.5 text-xs"
+              >
+                <Globe className="size-3.5 text-primary sync-security:text-[#ff9c00]" />
+                Allowlist IP (opzionale)
+              </Label>
+              <Textarea
+                id="sa-ip-allowlist"
+                value={ipAllowlist}
+                onChange={(e) => setIpAllowlist(e.target.value)}
+                placeholder={'192.168.1.10\n10.0.0.0/8\n2001:db8::/32'}
+                rows={3}
+                className="min-h-14 resize-none font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Una riga per IP o CIDR (IPv4/IPv6). Lascia vuoto per permitir
+                l'accesso da qualsiasi indirizzo. Le chiavi{' '}
+                <code className="rounded bg-muted px-1 py-0.5 text-[10px]">
+                  sw_sa_...
+                </code>{' '}
+                verranno accettate solo da questi IP; i tentativi bloccati
+                finiscono nell'audit di sistema.
+              </p>
+            </div>
 
             <Separator />
             </div>

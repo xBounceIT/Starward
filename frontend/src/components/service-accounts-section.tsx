@@ -648,6 +648,18 @@ export function ServiceAccountsSection({
                                 ? 'Lettura & Scrittura'
                                 : 'Sola lettura'}
                             </Badge>
+                            {sa.allowed_ip_cidrs.length > 0 && (
+                              <Badge
+                                variant="outline"
+                                title={sa.allowed_ip_cidrs.join(', ')}
+                                className="border-sky-500/40 bg-sky-500/10 px-2 py-0 text-[10px] font-semibold text-sky-400"
+                              >
+                                IP: {sa.allowed_ip_cidrs.length}{' '}
+                                {sa.allowed_ip_cidrs.length === 1
+                                  ? 'regola'
+                                  : 'regole'}
+                              </Badge>
+                            )}
                           </div>
 
                           <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
