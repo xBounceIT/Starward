@@ -87,6 +87,8 @@ export function CategoryIcon({
       return <IdCard className={className} />
     case 'api_key':
       return <Code2 className={className} />
+    case 'oauth2_client':
+      return <KeyRound className={className} />
     case 'database':
       return <Database className={className} />
     case 'ssh':
@@ -367,6 +369,17 @@ export function CredentialBrandIcon({
           )}
         >
           <Code2 className={iconClassName} />
+        </div>
+      )
+    case 'oauth2_client':
+      return (
+        <div
+          className={cn(
+            'flex shrink-0 items-center justify-center border border-teal-500/25 bg-teal-500/15 text-teal-400 sync-security:border-[#ff9c00]/35 sync-security:bg-[#ff9c00]/15 sync-security:text-[#ff9c00]',
+            className,
+          )}
+        >
+          <KeyRound className={iconClassName} />
         </div>
       )
     case 'card':

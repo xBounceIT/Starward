@@ -126,6 +126,8 @@ pub(super) fn parse_1password(content: &str) -> AppResult<Vec<RawImportItem>> {
             "database" => "database",
             "ssh key" | "ssh_key" | "ssh" => "ssh",
             "api credential" | "api_credential" | "api key" | "api_key" => "api_key",
+            "oauth2_client" | "oauth2 client" | "client oauth2" | "client_oauth2" | "oauth2"
+            | "oauth client" | "oauth_client" => "oauth2_client",
             "software license" | "software_license" | "license" | "licenza" => "license",
             "identity" | "identità" | "identita" => "identity",
             "passkey" | "fido2" | "webauthn" => "passkey",
@@ -1003,11 +1005,15 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
             "login",
             "login_username",
             "login name",
+            "client_id",
+            "client id",
             "password",
             "pass",
             "pwd",
             "secret",
             "segreto",
+            "client_secret",
+            "client secret",
             "token",
             "key",
             "login_password",
@@ -1050,6 +1056,8 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
                 "login",
                 "login_username",
                 "login name",
+                "client_id",
+                "client id",
             ])
             .to_string();
         let password = clean_password(row.get_any(&[
@@ -1058,6 +1066,8 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
             "pwd",
             "secret",
             "segreto",
+            "client_secret",
+            "client secret",
             "token",
             "key",
             "login_password",
@@ -1094,6 +1104,8 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
         let category = match raw_cat.as_str() {
             "note" | "nota" | "secure note" | "secure_note" | "nota sicura" => "note",
             "api_key" | "api key" | "api" | "token" => "api_key",
+            "oauth2_client" | "oauth2 client" | "client oauth2" | "client_oauth2" | "oauth2"
+            | "oauth" | "oauth client" | "oauth_client" => "oauth2_client",
             "database" | "db" => "database",
             "ssh" | "server" => "ssh",
             "card" | "carta" | "credit card" | "credit_card" => "card",
@@ -1178,6 +1190,23 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
                 && let Some(host) = host_from_url(&url) {
                     fields.insert("rp_id".to_string(), host);
                 }
+        } else if category == "oauth2_client" {
+            let mappings: &[(&str, &[&str])] = &[
+                ("provider", &["provider", "idp", "identity_provider"]),
+                ("environment", &["environment", "env", "ambiente"]),
+                ("scopes", &["scopes", "scope"]),
+                (
+                    "redirect_uris",
+                    &["redirect_uris", "redirect_uri", "callback_url", "callback_uri", "redirect_url"],
+                ),
+                ("expires_at", &["expires_at", "expiry", "expiration", "scadenza"]),
+            ];
+            for (field_key, aliases) in mappings {
+                let val = row.get_any_trimmed(aliases);
+                if !val.is_empty() {
+                    fields.insert((*field_key).to_string(), val.to_string());
+                }
+            }
         }
 
         let favorite = parse_bool_flag(row.get_any_trimmed(&["favorite", "preferito", "fav"]));

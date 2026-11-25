@@ -19,7 +19,7 @@ use crate::{
         credentials::{
             create_credential_for_user, delete_credential_for_user, get_credential_for_user,
             get_credential_otp_for_user, list_credential_metadata_for_user,
-            update_credential_for_user, ListCredentialsQuery,
+            update_credential_for_user, CREDENTIAL_CATEGORIES, ListCredentialsQuery,
         },
         vaults::{create_vault_for_user, list_vaults_for_user},
     },
@@ -29,18 +29,6 @@ use crate::{
 const SUPPORTED_PROTOCOL_VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 const DEFAULT_PROTOCOL_VERSION: &str = "2025-06-18";
 const MAX_BATCH_SIZE: usize = 50;
-
-const CREDENTIAL_CATEGORY_ENUM: &[&str] = &[
-    "login",
-    "passkey",
-    "identity",
-    "api_key",
-    "database",
-    "ssh",
-    "card",
-    "license",
-    "note",
-];
 
 #[derive(Debug)]
 struct RpcError {
@@ -254,7 +242,7 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                     },
                     "category": {
                         "type": "string",
-                        "enum": CREDENTIAL_CATEGORY_ENUM,
+                        "enum": CREDENTIAL_CATEGORIES,
                         "description": "Filtra per categoria credenziale"
                     },
                     "favorite": {
@@ -333,18 +321,18 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                     "title": { "type": "string", "description": "Titolo della credenziale (1-140 caratteri)" },
                     "category": {
                         "type": "string",
-                        "enum": CREDENTIAL_CATEGORY_ENUM,
+                        "enum": CREDENTIAL_CATEGORIES,
                         "default": "login",
                         "description": "Categoria della credenziale"
                     },
-                    "username": { "type": "string", "description": "Username, email o key ID" },
-                    "password": { "type": "string", "description": "Password, token, API key o valore segreto" },
-                    "url": { "type": "string", "description": "URL o host associato" },
+                    "username": { "type": "string", "description": "Username, email, key ID o Client ID (per oauth2_client)" },
+                    "password": { "type": "string", "description": "Password, token, API key, Client Secret o valore segreto" },
+                    "url": { "type": "string", "description": "URL, host o Issuer / Discovery URL associato" },
                     "notes": { "type": "string", "description": "Note cifrate opzionali" },
                     "fields": {
                         "type": "object",
                         "additionalProperties": { "type": "string" },
-                        "description": "Campi extra opzionali (es. totp [segreto Base32 o URI otpauth://totp/...], provider, environment, db_type, port, private_key, rp_id, credential_id, first_name, last_name, phone, address1)"
+                        "description": "Campi extra opzionali (es. totp [segreto Base32 o URI otpauth://totp/...], provider, environment, scopes, redirect_uris, expires_at, db_type, port, private_key, rp_id, credential_id, first_name, last_name, phone, address1)"
                     },
                     "custom_fields": custom_fields_input_schema(
                         "Campi personalizzati tipizzati stile Bitwarden",
@@ -371,7 +359,7 @@ fn build_tools_list(mcp_user: &AuthenticatedMcpUser) -> Vec<Value> {
                     "credential_id": { "type": "string", "description": "ID della credenziale da modificare" },
                     "vault_id": { "type": "string", "description": "Nuova cartella di destinazione (opzionale)" },
                     "title": { "type": "string", "description": "Nuovo titolo" },
-                    "category": { "type": "string", "enum": CREDENTIAL_CATEGORY_ENUM },
+                    "category": { "type": "string", "enum": CREDENTIAL_CATEGORIES },
                     "username": { "type": "string" },
                     "password": { "type": "string" },
                     "url": { "type": "string" },
@@ -1342,8 +1330,9 @@ mod tests {
             ]
         );
 
-        assert!(CREDENTIAL_CATEGORY_ENUM.contains(&"passkey"));
-        assert!(CREDENTIAL_CATEGORY_ENUM.contains(&"identity"));
+        assert!(CREDENTIAL_CATEGORIES.contains(&"passkey"));
+        assert!(CREDENTIAL_CATEGORIES.contains(&"identity"));
+        assert!(CREDENTIAL_CATEGORIES.contains(&"oauth2_client"));
 
         let list_tool = frw_tools
             .iter()
@@ -1354,6 +1343,7 @@ mod tests {
             .unwrap();
         assert!(list_cats.iter().any(|v| v == "passkey"));
         assert!(list_cats.iter().any(|v| v == "identity"));
+        assert!(list_cats.iter().any(|v| v == "oauth2_client"));
 
         let create_tool = frw_tools
             .iter()
@@ -1364,6 +1354,7 @@ mod tests {
             .unwrap();
         assert!(create_cats.iter().any(|v| v == "passkey"));
         assert!(create_cats.iter().any(|v| v == "identity"));
+        assert!(create_cats.iter().any(|v| v == "oauth2_client"));
     }
 
     #[tokio::test]

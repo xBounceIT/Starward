@@ -1178,6 +1178,13 @@ pub(crate) fn validate_credential_fields(
                 ));
             }
         }
+        "oauth2_client" => {
+            if username.trim().is_empty() && password.is_empty() {
+                return Err(AppError::BadRequest(
+                    "Inserisci almeno il Client ID o il Client Secret".to_string(),
+                ));
+            }
+        }
         "card" => {
             if password.is_empty() {
                 return Err(AppError::BadRequest(
@@ -1203,11 +1210,25 @@ pub(crate) fn validate_credential_fields(
     Ok(())
 }
 
+pub(crate) const CREDENTIAL_CATEGORIES: &[&str] = &[
+    "login",
+    "passkey",
+    "identity",
+    "api_key",
+    "oauth2_client",
+    "database",
+    "ssh",
+    "card",
+    "license",
+    "note",
+];
+
 pub(crate) fn normalize_category(input: &str) -> String {
-    match input.trim().to_lowercase().as_str() {
-        "login" | "passkey" | "identity" | "api_key" | "database" | "ssh" | "card"
-        | "license" | "note" => input.trim().to_lowercase(),
-        _ => "login".to_string(),
+    let normalized = input.trim().to_lowercase();
+    if CREDENTIAL_CATEGORIES.contains(&normalized.as_str()) {
+        normalized
+    } else {
+        "login".to_string()
     }
 }
 
@@ -1221,6 +1242,7 @@ mod tests {
         assert_eq!(normalize_category("passkey"), "passkey");
         assert_eq!(normalize_category("IDENTITY"), "identity");
         assert_eq!(normalize_category(" api_key "), "api_key");
+        assert_eq!(normalize_category("OAUTH2_CLIENT"), "oauth2_client");
         assert_eq!(normalize_category("database"), "database");
         assert_eq!(normalize_category("ssh"), "ssh");
         assert_eq!(normalize_category("card"), "card");
@@ -1263,6 +1285,12 @@ mod tests {
         // api_key, card, license require secret
         assert!(validate_credential_fields("api_key", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
         assert!(validate_credential_fields("api_key", "", "sk_live_123", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+
+        // oauth2_client requires at least client_id (username) or client_secret (password)
+        assert!(validate_credential_fields("oauth2_client", "  ", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("oauth2_client", "client-123", "", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("oauth2_client", "", "secret-xyz", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
+        assert!(validate_credential_fields("oauth2_client", "client-123", "secret-xyz", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
         assert!(validate_credential_fields("card", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]
         assert!(validate_credential_fields("card", "", "4242", "", &empty_fields).is_ok()); // codeql[trust/hard-coded-cryptographic-value]
         assert!(validate_credential_fields("license", "", "", "", &empty_fields).is_err()); // codeql[trust/hard-coded-cryptographic-value]

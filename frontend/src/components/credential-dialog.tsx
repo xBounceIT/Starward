@@ -332,6 +332,14 @@ export function CredentialDialog({
           return false
         }
         return true
+      case 'oauth2_client':
+        if (!coreValues.username.trim() && !coreValues.password) {
+          toast.error(
+            t('credential-dialog.inserisci-almeno-client-id-o-client-secret'),
+          )
+          return false
+        }
+        return true
       case 'card':
         if (!coreValues.password) {
           toast.error(t('credential-dialog.inserisci-il-numero-della-carta'))
@@ -753,7 +761,10 @@ export function CredentialDialog({
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => setFieldValue(field, e.target.value)}
-            className={field.rowsClass ?? 'min-h-20'}
+            className={cn(
+              field.rowsClass ?? 'min-h-20',
+              field.mono && 'font-mono text-xs',
+            )}
             required={field.required}
           />
         ) : field.type === 'secret-textarea' ? (

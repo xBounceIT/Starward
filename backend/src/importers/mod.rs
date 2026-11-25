@@ -593,6 +593,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
                 "card" => "Numero carta mancante",
                 "ssh" => "Password e chiave privata SSH mancanti",
                 "api_key" => "Chiave API / token mancante",
+                "oauth2_client" => "Client ID e Client Secret mancanti",
                 "license" => "Chiave di licenza mancante",
                 "passkey" => "Dati passkey mancanti (RP ID, Credential ID o chiave privata)",
                 "identity" => "Dati identità mancanti",
@@ -645,6 +646,7 @@ fn finalize_item(index: usize, raw: RawImportItem, folder_as_tag: bool) -> Evalu
             "ssh" => "Password e chiave privata mancanti: importata come Nota Sicura",
             "card" => "Numero carta mancante: importata come Nota Sicura",
             "api_key" => "Token mancante: importata come Nota Sicura",
+            "oauth2_client" => "Client ID e Client Secret mancanti: importata come Nota Sicura",
             "license" => "Chiave di licenza mancante: importata come Nota Sicura",
             "passkey" => "Dati passkey incompleti: importata come Nota Sicura",
             "identity" => "Dati identità incompleti: importata come Nota Sicura",
@@ -1777,5 +1779,32 @@ mod tests {
             gen_batch.items[0].updated_at.map(|d| d.format("%Y-%m-%d").to_string()),
             Some("2024-08-15".to_string())
         );
+    }
+
+    #[test]
+    fn generic_csv_imports_oauth2_client_confidential_and_public() {
+        let csv = "title,category,client_id,client_secret,url,provider,environment,scopes,redirect_uri,expires_at\n\
+            Google SSO,oauth2_client,12345.apps.googleusercontent.com,GOCSPX-secret-123,https://accounts.google.com,Google,production,openid profile email,https://app.example.com/callback,2027-06-30\n\
+            Mobile SPA,Client OAuth2,mobile-spa-client,,https://auth.example.com,Keycloak,staging,openid,myapp://callback,";
+        let batch = evaluate_import("generic_csv", csv, None, false, &HashSet::new()).unwrap();
+        assert_eq!(batch.items.len(), 2);
+
+        let confidential = &batch.items[0];
+        assert_eq!(confidential.status, "ready");
+        assert_eq!(confidential.category, "oauth2_client");
+        assert_eq!(confidential.username, "12345.apps.googleusercontent.com");
+        assert_eq!(confidential.password, "GOCSPX-secret-123"); // codeql[trust/hard-coded-cryptographic-value]
+        assert_eq!(confidential.fields.get("provider").map(String::as_str), Some("Google"));
+        assert_eq!(confidential.fields.get("environment").map(String::as_str), Some("production"));
+        assert_eq!(confidential.fields.get("scopes").map(String::as_str), Some("openid profile email"));
+        assert_eq!(confidential.fields.get("redirect_uris").map(String::as_str), Some("https://app.example.com/callback"));
+        assert_eq!(confidential.fields.get("expires_at").map(String::as_str), Some("2027-06-30"));
+
+        let public_client = &batch.items[1];
+        assert_eq!(public_client.status, "ready");
+        assert_eq!(public_client.category, "oauth2_client");
+        assert_eq!(public_client.username, "mobile-spa-client");
+        assert!(public_client.password.is_empty());
+        assert_eq!(public_client.fields.get("scopes").map(String::as_str), Some("openid"));
     }
 }

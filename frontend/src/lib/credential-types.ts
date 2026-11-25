@@ -6,6 +6,7 @@ export type CredentialCategory =
   | 'passkey'
   | 'identity'
   | 'api_key'
+  | 'oauth2_client'
   | 'database'
   | 'ssh'
   | 'card'
@@ -20,6 +21,7 @@ export const CREDENTIAL_CATEGORIES: readonly {
   { value: 'passkey', get label() { return t('credential-types.passkey') } },
   { value: 'identity', get label() { return t('credential-types.identita') } },
   { value: 'api_key', get label() { return t('credential-types.api-key-token') } },
+  { value: 'oauth2_client', get label() { return t('credential-types.client-oauth2') } },
   { value: "database", get label() { return t('credential-types.database-2') } },
   { value: "ssh", get label() { return t('credential-types.ssh-server') } },
   { value: 'card', get label() { return t('credential-types.carta-di-pagamento') } },
@@ -516,6 +518,93 @@ export const CREDENTIAL_CATEGORY_CONFIGS: Record<
       },
     ],
   },
+  oauth2_client: {
+    value: 'oauth2_client',
+    get label() { return t('credential-types.client-oauth2') },
+    fields: [
+      {
+        key: 'provider',
+        storage: 'extra',
+        get label() { return t('credential-types.servizio-provider') },
+        get placeholder() { return t('credential-types.es-google-keycloak-entra-id-auth0') },
+        type: 'text',
+        colSpan: 1,
+      },
+      {
+        key: 'environment',
+        storage: 'extra',
+        get label() { return t('credential-types.ambiente') },
+        get placeholder() { return t('credential-types.seleziona-ambiente') },
+        type: 'select',
+        options: ENVIRONMENT_OPTIONS,
+        colSpan: 1,
+      },
+      {
+        key: 'username',
+        storage: 'core',
+        get label() { return t('credential-types.client-id') },
+        get placeholder() { return t('credential-types.es-client-id-oauth2') },
+        type: 'text',
+        mono: true,
+        colSpan: 2,
+      },
+      {
+        key: 'password',
+        storage: 'core',
+        get label() { return t('credential-types.client-secret') },
+        get placeholder() { return t('credential-types.opzionale-per-client-pubblici-pkce') },
+        type: 'password',
+        mono: true,
+        secret: true,
+        showGenerator: true,
+        colSpan: 2,
+      },
+      {
+        key: 'url',
+        storage: 'core',
+        get label() { return t('credential-types.issuer-discovery-url') },
+        placeholder: 'https://idp.example.com/.well-known/openid-configuration',
+        type: 'url',
+        isLink: true,
+        colSpan: 2,
+      },
+      {
+        key: 'scopes',
+        storage: 'extra',
+        get label() { return t('credential-types.scope') },
+        placeholder: 'openid profile email',
+        type: 'text',
+        mono: true,
+        colSpan: 1,
+      },
+      {
+        key: 'expires_at',
+        storage: 'extra',
+        get label() { return t('credential-types.data-di-scadenza') },
+        placeholder: '',
+        type: 'date',
+        colSpan: 1,
+      },
+      {
+        key: 'redirect_uris',
+        storage: 'extra',
+        get label() { return t('credential-types.redirect-uri-callback') },
+        placeholder: 'https://app.example.com/api/auth/callback',
+        type: 'textarea',
+        mono: true,
+        rowsClass: 'min-h-16',
+        colSpan: 2,
+      },
+      {
+        key: 'notes',
+        storage: 'core',
+        get label() { return t('credential-types.note-cifrate') },
+        get placeholder() { return t('credential-types.note-oauth2-placeholder') },
+        type: 'textarea',
+        colSpan: 2,
+      },
+    ],
+  },
   database: {
     value: "database",
     get label() { return t('credential-types.database-2') },
@@ -925,17 +1014,21 @@ export function getCredentialSubtitle(cred: Credential): string {
       }
       return cred.url || cred.username || t('credential-types.server-ssh')
     }
-    case 'api_key': {
-      const apiConfig = getCategoryConfig('api_key')
-      const envField = apiConfig.fields.find((f) => f.key === 'environment')
-      const envLabel =
-        fields.environment && envField
-          ? getSelectOptionLabel(envField, fields.environment)
-          : ''
+    case 'api_key':
+    case 'oauth2_client': {
+      const envLabel = fields.environment
+        ? (ENVIRONMENT_OPTIONS.find((opt) => opt.value === fields.environment)
+            ?.label ?? fields.environment)
+        : ''
       const parts = [fields.provider, envLabel, cred.username || cred.url].filter(
         Boolean,
       )
-      return parts.join(' · ') || t('credential-types.api-key')
+      return (
+        parts.join(' · ') ||
+        (cred.category === 'oauth2_client'
+          ? t('credential-types.client-oauth2')
+          : t('credential-types.api-key'))
+      )
     }
     case 'card': {
       const last4 = cred.password.replace(/\s+/g, '').slice(-4)
@@ -1025,6 +1118,15 @@ export function getCredentialQuickCopy(cred: Credential): {
           : undefined,
         secondary: cred.password
           ? { label: t('credential-types.api-key'), value: cred.password }
+          : undefined,
+      }
+    case 'oauth2_client':
+      return {
+        primary: cred.username
+          ? { label: t('credential-types.client-id'), value: cred.username }
+          : undefined,
+        secondary: cred.password
+          ? { label: t('credential-types.client-secret'), value: cred.password }
           : undefined,
       }
     case 'license':
@@ -1124,6 +1226,14 @@ export function getCredentialListColumns(cred: Credential): {
           : 'sk-••••••••••••••••'
       }
       const secondary = cred.url || fields.provider || ''
+      return { primary, secondary }
+    }
+    case 'oauth2_client': {
+      const primary =
+        cred.username || fields.provider || t('credential-types.client-oauth2')
+      const secondary =
+        cred.url ||
+        (fields.provider && fields.provider !== primary ? fields.provider : '')
       return { primary, secondary }
     }
     case 'card': {
@@ -1287,6 +1397,8 @@ export function getSearchableMetadata(cred: Credential): string {
   return [
     fields.provider,
     fields.environment,
+    fields.scopes,
+    fields.redirect_uris,
     fields.db_type,
     fields.database_name,
     fields.brand,
