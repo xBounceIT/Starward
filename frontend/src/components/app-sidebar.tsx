@@ -554,7 +554,7 @@ export function AppSidebar({
             <span
               inert={sidebarCollapsed}
               aria-hidden={sidebarCollapsed || undefined}
-              className="shrink-0 text-[11px] leading-none text-muted-foreground sync-security:text-[#ff9c00]/90 group-data-[collapsible=strip]:hidden"
+              className="shrink-0 self-end pb-0.5 text-[11px] leading-none text-muted-foreground sync-security:text-[#ff9c00]/90 group-data-[collapsible=strip]:hidden"
             >
               v{APP_VERSION}
             </span>
