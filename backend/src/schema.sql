@@ -189,9 +189,6 @@ CREATE TABLE IF NOT EXISTS service_accounts (
     last_used_at TIMESTAMPTZ
 );
 
--- Migration for databases created before the IP allowlist existed.
-ALTER TABLE service_accounts ADD COLUMN IF NOT EXISTS allowed_ip_cidrs TEXT[] NOT NULL DEFAULT '{}';
-
 CREATE INDEX IF NOT EXISTS idx_service_accounts_is_active ON service_accounts (is_active);
 CREATE INDEX IF NOT EXISTS idx_service_accounts_created_by ON service_accounts (created_by);
 
