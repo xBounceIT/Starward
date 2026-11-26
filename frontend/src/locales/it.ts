@@ -604,6 +604,8 @@ export default {
     "in-proton-pass-impostazioni-esporta-scegli-il-fo": "In Proton Pass: Impostazioni → Esporta → scegli il formato CSV (non cifrato).",
     "login-carte-identita-e-cartelle-nordpass": "Login, carte, identità e cartelle NordPass",
     "in-nordpass-impostazioni-esporta-elementi-inseri": "In NordPass: Impostazioni → Esporta elementi → inserisci la Master Password e salva il file CSV.",
+    "export-json-del-datastore-con-cartelle-login-note-carte-identita-totp-passkey-e-ssh": "Export JSON del datastore con cartelle: login, note, carte, identità, TOTP, passkey e chiavi SSH",
+    "nel-client-psono-web-desktop-o-app-vai-in-other": "Nel client Psono (web, desktop o app): Other → Export → salva il file JSON (export.json) non cifrato.",
     "csv-generico": "CSV Generico",
     "tabella-personalizzata-it-en": "Tabella personalizzata (IT / EN)",
     "qualsiasi-file-csv-separato-da-virgola-o-punto-e": "Qualsiasi file CSV separato da virgola o punto e virgola con intestazioni come title/name, username/email, password, url, notes, folder, tags."

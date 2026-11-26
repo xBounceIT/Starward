@@ -296,14 +296,7 @@ pub(super) fn parse_bitwarden(
     }
 }
 
-fn json_val_to_string(val: Option<&Value>) -> String {
-    match val {
-        Some(Value::String(s)) => s.trim().to_string(),
-        Some(Value::Number(n)) => n.to_string(),
-        Some(Value::Bool(b)) => b.to_string(),
-        _ => String::new(),
-    }
-}
+use super::json_scalar_str as json_val_to_string;
 
 fn format_card_expiry(exp_month: Option<&Value>, exp_year: Option<&Value>) -> String {
     let month_raw = json_val_to_string(exp_month);
@@ -333,9 +326,63 @@ fn format_card_expiry(exp_month: Option<&Value>, exp_year: Option<&Value>) -> St
     }
 }
 
+fn psono_type_marker(v: &serde_json::Value) -> bool {
+    v.get("type")
+        .and_then(|t| t.as_str())
+        .is_some_and(|t| {
+            matches!(
+                t,
+                "website_password"
+                    | "application_password"
+                    | "totp"
+                    | "passkey"
+                    | "note"
+                    | "bookmark"
+                    | "credit_card"
+                    | "identity"
+                    | "ssh_own_key"
+                    | "ssh_connection"
+                    | "rdp_connection"
+                    | "vnc_connection"
+                    | "environment_variables"
+                    | "mail_gpg_own_key"
+                    | "elster_certificate"
+            )
+        })
+}
+
+fn looks_like_psono_json(root: &serde_json::Value) -> bool {
+    let scan_items = |items: &serde_json::Value| {
+        items
+            .as_array()
+            .map(|arr| arr.iter().any(psono_type_marker))
+            .unwrap_or(false)
+    };
+    if let Some(items) = root.get("items")
+        && scan_items(items) {
+            return true;
+        }
+    if let Some(folders) = root.get("folders").and_then(|f| f.as_array()) {
+        for f in folders {
+            if let Some(items) = f.get("items")
+                && scan_items(items) {
+                    return true;
+                }
+        }
+    }
+    false
+}
+
 fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
     // content is size-capped upstream (validate_import_content / MAX_IMPORT_BYTES) and parsed
     // into a typed struct that is validated below (encrypted flag, presence of "items").
+    if let Ok(root) = serde_json::from_str::<serde_json::Value>(content)
+        && looks_like_psono_json(&root) {
+            return Err(AppError::BadRequest(
+                "Il file sembra un export JSON di Psono. Seleziona 'Psono' prima di importarlo."
+                    .to_string(),
+            ));
+        }
     let export: BitwardenExport = serde_json::from_str(content).map_err(|e| { // codeql[trust/unsafe-deserialization]
         AppError::BadRequest(format!(
             "Impossibile leggere il file JSON Bitwarden: {e}"
@@ -350,6 +397,14 @@ fn parse_bitwarden_json(content: &str) -> AppResult<Vec<RawImportItem>> {
     }
 
     let Some(items) = export.items else {
+        if let Ok(root) = serde_json::from_str::<serde_json::Value>(content)
+            && looks_like_psono_json(&root)
+        {
+            return Err(AppError::BadRequest(
+                "Il file sembra un export JSON di Psono. Seleziona 'Psono' prima di importarlo."
+                    .to_string(),
+            ));
+        }
         return Err(AppError::BadRequest(
             "Il file JSON non sembra un export valido di Bitwarden (campo 'items' mancante)."
                 .to_string(),

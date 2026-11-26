@@ -1,15 +1,17 @@
 use std::collections::BTreeMap;
 
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 
 use crate::{
     error::{AppError, AppResult},
     importers::{
         append_note_section, apply_imported_totp, clean_password,
         csv_parser::{CsvRow, CsvTable},
-        detect_provider_hint_from_headers, host_from_url, parse_bool_flag,
-        parse_import_timestamp, RawImportItem,
+        detect_provider_hint_from_headers, host_from_url, json_scalar_raw,
+        json_scalar_str, parse_bool_flag, parse_import_timestamp, RawImportItem,
     },
+    models::{CustomField, CustomFieldType},
 };
 
 fn parse_csv_checking_json(content: &str, provider_label: &str) -> AppResult<CsvTable> {
@@ -1249,5 +1251,563 @@ pub(super) fn parse_generic_csv(content: &str) -> AppResult<Vec<RawImportItem>> 
         });
     }
 
+    Ok(items)
+}
+
+// ---------------------------------------------------------------------------
+// Psono (FOSS password manager, psono.com / psono.pw)
+//
+// The web client / desktop app export ("Other" -> "Export" -> JSON) is the
+// decrypted password datastore: a root folder object with recursive
+// `folders` (each with `name`, `folders`, `items`) and `items`. Every item
+// has a string `type` (e.g. "website_password") plus the decrypted secret
+// fields prefixed with the type (e.g. `website_password_password`).
+// ---------------------------------------------------------------------------
+
+fn psono_field(item: &Value, prefix: &str, name: &str) -> String {
+    json_scalar_str(item.get(format!("{prefix}_{name}").as_str()))
+}
+
+fn psono_field_raw(item: &Value, prefix: &str, name: &str) -> String {
+    json_scalar_raw(item.get(format!("{prefix}_{name}").as_str()))
+}
+
+/// Percent-encodes an otpauth label so titles containing '?', '#', '&' or
+/// spaces cannot break the URI structure (the parser splits on those chars).
+fn psono_encode_otp_label(label: &str) -> String {
+    let mut out = String::with_capacity(label.len());
+    for byte in label.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b':' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+fn psono_build_totp_uri(code: &str, digits: &str, period: &str, algorithm: &str, label: &str) -> String {
+    let code = code.trim();
+    if code.is_empty() {
+        return String::new();
+    }
+    let label = if label.trim().is_empty() { "TOTP" } else { label.trim() };
+    let mut uri = format!(
+        "otpauth://totp/{}?secret={}",
+        psono_encode_otp_label(label),
+        psono_encode_otp_label(code)
+    );
+    if let Ok(d) = digits.trim().parse::<u32>()
+        && d != 6 {
+            uri.push_str(&format!("&digits={d}"));
+        }
+    if let Ok(p) = period.trim().parse::<u32>()
+        && p != 30 {
+            uri.push_str(&format!("&period={p}"));
+        }
+    match algorithm.trim().to_uppercase().as_str() {
+        "SHA256" | "SHA512" => uri.push_str(&format!("&algorithm={}", algorithm.trim().to_uppercase())),
+        _ => {}
+    }
+    uri
+}
+
+fn psono_looks_like_bitwarden(root: &Value) -> bool {
+    if root.get("encrypted").is_some() {
+        return true;
+    }
+    root.get("items")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items.iter().any(|it| {
+                it.as_object()
+                    .map(|o| {
+                        o.contains_key("login")
+                            || o.contains_key("card")
+                            || o.contains_key("identity")
+                            || o.contains_key("sshKey")
+                            || o.get("type").and_then(Value::as_u64).is_some()
+                    })
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
+fn psono_walk_folder(folder: &Value, path: &str, out: &mut Vec<RawImportItem>) {
+    if let Some(items) = folder.get("items").and_then(Value::as_array) {
+        for item in items {
+            match psono_parse_item(item, path) {
+                Some(raw) => out.push(raw),
+                None => out.push(RawImportItem {
+                    title: "Elemento non valido".to_string(),
+                    username: String::new(),
+                    password: String::new(),
+                    url: String::new(),
+                    category: "login".to_string(),
+                    notes: String::new(),
+                    fields: BTreeMap::new(),
+                    custom_fields: Vec::new(),
+                    favorite: false,
+                    source_folder: if path.is_empty() { None } else { Some(path.to_string()) },
+                    folder_tags: if path.is_empty() { Vec::new() } else { vec![path.to_string()] },
+                    extra_tags: Vec::new(),
+                    created_at: None,
+                    updated_at: None,
+                    warning: None,
+                    pre_skip_reason: Some(
+                        "Voce dell'export Psono non valida (non è un oggetto JSON)".to_string(),
+                    ),
+                }),
+            }
+        }
+    }
+    if let Some(subfolders) = folder.get("folders").and_then(Value::as_array) {
+        for sub in subfolders {
+            if sub.get("deleted").and_then(Value::as_bool).unwrap_or(false) {
+                continue;
+            }
+            let name = json_scalar_str(sub.get("name"));
+            let child_path = if name.is_empty() {
+                path.to_string()
+            } else if path.is_empty() {
+                name
+            } else {
+                format!("{path}/{name}")
+            };
+            psono_walk_folder(sub, &child_path, out);
+        }
+    }
+}
+
+fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
+    let obj = item.as_object()?;
+    let item_type = json_scalar_str(item.get("type"));
+    let title_fallback = json_scalar_str(item.get("name"));
+    let prefix = item_type.as_str();
+    // urlfilter lives on the datastore item; the decrypted secret may also
+    // carry a "<type>_url_filter" copy — use it as fallback.
+    let urlfilter = {
+        let u = json_scalar_str(item.get("urlfilter"));
+        if u.is_empty() { psono_field(item, prefix, "url_filter") } else { u }
+    };
+
+    let source_folder = if path.is_empty() {
+        None
+    } else {
+        Some(path.to_string())
+    };
+    let folder_tags: Vec<String> = source_folder.iter().cloned().collect();
+
+    let created_at = parse_import_timestamp(&json_scalar_str(item.get("create_date")));
+    let updated_at = parse_import_timestamp(&json_scalar_str(item.get("write_date")))
+        .or_else(|| parse_import_timestamp(&json_scalar_str(item.get("password_modification_datetime"))));
+
+    // Psono tags (array of strings) -> extra tags
+    let extra_tags: Vec<String> = item
+        .get("tags")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|t| t.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(ToOwned::to_owned)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    // Psono custom fields ({ name, value, type? }) -> Starward custom fields
+    let custom_fields: Vec<CustomField> = item
+        .get("custom_fields")
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|f| f.as_object())
+                .filter_map(|f| {
+                    let name = json_scalar_str(f.get("name"));
+                    if name.is_empty() {
+                        return None;
+                    }
+                    let field_type = match json_scalar_str(f.get("type")).to_lowercase().as_str() {
+                        "password" | "hidden" | "secret" => CustomFieldType::Hidden,
+                        "checkbox" | "boolean" => CustomFieldType::Checkbox,
+                        "linked" => CustomFieldType::Linked,
+                        _ => CustomFieldType::Text,
+                    };
+                    Some(CustomField {
+                        field_type,
+                        label: name,
+                        value: json_scalar_raw(f.get("value")),
+                        linked_id: None,
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let base = |category: &str, title: String, username: String, password: String, url: String, notes: String, fields: BTreeMap<String, String>, warning: Option<String>, pre_skip_reason: Option<String>| RawImportItem {
+        title,
+        username,
+        password,
+        url,
+        category: category.to_string(),
+        notes,
+        fields,
+        custom_fields: custom_fields.clone(),
+        favorite: parse_bool_flag(&json_scalar_str(item.get("favorite"))),
+        source_folder,
+        folder_tags: folder_tags.clone(),
+        extra_tags: extra_tags.clone(),
+        created_at,
+        updated_at,
+        warning,
+        pre_skip_reason,
+    };
+
+    if obj.get("deleted").and_then(Value::as_bool).unwrap_or(false) {
+        return Some(base(
+            "login",
+            if title_fallback.is_empty() { "Elemento nel cestino".to_string() } else { title_fallback },
+            String::new(),
+            String::new(),
+            urlfilter,
+            String::new(),
+            BTreeMap::new(),
+            None,
+            Some("Elemento nel cestino di Psono".to_string()),
+        ));
+    }
+
+    let typed_title = psono_field(item, prefix, "title");
+    let title = if !typed_title.is_empty() { typed_title } else { title_fallback.clone() };
+
+    match prefix {
+        "website_password" | "application_password" => {
+            let url = {
+                let u = psono_field(item, prefix, "url");
+                if u.is_empty() { urlfilter.clone() } else { u }
+            };
+            let username = psono_field(item, prefix, "username");
+            let password = clean_password(&psono_field_raw(item, prefix, "password"));
+            let mut notes = psono_field(item, prefix, "notes");
+            // Legacy autofill callback fields may carry extra credentials
+            for (key, label) in [
+                ("callback_url", "Callback URL"),
+                ("callback_user", "Callback user"),
+                ("callback_pass", "Callback password"),
+            ] {
+                let v = json_scalar_raw(item.get(key));
+                if !v.trim().is_empty() {
+                    append_note_section(&mut notes, None, &format!("{label}: {v}"));
+                }
+            }
+            let mut fields = BTreeMap::new();
+
+            let totp_code = psono_field(item, prefix, "totp_code");
+            if !totp_code.is_empty() {
+                let label = if !title.is_empty() { title.clone() } else { host_from_url(&url).unwrap_or_else(|| "TOTP".to_string()) };
+                let uri = psono_build_totp_uri(
+                    &totp_code,
+                    &psono_field(item, prefix, "totp_digits"),
+                    &psono_field(item, prefix, "totp_period"),
+                    &psono_field(item, prefix, "totp_algorithm"),
+                    &label,
+                );
+                apply_imported_totp(&uri, &mut fields, &mut notes);
+            }
+
+            Some(base("login", title, username, password, url, notes, fields, None, None))
+        }
+        "totp" => {
+            let mut notes = psono_field(item, prefix, "notes");
+            let mut fields = BTreeMap::new();
+            let code = psono_field(item, prefix, "code");
+            let label = if !title.is_empty() { title.clone() } else { "TOTP".to_string() };
+            let uri = psono_build_totp_uri(
+                &code,
+                &psono_field(item, prefix, "digits"),
+                &psono_field(item, prefix, "period"),
+                &psono_field(item, prefix, "algorithm"),
+                &label,
+            );
+            if !uri.is_empty() {
+                apply_imported_totp(&uri, &mut fields, &mut notes);
+                if notes.is_empty() {
+                    append_note_section(&mut notes, None, &uri);
+                }
+            }
+            let url = urlfilter.clone();
+            Some(base("note", title, String::new(), String::new(), url, notes, fields, None, None))
+        }
+        "note" => {
+            let notes = psono_field(item, prefix, "notes");
+            Some(base("note", title, String::new(), String::new(), urlfilter, notes, BTreeMap::new(), None, None))
+        }
+        "bookmark" => {
+            let url = {
+                let u = psono_field(item, prefix, "url");
+                if u.is_empty() { urlfilter.clone() } else { u }
+            };
+            let notes = psono_field(item, prefix, "notes");
+            Some(base("login", title, String::new(), String::new(), url, notes, BTreeMap::new(), None, None))
+        }
+        "credit_card" => {
+            let mut fields = BTreeMap::new();
+            let cvv = psono_field(item, prefix, "cvc");
+            if !cvv.is_empty() {
+                fields.insert("cvv".to_string(), cvv);
+            }
+            let expiry = psono_field(item, prefix, "valid_through");
+            if !expiry.is_empty() {
+                fields.insert("expiry".to_string(), expiry);
+            }
+            let mut notes = psono_field(item, prefix, "notes");
+            let pin = psono_field(item, prefix, "pin");
+            if !pin.is_empty() {
+                append_note_section(&mut notes, None, &format!("PIN: {pin}"));
+            }
+            let number = clean_password(&psono_field_raw(item, prefix, "number"));
+            let holder = psono_field(item, prefix, "name");
+            Some(base("card", title, holder, number, urlfilter, notes, fields, None, None))
+        }
+        "identity" => {
+            let mut fields = BTreeMap::new();
+            let mappings: &[(&str, &str)] = &[
+                ("identity_title", "title"),
+                ("first_name", "first_name"),
+                ("last_name", "last_name"),
+                ("company", "company"),
+                ("address1", "address"),
+                ("city", "city"),
+                ("state", "state"),
+                ("postal_code", "postal_code"),
+                ("country", "country"),
+                ("phone", "phone_number"),
+            ];
+            for (field_key, psono_name) in mappings {
+                let val = psono_field(item, prefix, psono_name);
+                if !val.is_empty() {
+                    fields.insert((*field_key).to_string(), val);
+                }
+            }
+            let email = psono_field(item, prefix, "email");
+            let notes = psono_field(item, prefix, "notes");
+            Some(base("identity", title, email, String::new(), urlfilter, notes, fields, None, None))
+        }
+        "ssh_own_key" => {
+            let mut fields = BTreeMap::new();
+            let priv_key = psono_field(item, prefix, "private");
+            if !priv_key.is_empty() {
+                fields.insert("private_key".to_string(), priv_key);
+            }
+            let pub_key = psono_field(item, prefix, "public");
+            if !pub_key.is_empty() {
+                fields.insert("public_key".to_string(), pub_key);
+            }
+            let notes = psono_field(item, prefix, "notes");
+            let username = {
+                let n = psono_field(item, prefix, "name");
+                if !n.is_empty() { n } else { psono_field(item, prefix, "email") }
+            };
+            Some(base("ssh", title, username, String::new(), urlfilter, notes, fields, None, None))
+        }
+        "ssh_connection" => {
+            let mut fields = BTreeMap::new();
+            let port = psono_field(item, prefix, "port");
+            if !port.is_empty() {
+                fields.insert("port".to_string(), port);
+            }
+            let priv_key = psono_field(item, prefix, "private_key");
+            if !priv_key.is_empty() {
+                fields.insert("private_key".to_string(), priv_key);
+            }
+            let mut notes = psono_field(item, prefix, "notes");
+            let auth_type = psono_field(item, prefix, "authentication_type");
+            if !auth_type.is_empty() {
+                append_note_section(&mut notes, None, &format!("Autenticazione: {auth_type}"));
+            }
+            let host = psono_field(item, prefix, "host");
+            let url = if !host.is_empty() { host } else { urlfilter.clone() };
+            let username = psono_field(item, prefix, "username");
+            let password = clean_password(&psono_field_raw(item, prefix, "password"));
+            Some(base("ssh", title, username, password, url, notes, fields, None, None))
+        }
+        "rdp_connection" | "vnc_connection" => {
+            let scheme = if prefix == "rdp_connection" { "rdp" } else { "vnc" };
+            let host = psono_field(item, prefix, "host");
+            let port = psono_field(item, prefix, "port");
+            let url = if !host.is_empty() {
+                if !port.is_empty() { format!("{scheme}://{host}:{port}") } else { format!("{scheme}://{host}") }
+            } else {
+                urlfilter.clone()
+            };
+            let mut notes = psono_field(item, prefix, "notes");
+            let domain = psono_field(item, prefix, "domain");
+            if !domain.is_empty() {
+                append_note_section(&mut notes, None, &format!("Dominio: {domain}"));
+            }
+            let username = psono_field(item, prefix, "username");
+            let password = clean_password(&psono_field_raw(item, prefix, "password"));
+            Some(base("login", title, username, password, url, notes, BTreeMap::new(), None, None))
+        }
+        "environment_variables" => {
+            let mut notes = psono_field(item, prefix, "notes");
+            let vars = item.get(format!("{prefix}_variables").as_str());
+            let mut lines = Vec::new();
+            match vars {
+                Some(Value::Array(arr)) => {
+                    for v in arr {
+                        let key = {
+                            let k = json_scalar_str(v.get("key"));
+                            if k.is_empty() { json_scalar_str(v.get("name")) } else { k }
+                        };
+                        let val = json_scalar_str(v.get("value"));
+                        if !key.is_empty() {
+                            lines.push(format!("{key}: {val}"));
+                        }
+                    }
+                }
+                Some(Value::Object(map)) => {
+                    for (k, v) in map {
+                        lines.push(format!("{k}: {}", json_scalar_str(Some(v))));
+                    }
+                }
+                _ => {}
+            }
+            if !lines.is_empty() {
+                append_note_section(&mut notes, Some("Variabili d'ambiente:"), &lines.join("\n"));
+            }
+            Some(base("note", title, String::new(), String::new(), urlfilter, notes, BTreeMap::new(), None, None))
+        }
+        "mail_gpg_own_key" => {
+            let mut notes = String::new();
+            let name = psono_field(item, prefix, "name");
+            if !name.is_empty() {
+                append_note_section(&mut notes, None, &format!("Nome: {name}"));
+            }
+            let email = psono_field(item, prefix, "email");
+            if !email.is_empty() {
+                append_note_section(&mut notes, None, &format!("Email: {email}"));
+            }
+            let pub_key = psono_field(item, prefix, "public");
+            if !pub_key.is_empty() {
+                append_note_section(&mut notes, Some("Chiave pubblica GPG:"), &pub_key);
+            }
+            let priv_key = psono_field(item, prefix, "private");
+            if !priv_key.is_empty() {
+                append_note_section(&mut notes, Some("Chiave privata GPG:"), &priv_key);
+            }
+            Some(base("note", title, email, String::new(), urlfilter, notes, BTreeMap::new(), None, None))
+        }
+        "elster_certificate" => {
+            let password = clean_password(&psono_field_raw(item, prefix, "password"));
+            let mut notes = psono_field(item, prefix, "notes");
+            let retrieval = psono_field(item, prefix, "retrieval_code");
+            if !retrieval.is_empty() {
+                append_note_section(&mut notes, None, &format!("Codice di recupero: {retrieval}"));
+            }
+            Some(base("note", title, String::new(), password, urlfilter, notes, BTreeMap::new(), None, None))
+        }
+        "passkey" => {
+            let mut fields = BTreeMap::new();
+            let rp_id = psono_field(item, prefix, "rp_id");
+            if !rp_id.is_empty() {
+                fields.insert("rp_id".to_string(), rp_id);
+            }
+            let cred_id = psono_field(item, prefix, "id");
+            if !cred_id.is_empty() {
+                fields.insert("credential_id".to_string(), cred_id);
+            }
+            let priv_key = psono_field(item, prefix, "private_key");
+            if !priv_key.is_empty() {
+                fields.insert("private_key".to_string(), priv_key);
+            }
+            let user_handle = psono_field(item, prefix, "user_handle");
+            if !user_handle.is_empty() {
+                fields.insert("user_handle".to_string(), user_handle);
+            }
+            let algorithm = psono_field(item, prefix, "algorithm");
+            if !algorithm.is_empty() {
+                fields.insert("key_algorithm".to_string(), algorithm);
+            }
+            let url = {
+                let u = psono_field(item, prefix, "url");
+                if u.is_empty() { urlfilter.clone() } else { u }
+            };
+            if !fields.contains_key("rp_id")
+                && let Some(host) = host_from_url(&url) {
+                    fields.insert("rp_id".to_string(), host);
+                }
+            let notes = psono_field(item, prefix, "notes");
+            Some(base("passkey", title, String::new(), String::new(), url, notes, fields, None, None))
+        }
+        "file" => Some(base(
+            "login",
+            if title_fallback.is_empty() { "File".to_string() } else { title_fallback },
+            String::new(),
+            String::new(),
+            urlfilter,
+            String::new(),
+            BTreeMap::new(),
+            None,
+            Some("I file non sono supportati dall'importazione (l'export JSON di Psono non include i file)".to_string()),
+        )),
+        other => {
+            // Tipo non riconosciuto: conserva i dati come nota con i campi serializzati
+            let mut lines = Vec::new();
+            for (k, v) in obj {
+                if k.starts_with(&format!("{other}_")) {
+                    let val = json_scalar_str(Some(v));
+                    if !val.is_empty() {
+                        lines.push(format!("{}: {}", &k[other.len() + 1..], val));
+                    }
+                }
+            }
+            let mut notes = String::new();
+            if !lines.is_empty() {
+                append_note_section(&mut notes, Some("Dettagli importati:"), &lines.join("\n"));
+            }
+            Some(base("note", title, String::new(), String::new(), urlfilter, notes, BTreeMap::new(), None, None))
+        }
+    }
+}
+
+pub(super) fn parse_psono(content: &str) -> AppResult<Vec<RawImportItem>> {
+    let stripped = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let trimmed = stripped.trim_start();
+    if trimmed.is_empty() {
+        return Err(AppError::BadRequest("Il file da importare è vuoto.".to_string()));
+    }
+    if !trimmed.starts_with('{') {
+        return Err(AppError::BadRequest(
+            "Psono esporta solo file JSON: carica il file export.json scaricato dal client Psono (Other → Export). Per i file CSV usa 'CSV Generico'.".to_string(),
+        ));
+    }
+    let root: Value = serde_json::from_str(stripped).map_err(|e| { // codeql[trust/unsafe-deserialization]
+        AppError::BadRequest(format!("Impossibile leggere il file JSON Psono: {e}"))
+    })?;
+
+    if psono_looks_like_bitwarden(&root) {
+        return Err(AppError::BadRequest(
+            "Il file sembra un export JSON di Bitwarden. Seleziona 'Bitwarden' prima di importarlo.".to_string(),
+        ));
+    }
+
+    let obj = root.as_object().ok_or_else(|| {
+        AppError::BadRequest("Il file JSON di Psono deve contenere un oggetto radice (il datastore).".to_string())
+    })?;
+
+    let has_folders = obj.get("folders").and_then(Value::as_array).is_some();
+    let has_items = obj.get("items").and_then(Value::as_array).is_some();
+    if !has_folders && !has_items {
+        return Err(AppError::BadRequest(
+            "Il file JSON non sembra un export di Psono (attesi i campi 'folders' e/o 'items' del datastore).".to_string(),
+        ));
+    }
+
+    let mut items = Vec::new();
+    psono_walk_folder(&root, "", &mut items);
     Ok(items)
 }

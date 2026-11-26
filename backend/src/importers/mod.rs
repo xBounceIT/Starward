@@ -30,6 +30,7 @@ pub enum ImportProvider {
     Dashlane,
     ProtonPass,
     NordPass,
+    Psono,
     GenericCsv,
 }
 
@@ -53,6 +54,7 @@ impl ImportProvider {
             "dashlane" => Ok(Self::Dashlane),
             "protonpass" | "proton_pass" | "proton-pass" => Ok(Self::ProtonPass),
             "nordpass" => Ok(Self::NordPass),
+            "psono" | "psono_json" | "psono-json" => Ok(Self::Psono),
             "generic_csv" | "generic" | "csv" => Ok(Self::GenericCsv),
             other => Err(AppError::BadRequest(format!(
                 "Provider di importazione non supportato: '{other}'"
@@ -74,6 +76,7 @@ impl ImportProvider {
             Self::Dashlane => "dashlane",
             Self::ProtonPass => "protonpass",
             Self::NordPass => "nordpass",
+            Self::Psono => "psono",
             Self::GenericCsv => "generic_csv",
         }
     }
@@ -92,6 +95,7 @@ impl ImportProvider {
             Self::Dashlane => "Dashlane",
             Self::ProtonPass => "Proton Pass",
             Self::NordPass => "NordPass",
+            Self::Psono => "Psono",
             Self::GenericCsv => "CSV Generico",
         }
     }
@@ -189,6 +193,16 @@ pub fn all_provider_dtos() -> Vec<ImportProviderDto> {
             description: "Export CSV da NordPass (login, carte, identità e cartelle)".to_string(),
             formats: vec!["CSV".to_string()],
             extensions: vec![".csv".to_string()],
+            featured: false,
+            supports_folders: true,
+        },
+        ImportProviderDto {
+            id: "psono".to_string(),
+            name: "Psono".to_string(),
+            description: "Export JSON del client Psono (web client, desktop o app) con cartelle, login, note, carte, identità, TOTP, passkey e chiavi SSH"
+                .to_string(),
+            formats: vec!["JSON".to_string()],
+            extensions: vec![".json".to_string()],
             featured: false,
             supports_folders: true,
         },
@@ -330,6 +344,7 @@ pub fn evaluate_import(
         ImportProvider::Dashlane => ("CSV".to_string(), providers::parse_dashlane(content)?),
         ImportProvider::ProtonPass => ("CSV".to_string(), providers::parse_protonpass(content)?),
         ImportProvider::NordPass => ("CSV".to_string(), providers::parse_nordpass(content)?),
+        ImportProvider::Psono => ("JSON".to_string(), providers::parse_psono(content)?),
         ImportProvider::GenericCsv => ("CSV".to_string(), providers::parse_generic_csv(content)?),
     };
 
@@ -752,6 +767,28 @@ pub(crate) fn clean_password(raw: &str) -> String {
         String::new()
     } else {
         raw.to_string()
+    }
+}
+
+/// Scalar JSON value as a trimmed string (titles, usernames, urls, ...).
+pub(crate) fn json_scalar_str(val: Option<&serde_json::Value>) -> String {
+    match val {
+        Some(serde_json::Value::String(s)) => s.trim().to_string(),
+        Some(serde_json::Value::Number(n)) => n.to_string(),
+        Some(serde_json::Value::Bool(b)) => b.to_string(),
+        _ => String::new(),
+    }
+}
+
+/// Scalar JSON value as a raw string, preserving leading/trailing whitespace:
+/// for secret values (passwords, keys, card numbers) that may legitimately
+/// start or end with spaces.
+pub(crate) fn json_scalar_raw(val: Option<&serde_json::Value>) -> String {
+    match val {
+        Some(serde_json::Value::String(s)) => s.clone(),
+        Some(serde_json::Value::Number(n)) => n.to_string(),
+        Some(serde_json::Value::Bool(b)) => b.to_string(),
+        _ => String::new(),
     }
 }
 
@@ -1806,5 +1843,362 @@ mod tests {
         assert_eq!(public_client.username, "mobile-spa-client");
         assert!(public_client.password.is_empty());
         assert_eq!(public_client.fields.get("scopes").map(String::as_str), Some("openid"));
+    }
+
+    #[test]
+    fn psono_json_parses_all_supported_types_folders_totp_and_trash() {
+        let json = r#"{
+            "datastore_id": "5fb571e3-8d08-42d6-8105-fee8f9a0099b",
+            "name": "Personale",
+            "items": [
+                {
+                    "type": "note",
+                    "name": "Nota radice",
+                    "note_title": "Nota radice",
+                    "note_notes": "Contenuto segreto",
+                    "create_date": "2024-01-10T08:00:00Z",
+                    "write_date": "2024-02-11T09:30:00Z"
+                },
+                {
+                    "type": "website_password",
+                    "name": "GitHub",
+                    "urlfilter": "github.com",
+                    "website_password_title": "GitHub",
+                    "website_password_url": "https://github.com/login",
+                    "website_password_username": "octocat",
+                    "website_password_password": "Secret!123",
+                    "website_password_notes": "Account dev",
+                    "website_password_totp_code": "JBSWY3DPEHPK3PXP",
+                    "website_password_totp_digits": "8",
+                    "website_password_totp_period": "60",
+                    "website_password_totp_algorithm": "SHA256"
+                },
+                {
+                    "type": "website_password",
+                    "name": "Nel cestino",
+                    "deleted": true,
+                    "website_password_password": "old"
+                },
+                {
+                    "type": "file",
+                    "name": "doc.pdf"
+                }
+            ],
+            "folders": [
+                {
+                    "name": "Lavoro",
+                    "folders": [
+                        {
+                            "name": "Server",
+                            "items": [
+                                {
+                                    "type": "ssh_connection",
+                                    "name": "Bastion",
+                                    "ssh_connection_title": "Bastion",
+                                    "ssh_connection_host": "10.0.0.1",
+                                    "ssh_connection_port": "2222",
+                                    "ssh_connection_username": "root",
+                                    "ssh_connection_password": "rootpw",
+                                    "ssh_connection_private_key": "-----BEGIN KEY-----\nabc\n-----END KEY-----",
+                                    "ssh_connection_authentication_type": "password"
+                                },
+                                {
+                                    "type": "credit_card",
+                                    "name": "Carta",
+                                    "credit_card_title": "Carta Aziendale",
+                                    "credit_card_number": "4111222233334444",
+                                    "credit_card_name": "Mario Rossi",
+                                    "credit_card_cvc": "123",
+                                    "credit_card_valid_through": "12/2029",
+                                    "credit_card_pin": "9876"
+                                },
+                                {
+                                    "type": "identity",
+                                    "name": "Mario",
+                                    "identity_title": "Ing.",
+                                    "identity_first_name": "Mario",
+                                    "identity_last_name": "Rossi",
+                                    "identity_email": "mario@acme.it",
+                                    "identity_company": "Acme",
+                                    "identity_city": "Milano",
+                                    "identity_country": "Italia"
+                                },
+                                {
+                                    "type": "passkey",
+                                    "name": "GitHub PK",
+                                    "passkey_title": "GitHub PK",
+                                    "passkey_url": "https://github.com",
+                                    "passkey_rp_id": "github.com",
+                                    "passkey_id": "cred-1",
+                                    "passkey_private_key": "MIGH-PK",
+                                    "passkey_user_handle": "b2N0b2NhdA",
+                                    "passkey_algorithm": "ES256"
+                                },
+                                {
+                                    "type": "totp",
+                                    "name": "AWS TOTP",
+                                    "totp_title": "AWS TOTP",
+                                    "totp_code": "JBSWY3DPEHPK3PXP"
+                                },
+                                {
+                                    "type": "rdp_connection",
+                                    "name": "RDP",
+                                    "rdp_connection_title": "RDP Admin",
+                                    "rdp_connection_host": "rdp.acme.it",
+                                    "rdp_connection_port": "3389",
+                                    "rdp_connection_username": "administrator",
+                                    "rdp_connection_password": "RdpPw!1",
+                                    "rdp_connection_domain": "ACME"
+                                },
+                                {
+                                    "type": "environment_variables",
+                                    "name": "Env prod",
+                                    "environment_variables_title": "Env prod",
+                                    "environment_variables_variables": [
+                                        { "key": "DB_PASSWORD", "value": "dbsecret" },
+                                        { "key": "API_KEY", "value": "abc123" }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "items": [
+                        {
+                            "type": "bookmark",
+                            "name": "Docs",
+                            "bookmark_title": "Docs",
+                            "bookmark_url": "https://docs.example.com",
+                            "bookmark_notes": "Documentazione"
+                        }
+                    ]
+                }
+            ]
+        }"#;
+
+        let batch = evaluate_import("psono", json, Some("export.json"), true, &HashSet::new()).unwrap();
+        assert_eq!(batch.provider, "psono");
+        assert_eq!(batch.provider_label, "Psono");
+        assert_eq!(batch.detected_format, "JSON");
+        // 4 root items + 1 bookmark + 7 in Lavoro/Server = 12
+        assert_eq!(batch.total_parsed, 12);
+        assert_eq!(batch.skipped_count, 2); // cestino + file
+        assert_eq!(batch.source_folders, vec!["Lavoro", "Lavoro/Server"]);
+        assert!(batch.has_items_without_folder);
+
+        let note = &batch.items[0];
+        assert_eq!(note.category, "note");
+        assert_eq!(note.title, "Nota radice");
+        assert_eq!(note.notes, "Contenuto segreto");
+        assert_eq!(note.created_at.map(|d| d.format("%Y-%m-%d").to_string()), Some("2024-01-10".to_string()));
+        assert_eq!(note.updated_at.map(|d| d.format("%Y-%m-%d").to_string()), Some("2024-02-11".to_string()));
+
+        let login = &batch.items[1];
+        assert_eq!(login.category, "login");
+        assert_eq!(login.status, "ready");
+        assert_eq!(login.title, "GitHub");
+        assert_eq!(login.url, "https://github.com/login");
+        assert_eq!(login.username, "octocat");
+        assert_eq!(login.password, "Secret!123");
+        assert_eq!(login.notes, "Account dev");
+        assert_eq!(
+            login.fields.get("totp").map(String::as_str),
+            Some("otpauth://totp/GitHub?secret=JBSWY3DPEHPK3PXP&digits=8&period=60&algorithm=SHA256")
+        );
+
+        assert_eq!(batch.items[2].status, "skipped");
+        assert!(batch.items[2].skip_reason.as_deref().unwrap().contains("cestino"));
+        assert_eq!(batch.items[3].status, "skipped");
+        assert!(batch.items[3].skip_reason.as_deref().unwrap().contains("file"));
+
+        let bookmark = &batch.items[4];
+        assert_eq!(bookmark.url, "https://docs.example.com");
+        assert_eq!(bookmark.source_folder.as_deref(), Some("Lavoro"));
+        assert_eq!(bookmark.tags, vec!["Lavoro"]);
+        // bookmark senza password -> nota con avviso
+        assert_eq!(bookmark.category, "note");
+        assert_eq!(bookmark.status, "warning");
+
+        let bastion = &batch.items[5];
+        assert_eq!(bastion.category, "ssh");
+        assert_eq!(bastion.source_folder.as_deref(), Some("Lavoro/Server"));
+        assert_eq!(bastion.url, "10.0.0.1");
+        assert_eq!(bastion.username, "root");
+        assert_eq!(bastion.password, "rootpw");
+        assert_eq!(bastion.fields.get("port").map(String::as_str), Some("2222"));
+        assert!(bastion.fields.get("private_key").unwrap().contains("BEGIN KEY"));
+        assert!(bastion.notes.contains("Autenticazione: password"));
+
+        let card = &batch.items[6];
+        assert_eq!(card.category, "card");
+        assert_eq!(card.password, "4111222233334444");
+        assert_eq!(card.username, "Mario Rossi");
+        assert_eq!(card.fields.get("cvv").map(String::as_str), Some("123"));
+        assert_eq!(card.fields.get("expiry").map(String::as_str), Some("12/2029"));
+        assert!(card.notes.contains("PIN: 9876"));
+
+        let ident = &batch.items[7];
+        assert_eq!(ident.category, "identity");
+        assert_eq!(ident.status, "ready");
+        assert_eq!(ident.username, "mario@acme.it");
+        assert_eq!(ident.fields.get("first_name").map(String::as_str), Some("Mario"));
+        assert_eq!(ident.fields.get("last_name").map(String::as_str), Some("Rossi"));
+        assert_eq!(ident.fields.get("city").map(String::as_str), Some("Milano"));
+        assert_eq!(ident.fields.get("country").map(String::as_str), Some("Italia"));
+
+        let pk = &batch.items[8];
+        assert_eq!(pk.category, "passkey");
+        assert_eq!(pk.url, "https://github.com");
+        assert_eq!(pk.fields.get("rp_id").map(String::as_str), Some("github.com"));
+        assert_eq!(pk.fields.get("credential_id").map(String::as_str), Some("cred-1"));
+        assert_eq!(pk.fields.get("private_key").map(String::as_str), Some("MIGH-PK"));
+        assert_eq!(pk.fields.get("user_handle").map(String::as_str), Some("b2N0b2NhdA"));
+        assert_eq!(pk.fields.get("key_algorithm").map(String::as_str), Some("ES256"));
+
+        let totp = &batch.items[9];
+        assert_eq!(totp.category, "note");
+        assert_eq!(
+            totp.fields.get("totp").map(String::as_str),
+            Some("otpauth://totp/AWS%20TOTP?secret=JBSWY3DPEHPK3PXP")
+        );
+
+        let rdp = &batch.items[10];
+        assert_eq!(rdp.category, "login");
+        assert_eq!(rdp.url, "rdp://rdp.acme.it:3389");
+        assert_eq!(rdp.username, "administrator");
+        assert_eq!(rdp.password, "RdpPw!1");
+        assert!(rdp.notes.contains("Dominio: ACME"));
+
+        let env = &batch.items[11];
+        assert_eq!(env.category, "note");
+        assert!(env.notes.contains("DB_PASSWORD: dbsecret"));
+        assert!(env.notes.contains("API_KEY: abc123"));
+    }
+
+    #[test]
+    fn psono_rejects_csv_and_bitwarden_json_and_bitwarden_hints_psono() {
+        let csv = "name,url,username,password\nA,https://a.it,u,p";
+        let err = evaluate_import("psono", csv, None, true, &HashSet::new()).unwrap_err();
+        assert!(err.to_string().contains("JSON"));
+
+        let bw = r#"{ "encrypted": false, "items": [ { "type": 1, "name": "x", "login": { "username": "u", "password": "p" } } ] }"#;
+        let err = evaluate_import("psono", bw, None, true, &HashSet::new()).unwrap_err();
+        assert!(err.to_string().contains("Bitwarden"));
+
+        let psono = r#"{ "folders": [ { "name": "F", "items": [ { "type": "website_password", "name": "x", "website_password_password": "p" } ] } ] }"#;
+        let err = evaluate_import("bitwarden", psono, None, true, &HashSet::new()).unwrap_err();
+        assert!(err.to_string().contains("Psono"));
+
+        let not_psono = r#"{ "foo": "bar" }"#;
+        let err = evaluate_import("psono", not_psono, None, true, &HashSet::new()).unwrap_err();
+        assert!(err.to_string().contains("Psono"));
+    }
+
+    #[test]
+    fn psono_preserves_secret_whitespace_tags_custom_fields_and_edge_cases() {
+        let json = r#"{
+            "items": [
+                {
+                    "type": "website_password",
+                    "name": "Spazi",
+                    "website_password_title": "Spazi",
+                    "website_password_username": "u",
+                    "website_password_password": "  secret con spazi  ",
+                    "website_password_url_filter": "fallback.example.com",
+                    "tags": ["dev", " prod ", ""],
+                    "custom_fields": [
+                        { "name": "PIN", "value": "1234", "type": "password" },
+                        { "name": "Note campo", "value": "valore" },
+                        { "name": "", "value": "ignorato" }
+                    ],
+                    "write_date": "2024-05-01T10:00:00Z"
+                },
+                {
+                    "type": "website_password",
+                    "name": "TOTP con ? nel titolo",
+                    "website_password_title": "A?B#C",
+                    "website_password_username": "u2",
+                    "website_password_password": "pw",
+                    "website_password_totp_code": "JBSWY3DPEHPK3PXP"
+                },
+                {
+                    "type": "identity",
+                    "name": "Mario",
+                    "identity_first_name": "Mario",
+                    "identity_last_name": "Rossi",
+                    "identity_notes": "Nota identità cifrata in Psono",
+                    "password_modification_datetime": "2024-06-15T12:00:00Z"
+                },
+                "non-un-oggetto",
+                42
+            ]
+        }"#;
+
+        let batch = evaluate_import("psono", json, Some("export.json"), true, &HashSet::new()).unwrap();
+        assert_eq!(batch.total_parsed, 5);
+
+        // I segreti preservano gli spazi iniziali/finali
+        let spaced = &batch.items[0];
+        assert_eq!(spaced.password, "  secret con spazi  ");
+        assert_eq!(spaced.url, "fallback.example.com"); // url_filter di fallback
+        assert_eq!(spaced.custom_fields.len(), 2);
+        assert_eq!(spaced.custom_fields[0].label, "PIN");
+        assert_eq!(spaced.custom_fields[0].value, "1234");
+        assert!(matches!(spaced.custom_fields[0].field_type, CustomFieldType::Hidden));
+        assert_eq!(spaced.custom_fields[1].label, "Note campo");
+        assert!(matches!(spaced.custom_fields[1].field_type, CustomFieldType::Text));
+        assert_eq!(spaced.updated_at.map(|d| d.format("%Y-%m-%d").to_string()), Some("2024-05-01".to_string()));
+        // tags + folder_as_tag -> campo "tags" con i tag
+        assert_eq!(spaced.tags, vec!["dev", "prod"]);
+
+        // Il label TOTP con caratteri structurali viene percent-codificato e resta valido
+        let q = &batch.items[1];
+        assert_eq!(
+            q.fields.get("totp").map(String::as_str),
+            Some("otpauth://totp/A%3FB%23C?secret=JBSWY3DPEHPK3PXP")
+        );
+
+        // identity_notes finisce nelle note; password_modification_datetime -> updated_at
+        let ident = &batch.items[2];
+        assert_eq!(ident.category, "identity");
+        assert_eq!(ident.notes, "Nota identità cifrata in Psono");
+        assert_eq!(ident.updated_at.map(|d| d.format("%Y-%m-%d").to_string()), Some("2024-06-15".to_string()));
+        assert!(ident.created_at.is_none());
+
+        // Voci non-oggetto -> saltate con motivo, non perdute silenziosamente
+        assert_eq!(batch.items[3].status, "skipped");
+        assert!(batch.items[3].skip_reason.as_deref().unwrap().contains("non valida"));
+        assert_eq!(batch.items[4].status, "skipped");
+        assert_eq!(batch.skipped_count, 2);
+    }
+
+    #[test]
+    fn psono_metadata_only_export_degrades_gracefully() {
+        // Export con soli metadati cifrati (senza campi decifrati): niente crash,
+        // le voci login senza password deviennent note con avviso
+        let json = r#"{
+            "datastore_id": "abc",
+            "folders": [
+                {
+                    "name": "F",
+                    "items": [
+                        {
+                            "type": "website_password",
+                            "urlfilter": "example.com",
+                            "name": "Solo metadati",
+                            "secret_id": "fc908def-104a-4d20-9ab0-6b8ea2908d30",
+                            "secret_key": "c9701d30"
+                        }
+                    ]
+                }
+            ]
+        }"#;
+        let batch = evaluate_import("psono", json, None, true, &HashSet::new()).unwrap();
+        assert_eq!(batch.total_parsed, 1);
+        let item = &batch.items[0];
+        assert_eq!(item.status, "warning");
+        assert_eq!(item.category, "note");
+        assert_eq!(item.source_folder.as_deref(), Some("F"));
+        assert_eq!(item.url, "example.com");
+        assert!(item.warning.as_deref().unwrap().contains("Password mancante"));
     }
 }
