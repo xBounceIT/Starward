@@ -674,6 +674,33 @@ mod tests {
             .iter()
             .any(|m| m["user_id"] == charlie_id && m["role"] == "editor" && m["is_pending"] == false));
 
+        // 7c. Charlie (editor) adds a credential to the shared "Produzione" vault owned by Alice
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/credentials")
+                    .header("Authorization", format!("Bearer {charlie_token}"))
+                    .header("Content-Type", "application/json")
+                    .body(Body::from(
+                        json!({
+                            "vault_id": prod_id,
+                            "title": "DB prod da Charlie",
+                            "username": "charlie",
+                            "password": "CharlieSecret!1",
+                            "category": "login"
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::CREATED);
+        let shared_cred = read_json(res).await;
+        let shared_cred_id = shared_cred["id"].as_str().unwrap().to_string();
+
         // 8. Database credential encrypts extra fields at rest and returns decrypted fields
         let res = app
             .clone()
@@ -994,6 +1021,26 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(res.status(), StatusCode::NO_CONTENT);
+
+        // Deleting a user must not delete their credentials from a shared vault
+        // owned by someone else: the credential survives, reassigned to the vault owner
+        let (shared_created_by,): (String,) =
+            sqlx::query_as("SELECT created_by FROM credentials WHERE id = $1")
+                .bind(&shared_cred_id)
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(shared_created_by, alice_id);
+
+        // The user's personal vault is cascade-deleted together with its credentials
+        let (personal_creds,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM credentials WHERE vault_id = $1",
+        )
+        .bind(&charlie_personal_id)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(personal_creds, 0);
 
         // 11. User settings & display name customization
         let res = app
