@@ -84,7 +84,7 @@ fn build_cors_origin(raw: &str) -> AllowOrigin {
             return AllowOrigin::mirror_request();
         }
         panic!(
-            "CORS_ORIGIN must be an explicit origin in production (got a wildcard-like value: \"{raw}\"). \
+            "CORS_ORIGIN must be an explicit origin in production (wildcard-like values such as * or 0.0.0.0 are rejected; the configured value is intentionally not echoed to logs). \
              Set CORS_ORIGIN to the frontend URL (e.g. https://vault.example.com), \
              or set STARWARD_DEV_MODE=true for local development."
         );
@@ -312,10 +312,9 @@ async fn main() {
     // origin (e.g. the 0.0.0.0 default) must never reach build_cors_origin.
     if !config::dev_mode() && is_wildcard_cors_origin(&config.cors_origin) {
         panic!(
-            "CORS_ORIGIN must be an explicit origin in production (got a wildcard-like value: \"{}\"). \
+            "CORS_ORIGIN must be an explicit origin in production (wildcard-like values such as * or 0.0.0.0 are rejected; the configured value is intentionally not echoed to logs). \
              Set CORS_ORIGIN to the frontend URL (e.g. https://vault.example.com), \
-             or set STARWARD_DEV_MODE=true for local development.",
-            config.cors_origin
+             or set STARWARD_DEV_MODE=true for local development."
         );
     }
     let db = init_db(&config.database_url)
