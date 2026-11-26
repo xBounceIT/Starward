@@ -1272,6 +1272,18 @@ fn psono_field_raw(item: &Value, prefix: &str, name: &str) -> String {
     json_scalar_raw(item.get(format!("{prefix}_{name}").as_str()))
 }
 
+/// Secret field value as a string: strings are preserved raw (no trimming, key
+/// material may legitimately have significant whitespace), structured values
+/// such as a JWK private-key object are serialized as compact JSON so no data
+/// is lost. Returns None for missing or unusable (number/bool) values.
+fn psono_secret_value(val: Option<&Value>) -> Option<String> {
+    match val {
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(v @ (Value::Object(_) | Value::Array(_))) => serde_json::to_string(v).ok(),
+        _ => None,
+    }
+}
+
 /// Percent-encodes an otpauth label so titles containing '?', '#', '&' or
 /// spaces cannot break the URI structure (the parser splits on those chars).
 fn psono_encode_otp_label(label: &str) -> String {
@@ -1708,7 +1720,35 @@ fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
             if !retrieval.is_empty() {
                 append_note_section(&mut notes, None, &format!("Codice di recupero: {retrieval}"));
             }
-            Some(base("note", title, String::new(), password, urlfilter, notes, BTreeMap::new(), None, None))
+            // The certificate payload (base64 .pfx) is required to use the entry:
+            // keep it verbatim instead of importing a metadata-only note. Try the
+            // known field aliases in order and use the first one with a usable
+            // (non-empty) value, so an empty `certificate` does not shadow a
+            // populated `file_content`.
+            const CERT_ALIASES: &[&str] = &["certificate", "file_content", "content", "cert", "pfx", "file"];
+            let cert = CERT_ALIASES.iter().find_map(|name| {
+                item.get(format!("{prefix}_{name}").as_str())
+                    .and_then(|v| psono_secret_value(Some(v)))
+                    .filter(|s| !s.trim().is_empty())
+            });
+            let any_cert_field_present = CERT_ALIASES
+                .iter()
+                .any(|name| item.get(format!("{prefix}_{name}").as_str()).is_some_and(|v| !v.is_null()));
+            let mut fields = BTreeMap::new();
+            match cert {
+                Some(cert) => {
+                    fields.insert("certificate".to_string(), cert);
+                }
+                None => {
+                    let reason = if any_cert_field_present {
+                        "Certificato ELSTER con payload in un formato non supportato: importazione saltata per non perdere il certificato".to_string()
+                    } else {
+                        "Certificato ELSTER senza payload del certificato (campo 'elster_certificate_file_content'/'elster_certificate_certificate' mancante): importazione saltata".to_string()
+                    };
+                    return Some(base("note", title, String::new(), password, urlfilter, notes, BTreeMap::new(), None, Some(reason)));
+                }
+            }
+            Some(base("note", title, String::new(), password, urlfilter, notes, fields, None, None))
         }
         "passkey" => {
             let mut fields = BTreeMap::new();
@@ -1719,10 +1759,6 @@ fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
             let cred_id = psono_field(item, prefix, "id");
             if !cred_id.is_empty() {
                 fields.insert("credential_id".to_string(), cred_id);
-            }
-            let priv_key = psono_field(item, prefix, "private_key");
-            if !priv_key.is_empty() {
-                fields.insert("private_key".to_string(), priv_key);
             }
             let user_handle = psono_field(item, prefix, "user_handle");
             if !user_handle.is_empty() {
@@ -1741,6 +1777,29 @@ fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
                     fields.insert("rp_id".to_string(), host);
                 }
             let notes = psono_field(item, prefix, "notes");
+            // The private key may be a plain string or a structured JWK object;
+            // keep it verbatim (raw string or compact JSON) so the passkey stays
+            // usable. Without a usable private key the passkey cannot authenticate,
+            // so the entry is skipped instead of imported broken.
+            let priv_key_val = item
+                .get(format!("{prefix}_private_key").as_str())
+                .filter(|v| !v.is_null());
+            match priv_key_val
+                .and_then(|v| psono_secret_value(Some(v)))
+                .filter(|s| !s.trim().is_empty())
+            {
+                Some(priv_key) => {
+                    fields.insert("private_key".to_string(), priv_key);
+                }
+                None => {
+                    let reason = if priv_key_val.is_some() {
+                        "Passkey con chiave privata in un formato non supportato: importazione saltata per non perdere dati richiesti".to_string()
+                    } else {
+                        "Passkey senza chiave privata: importazione saltata perché senza di essa il passkey non può autenticare".to_string()
+                    };
+                    return Some(base("passkey", title, String::new(), String::new(), url, notes, fields, None, Some(reason)));
+                }
+            }
             Some(base("passkey", title, String::new(), String::new(), url, notes, fields, None, None))
         }
         "file" => Some(base(

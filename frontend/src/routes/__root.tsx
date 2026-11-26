@@ -8,17 +8,33 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 
+import { createIsomorphicFn } from '@tanstack/react-start'
+
+import { getRequest } from '@tanstack/react-start/server'
+
 import { useTranslation } from 'react-i18next'
 
 import { Toaster } from '@/components/ui/sonner'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
 
-import { t } from '@/lib/i18n'
+import {
+  applyServerLanguage,
+  getLanguagePreference,
+  languageFromAcceptLanguage,
+  resolveLanguage,
+  t,
+} from '@/lib/i18n'
 
 import { ThemeProvider } from '@/lib/theme'
 
 import appCss from '@/styles/app.css?url'
+
+// Legge l'header Accept-Language solo durante la SSR; sul client il ramo
+// server viene rimosso dal bundler e la funzione ritorna null.
+const getAcceptLanguageHeader = createIsomorphicFn()
+  .server(() => getRequest().headers.get('accept-language'))
+  .client(() => null)
 
 const NO_TRANSITIONS_STYLE =
   'html.no-transitions *,html.no-transitions *::before,html.no-transitions *::after{transition:none!important}'
@@ -39,7 +55,12 @@ const CSP_POLICY = [
 // Pre-hydration: applica tema e lingua (da localStorage oppure rilevata dal
 // browser tramite navigator.languages — funziona sia su Chrome sia su Firefox)
 // cosi' <html lang> e i contenuti non "flashano" nella lingua sbagliata.
-const INITIAL_LOAD_SCRIPT = `(() => {
+// `serverLang` e' la lingua usata dal server durante la SSR (da
+// Accept-Language): viene serializzata in window.__STARWARD_SERVER_LANGUAGE__
+// prima del caricamento dei bundle, cosi' il primo render client usa la stessa
+// lingua del markup server e l'hydration non fallisce (React error #418).
+const initialLoadScript = (serverLang: string) => `(() => {
+  window.__STARWARD_SERVER_LANGUAGE__ = ${JSON.stringify(serverLang)};
   const root = document.documentElement;
   root.classList.add('no-transitions');
   try {
@@ -65,6 +86,13 @@ const INITIAL_LOAD_SCRIPT = `(() => {
 })();`
 
 export const Route = createRootRoute({
+  beforeLoad: () => {
+    // Durante la SSR allinea la lingua al Accept-Language della request:
+    // server e browser renderizzano cosi' la stessa lingua al primo render.
+    if (typeof window === 'undefined') {
+      applyServerLanguage(languageFromAcceptLanguage(getAcceptLanguageHeader()))
+    }
+  },
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -124,11 +152,21 @@ function RootDocument() {
     if (meta) meta.content = t('root.meta-description')
   }, [lang])
 
+  // Dopo l'hydration allinea la lingua alla preferenza locale (localStorage /
+  // browser): il primo render usa la lingua del server, quindi questo cambio
+  // avviene post-hydration senza errori di mismatch.
+  useEffect(() => {
+    const preferred = resolveLanguage(getLanguagePreference())
+    if (preferred !== i18nInstance.language) {
+      void i18nInstance.changeLanguage(preferred)
+    }
+  }, [i18nInstance])
+
   return (
     <html lang={lang} className="dark" suppressHydrationWarning>
       <head>
         <HeadContent />
-        <ScriptOnce>{INITIAL_LOAD_SCRIPT}</ScriptOnce>
+        <ScriptOnce>{initialLoadScript(lang)}</ScriptOnce>
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <ThemeProvider>

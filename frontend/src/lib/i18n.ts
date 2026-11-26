@@ -19,6 +19,25 @@ export const LANGUAGE_STORAGE_KEY = 'starward-language'
 
 export const DEFAULT_LANGUAGE: LanguageCode = 'it'
 
+declare global {
+  interface Window {
+    /** Lingua usata dal server durante la SSR, serializzata nello stream HTML. */
+    __STARWARD_SERVER_LANGUAGE__?: string
+  }
+}
+
+// Lingua decisa lato server (da Accept-Language) durante la SSR. Node >= 21
+// espone un `navigator` globale finto ('en-US'), quindi il rilevamento via
+// navigator va eseguito solo in un browser reale: durante la SSR la lingua
+// va presa dalla request HTTP, altrimenti server e client renderizzano
+// lingue diverse e React fallisce l'hydration (error #418).
+let serverSideLanguage: LanguageCode | null = null
+
+export function applyServerLanguage(lang: LanguageCode): void {
+  serverSideLanguage = lang
+  void i18n.changeLanguage(lang)
+}
+
 function normalizeLanguageTag(tag: string | undefined | null): string {
   return (tag ?? '').split('-')[0]?.trim().toLowerCase() ?? ''
 }
@@ -27,10 +46,11 @@ function normalizeLanguageTag(tag: string | undefined | null): string {
  * Rileva la lingua del browser tramite navigator.languages / navigator.language.
  * Funziona sia su Chrome/Edge sia su Firefox (entrambi espongono
  * navigator.languages). Ritorna la prima lingua supportata trovata,
- * altrimenti la lingua di fallback.
+ * altrimenti la lingua di fallback. Sul server (dove `navigator` di Node è
+ * finto) usa la lingua decisa dalla request, oppure il default.
  */
 export function detectBrowserLanguage(): LanguageCode {
-  if (typeof navigator === 'undefined') return DEFAULT_LANGUAGE
+  if (typeof window === 'undefined') return serverSideLanguage ?? DEFAULT_LANGUAGE
   const candidates: string[] = []
   if (Array.isArray(navigator.languages) && navigator.languages.length > 0) {
     candidates.push(...navigator.languages)
@@ -93,8 +113,19 @@ export function getRequestT(request: Request) {
   )
 }
 
-const initialPreference = getLanguagePreference()
-const initialLanguage = resolveLanguage(initialPreference)
+// Al primo render client usa la lingua serializzata dal server
+// (window.__STARWARD_SERVER_LANGUAGE__, iniettata nello stream HTML) cosi'
+// l'hydration confronta markup identici; la preferenza locale viene
+// applicata dopo il mount.
+function getInitialLanguage(): LanguageCode {
+  if (typeof window !== 'undefined') {
+    const fromServer = window.__STARWARD_SERVER_LANGUAGE__
+    if (fromServer === 'it' || fromServer === 'en') return fromServer
+  }
+  return resolveLanguage(getLanguagePreference())
+}
+
+const initialLanguage = getInitialLanguage()
 
 void i18n.use(initReactI18next).init({
   resources: {

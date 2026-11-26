@@ -326,32 +326,36 @@ pub async fn delete_user(
     .execute(&mut *tx)
     .await?;
 
-    // Preserve credentials created or edited by this user inside shared vaults owned by others
+    // Preserve credentials created or edited by this user: in vaults owned by
+    // others they are reassigned to the vault owner; in the user's own vaults
+    // (which are cascade-deleted with the user) they are reassigned to the
+    // deleting admin, otherwise the credentials_created_by_fkey NO ACTION
+    // constraint aborts the DELETE with a foreign-key violation.
     sqlx::query(
         r#"
         UPDATE credentials c
-        SET created_by = v.owner_id
+        SET created_by = CASE WHEN v.owner_id = $1 THEN $2 ELSE v.owner_id END
         FROM vaults v
         WHERE c.vault_id = v.id
           AND c.created_by = $1
-          AND v.owner_id != $1
         "#,
     )
     .bind(&target_user_id)
+    .bind(&user.id)
     .execute(&mut *tx)
     .await?;
 
     sqlx::query(
         r#"
         UPDATE credentials c
-        SET updated_by = v.owner_id
+        SET updated_by = CASE WHEN v.owner_id = $1 THEN $2 ELSE v.owner_id END
         FROM vaults v
         WHERE c.vault_id = v.id
           AND c.updated_by = $1
-          AND v.owner_id != $1
         "#,
     )
     .bind(&target_user_id)
+    .bind(&user.id)
     .execute(&mut *tx)
     .await?;
 

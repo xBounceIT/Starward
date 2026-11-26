@@ -2201,4 +2201,104 @@ mod tests {
         assert_eq!(item.url, "example.com");
         assert!(item.warning.as_deref().unwrap().contains("Password mancante"));
     }
+
+    #[test]
+    fn psono_preserves_structured_passkey_key_and_elster_certificate_payload() {
+        let json = r#"{
+            "items": [
+                {
+                    "type": "passkey",
+                    "name": "Passkey JWK",
+                    "passkey_title": "Passkey JWK",
+                    "passkey_url": "https://example.com",
+                    "passkey_rp_id": "example.com",
+                    "passkey_id": "cred-jwk",
+                    "passkey_private_key": { "kty": "EC", "crv": "P-256", "x": "abc", "y": "def", "d": "secret-d" },
+                    "passkey_user_handle": "uh-1",
+                    "passkey_algorithm": "ES256"
+                },
+                {
+                    "type": "passkey",
+                    "name": "Passkey senza chiave",
+                    "passkey_rp_id": "example.org",
+                    "passkey_id": "cred-nokey"
+                },
+                {
+                    "type": "passkey",
+                    "name": "Passkey chiave formato errato",
+                    "passkey_rp_id": "example.net",
+                    "passkey_private_key": 12345
+                },
+                {
+                    "type": "elster_certificate",
+                    "name": "ELSTER",
+                    "elster_certificate_title": "ELSTER",
+                    "elster_certificate_password": "1234",
+                    "elster_certificate_retrieval_code": "RC-1",
+                    "elster_certificate_file_content": "MIIB-base64-pfx-payload"
+                },
+                {
+                    "type": "elster_certificate",
+                    "name": "ELSTER senza certificato",
+                    "elster_certificate_password": "9999"
+                },
+                {
+                    "type": "elster_certificate",
+                    "name": "ELSTER alias",
+                    "elster_certificate_password": "5555",
+                    "elster_certificate_certificate": "",
+                    "elster_certificate_file_content": "PFX-DA-FILE-CONTENT"
+                }
+            ]
+        }"#;
+
+        let batch = evaluate_import("psono", json, Some("export.json"), true, &HashSet::new()).unwrap();
+        assert_eq!(batch.total_parsed, 6);
+
+        // JWK private key is preserved as compact JSON, not dropped
+        let pk = &batch.items[0];
+        assert_eq!(pk.category, "passkey");
+        assert_eq!(pk.status, "ready");
+        let jwk = pk.fields.get("private_key").unwrap();
+        assert!(jwk.contains("\"kty\":\"EC\""));
+        assert!(jwk.contains("\"d\":\"secret-d\""));
+        assert_eq!(pk.fields.get("rp_id").map(String::as_str), Some("example.com"));
+        assert_eq!(pk.fields.get("credential_id").map(String::as_str), Some("cred-jwk"));
+        assert_eq!(pk.fields.get("user_handle").map(String::as_str), Some("uh-1"));
+        assert_eq!(pk.fields.get("key_algorithm").map(String::as_str), Some("ES256"));
+
+        // Passkey without a private key is skipped with a clear reason, not imported broken
+        let no_key = &batch.items[1];
+        assert_eq!(no_key.status, "skipped");
+        assert!(no_key.skip_reason.as_deref().unwrap().contains("senza chiave privata"));
+
+        // Passkey with a private key in an unusable format is skipped too
+        let bad_key = &batch.items[2];
+        assert_eq!(bad_key.status, "skipped");
+        assert!(bad_key.skip_reason.as_deref().unwrap().contains("formato non supportato"));
+
+        // ELSTER certificate payload is preserved alongside PIN and retrieval code
+        let elster = &batch.items[3];
+        assert_eq!(elster.category, "note");
+        assert_eq!(elster.status, "ready");
+        assert_eq!(elster.password, "1234");
+        assert_eq!(
+            elster.fields.get("certificate").map(String::as_str),
+            Some("MIIB-base64-pfx-payload")
+        );
+        assert!(elster.notes.contains("Codice di recupero: RC-1"));
+
+        // ELSTER entry without the certificate payload is skipped with a clear reason
+        let elster_no_cert = &batch.items[4];
+        assert_eq!(elster_no_cert.status, "skipped");
+        assert!(elster_no_cert.skip_reason.as_deref().unwrap().contains("senza payload"));
+
+        // An empty `certificate` alias must not shadow a populated `file_content`
+        let elster_alias = &batch.items[5];
+        assert_eq!(elster_alias.status, "ready");
+        assert_eq!(
+            elster_alias.fields.get("certificate").map(String::as_str),
+            Some("PFX-DA-FILE-CONTENT")
+        );
+    }
 }
