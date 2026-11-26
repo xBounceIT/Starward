@@ -23,6 +23,7 @@ const WATCHED_INPUTS = [
   'vite.config.ts',
   'tsconfig.json',
   'package.json',
+  'pnpm-lock.yaml',
   'playwright.config.ts',
 ]
 
