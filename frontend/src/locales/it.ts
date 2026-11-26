@@ -348,6 +348,7 @@ export default {
     "cancella": "Cancella",
     "cartelle": "Cartelle",
     "tutte": "Tutte",
+    "totp": "TOTP",
     "credenziale": "credenziale",
     "credenziali": "credenziali"
   },

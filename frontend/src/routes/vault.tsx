@@ -50,7 +50,9 @@ import { authClient } from '@/lib/auth-client'
 import { getServerSessionFn } from '@/lib/auth-server'
 import {
   getSearchableMetadata,
+  hasCredentialTotp,
   serializeCredentialTags,
+  TOTP_FILTER_VALUE,
 } from '@/lib/credential-types'
 import { useTheme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
@@ -482,7 +484,11 @@ function VaultWorkspace() {
       if (selection.type === 'favorites' && !cred.favorite) return false
       if (selection.type === 'vault' && cred.vault_id !== selection.vaultId)
         return false
-      if (categoryFilter && cred.category !== categoryFilter) return false
+      if (categoryFilter === TOTP_FILTER_VALUE) {
+        if (!hasCredentialTotp(cred)) return false
+      } else if (categoryFilter && cred.category !== categoryFilter) {
+        return false
+      }
       if (q) {
         const hay =
           `${cred.title} ${cred.username} ${cred.url} ${cred.vault_name} ${getSearchableMetadata(cred)}`.toLowerCase()

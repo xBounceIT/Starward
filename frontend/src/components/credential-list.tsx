@@ -65,6 +65,7 @@ import {
   getCredentialListColumns,
   getCredentialQuickCopy,
   hasCredentialTotp,
+  TOTP_FILTER_VALUE,
 } from '@/lib/credential-types'
 import { generateTotpFromRaw } from '@/lib/otp'
 import { cn, copyToClipboard } from '@/lib/utils'
@@ -102,6 +103,15 @@ function computeGridCols(width: number): 1 | 2 | 3 {
   if (width >= GRID_3COL_MIN_WIDTH) return 3
   if (width >= GRID_2COL_MIN_WIDTH) return 2
   return 1
+}
+
+function filterPillClassName(active: boolean): string {
+  return cn(
+    'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
+    active
+      ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
+      : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
+  )
 }
 
 interface CredentialRowMenuButtonProps {
@@ -1122,12 +1132,7 @@ export const CredentialList = memo(function CredentialList({
               <button
                 type="button"
                 onClick={() => onCategoryFilterChange('')}
-                className={cn(
-                  'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
-                  categoryFilter === ''
-                    ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
-                    : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
-                )}
+                className={filterPillClassName(categoryFilter === '')}
               >
                 {t('credential-list.tutte')}</button>
               {CREDENTIAL_CATEGORIES.map((cat) => {
@@ -1139,18 +1144,25 @@ export const CredentialList = memo(function CredentialList({
                     onClick={() =>
                       onCategoryFilterChange(active ? '' : cat.value)
                     }
-                    className={cn(
-                      'inline-flex h-8 shrink-0 items-center gap-1.5 px-3.5 text-xs transition-colors rounded-md',
-                      active
-                        ? 'bg-foreground text-background shadow-xs border sync-security:border-[#ff9c00] sync-security:bg-[#ff9c00] font-bold sync-security:text-[#1a2c4b]'
-                        : 'border border-border/70 bg-card/40 font-medium text-muted-foreground hover:bg-card hover:text-foreground sync-security:border-white/20 sync-security:bg-[#0e1b33] sync-security:text-white/80 sync-security:hover:border-[#ff9c00] sync-security:hover:text-[#ff9c00]',
-                    )}
+                    className={filterPillClassName(active)}
                   >
                     <CategoryIcon category={cat.value} className="size-3.5" />
                     <span>{cat.label}</span>
                   </button>
                 )
               })}
+              <button
+                type="button"
+                onClick={() =>
+                  onCategoryFilterChange(
+                    categoryFilter === TOTP_FILTER_VALUE ? '' : TOTP_FILTER_VALUE,
+                  )
+                }
+                className={filterPillClassName(categoryFilter === TOTP_FILTER_VALUE)}
+              >
+                <CategoryIcon category={TOTP_FILTER_VALUE} className="size-3.5" />
+                <span>{t('credential-list.totp')}</span>
+              </button>
             </div>
             {categoryEdges.left && (
               <div

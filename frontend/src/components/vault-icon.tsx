@@ -14,6 +14,7 @@ import {
   Lock,
   Server,
   Shield,
+  ShieldCheck,
   Terminal,
   Users,
 } from 'lucide-react'
@@ -99,6 +100,8 @@ export function CategoryIcon({
       return <KeySquare className={className} />
     case 'note':
       return <FileText className={className} />
+    case 'totp':
+      return <ShieldCheck className={className} />
     default:
       return <Globe className={className} />
   }

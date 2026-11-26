@@ -348,6 +348,7 @@ export default {
     "cancella": "Delete",
     "cartelle": "Vaults",
     "tutte": "All",
+    "totp": "TOTP",
     "credenziale": "credential",
     "credenziali": "credentials"
   },

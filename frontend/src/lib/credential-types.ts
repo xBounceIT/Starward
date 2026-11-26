@@ -1299,6 +1299,9 @@ export function hasCredentialTotp(cred: Pick<Credential, 'fields'>): boolean {
   return Boolean(cred.fields?.totp?.trim())
 }
 
+/// Valore speciale del filtro pill che mostra solo le credenziali con codice TOTP configurato.
+export const TOTP_FILTER_VALUE = 'totp'
+
 export interface CustomFieldTypeOption {
   value: CustomFieldType
   label: string
