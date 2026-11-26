@@ -363,6 +363,9 @@ export function CredentialDetail({
     const isRevealed = Boolean(revealedFields[field.key])
     const isMultiline =
       field.type === 'textarea' || field.type === 'secret-textarea'
+    // A masked secret renders as a single line of dots, so it must stay
+    // vertically centered instead of being top-aligned like a multiline value
+    const isMaskedSecret = Boolean(rawValue) && Boolean(field.secret) && !isRevealed
 
     const externalHref =
       (field.isLink || field.key === 'url') && rawValue
@@ -380,14 +383,14 @@ export function CredentialDetail({
         <div
           className={cn(
             'flex min-w-0 items-center justify-between gap-2 overflow-hidden border border-border/70 bg-card/50 px-3.5 py-2.5 rounded-lg sync-security:border-white/15 sync-security:bg-[#0e1b33]',
-            isMultiline && 'items-start',
+            isMultiline && !isMaskedSecret && 'items-start',
           )}
         >
           <div className="min-w-0 flex-1 overflow-hidden">
             {!rawValue ? (
               <span className="text-xs italic text-muted-foreground">
                 {t('credential-detail.non-specificato')}</span>
-            ) : field.secret && !isRevealed ? (
+            ) : isMaskedSecret ? (
               <span className="block truncate font-mono text-sm tracking-widest text-foreground select-none">
                 {field.type === 'secret-textarea'
                   ? '••••••••••••••••••••••••'
