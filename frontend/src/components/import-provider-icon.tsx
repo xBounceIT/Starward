@@ -8,6 +8,7 @@ import keePassLogo from '@/assets/provider-icons/keepass.svg'
 import lastPassLogo from '@/assets/provider-icons/lastpass.svg'
 import nordPassLogo from '@/assets/provider-icons/nordpass.svg'
 import protonPassLogo from '@/assets/provider-icons/protonpass.svg'
+import psonoLogo from '@/assets/provider-icons/psono.svg'
 import safariLogo from '@/assets/provider-icons/safari.svg'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +31,7 @@ const PROVIDER_LOGO_MAP: Record<string, string> = {
   dashlane: dashlaneLogo,
   protonpass: protonPassLogo,
   nordpass: nordPassLogo,
+  psono: psonoLogo,
 }
 
 /** Renders the official full-color brand logo for an import provider. */
