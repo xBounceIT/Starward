@@ -19,3 +19,7 @@ frontend/data/
 .env
 backend/.env
 frontend/.env
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/

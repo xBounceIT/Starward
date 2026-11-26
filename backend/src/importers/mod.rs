@@ -2235,7 +2235,7 @@ mod tests {
                     "elster_certificate_title": "ELSTER",
                     "elster_certificate_password": "1234",
                     "elster_certificate_retrieval_code": "RC-1",
-                    "elster_certificate_certificate": "MIIB-base64-pfx-payload"
+                    "elster_certificate_file_content": "MIIB-base64-pfx-payload"
                 },
                 {
                     "type": "elster_certificate",

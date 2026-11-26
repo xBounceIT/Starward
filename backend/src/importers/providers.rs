@@ -1722,7 +1722,7 @@ fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
             }
             // The certificate payload (base64 .pfx) is required to use the entry:
             // keep it verbatim instead of importing a metadata-only note.
-            let cert_val = ["certificate", "cert", "pfx", "file"]
+            let cert_val = ["certificate", "file_content", "content", "cert", "pfx", "file"]
                 .iter()
                 .find_map(|name| item.get(format!("{prefix}_{name}").as_str()).filter(|v| !v.is_null()));
             let mut fields = BTreeMap::new();
@@ -1737,7 +1737,7 @@ fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
                     let reason = if cert_val.is_some() {
                         "Certificato ELSTER con payload in un formato non supportato: importazione saltata per non perdere il certificato".to_string()
                     } else {
-                        "Certificato ELSTER senza payload del certificato (campo 'elster_certificate_certificate' mancante): importazione saltata".to_string()
+                        "Certificato ELSTER senza payload del certificato (campo 'elster_certificate_file_content'/'elster_certificate_certificate' mancante): importazione saltata".to_string()
                     };
                     return Some(base("note", title, String::new(), password, urlfilter, notes, BTreeMap::new(), None, Some(reason)));
                 }
