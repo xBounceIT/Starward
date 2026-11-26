@@ -138,7 +138,8 @@ export function getRequestT(request: Request) {
 // allocate a new TFunction on every t() call.
 const fixedTCache = new Map<LanguageCode, TFunction>()
 
-function fixedT(lang: LanguageCode): TFunction {
+/** Fixed translator for a language, cached (safe to call per request). */
+export function getFixedTFor(lang: LanguageCode): TFunction {
   let fn = fixedTCache.get(lang)
   if (!fn) {
     fn = i18n.getFixedT(lang)
@@ -197,7 +198,7 @@ syncDocumentLanguage(i18n.language)
  */
 export const t = ((key: unknown, options?: unknown) => {
   if (typeof window === 'undefined') {
-    return fixedT(languageFromCurrentRequest() ?? DEFAULT_LANGUAGE)(
+    return getFixedTFor(languageFromCurrentRequest() ?? DEFAULT_LANGUAGE)(
       key as never,
       options as never,
     )

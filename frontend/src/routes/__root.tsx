@@ -15,6 +15,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 import i18n, {
+  getFixedTFor,
   getLanguagePreference,
   getRequestLanguage,
   getSsrI18n,
@@ -82,7 +83,7 @@ export const Route = createRootRoute({
     // i18n instance language.
     const lang =
       typeof window === 'undefined' ? getRequestLanguage() : (i18n.language as 'it' | 'en')
-    const tt = i18n.getFixedT(lang)
+    const tt = getFixedTFor(lang)
     return {
       meta: [
         { charSet: 'utf-8' },
@@ -92,22 +93,22 @@ export const Route = createRootRoute({
           name: 'description',
           content: tt('root.meta-description'),
         },
-      { httpEquiv: 'Content-Security-Policy', content: CSP_POLICY },
-      { name: 'referrer', content: 'strict-origin-when-cross-origin' },
-    ],
-    links: [
-      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
-      {
-        rel: 'preconnect',
-        href: 'https://fonts.gstatic.com',
-        crossOrigin: 'anonymous',
-      },
-      { rel: 'stylesheet', href: appCss },
-      {
-        rel: 'stylesheet',
-        href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wght@6..144,-10..0,1..1000&display=swap',
-      },
-    ],
+        { httpEquiv: 'Content-Security-Policy', content: CSP_POLICY },
+        { name: 'referrer', content: 'strict-origin-when-cross-origin' },
+      ],
+      links: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        {
+          rel: 'preconnect',
+          href: 'https://fonts.gstatic.com',
+          crossOrigin: 'anonymous',
+        },
+        { rel: 'stylesheet', href: appCss },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wght@6..144,-10..0,1..1000&display=swap',
+        },
+      ],
       styles: [{ children: NO_TRANSITIONS_STYLE }],
     }
   },
