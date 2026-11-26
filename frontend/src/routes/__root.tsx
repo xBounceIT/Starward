@@ -89,11 +89,9 @@ export const Route = createRootRoute({
   beforeLoad: () => {
     // Durante la SSR allinea la lingua al Accept-Language della request:
     // server e browser renderizzano cosi' la stessa lingua al primo render.
-    const lang = languageFromAcceptLanguage(getAcceptLanguageHeader())
     if (typeof window === 'undefined') {
-      applyServerLanguage(lang)
+      applyServerLanguage(languageFromAcceptLanguage(getAcceptLanguageHeader()))
     }
-    return { lang }
   },
   head: () => ({
     meta: [

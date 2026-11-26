@@ -1721,20 +1721,26 @@ fn psono_parse_item(item: &Value, path: &str) -> Option<RawImportItem> {
                 append_note_section(&mut notes, None, &format!("Codice di recupero: {retrieval}"));
             }
             // The certificate payload (base64 .pfx) is required to use the entry:
-            // keep it verbatim instead of importing a metadata-only note.
-            let cert_val = ["certificate", "file_content", "content", "cert", "pfx", "file"]
+            // keep it verbatim instead of importing a metadata-only note. Try the
+            // known field aliases in order and use the first one with a usable
+            // (non-empty) value, so an empty `certificate` does not shadow a
+            // populated `file_content`.
+            const CERT_ALIASES: &[&str] = &["certificate", "file_content", "content", "cert", "pfx", "file"];
+            let cert = CERT_ALIASES.iter().find_map(|name| {
+                item.get(format!("{prefix}_{name}").as_str())
+                    .and_then(|v| psono_secret_value(Some(v)))
+                    .filter(|s| !s.trim().is_empty())
+            });
+            let any_cert_field_present = CERT_ALIASES
                 .iter()
-                .find_map(|name| item.get(format!("{prefix}_{name}").as_str()).filter(|v| !v.is_null()));
+                .any(|name| item.get(format!("{prefix}_{name}").as_str()).is_some_and(|v| !v.is_null()));
             let mut fields = BTreeMap::new();
-            match cert_val
-                .and_then(|v| psono_secret_value(Some(v)))
-                .filter(|s| !s.trim().is_empty())
-            {
+            match cert {
                 Some(cert) => {
                     fields.insert("certificate".to_string(), cert);
                 }
                 None => {
-                    let reason = if cert_val.is_some() {
+                    let reason = if any_cert_field_present {
                         "Certificato ELSTER con payload in un formato non supportato: importazione saltata per non perdere il certificato".to_string()
                     } else {
                         "Certificato ELSTER senza payload del certificato (campo 'elster_certificate_file_content'/'elster_certificate_certificate' mancante): importazione saltata".to_string()

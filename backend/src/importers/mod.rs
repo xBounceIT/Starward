@@ -2241,12 +2241,19 @@ mod tests {
                     "type": "elster_certificate",
                     "name": "ELSTER senza certificato",
                     "elster_certificate_password": "9999"
+                },
+                {
+                    "type": "elster_certificate",
+                    "name": "ELSTER alias",
+                    "elster_certificate_password": "5555",
+                    "elster_certificate_certificate": "",
+                    "elster_certificate_file_content": "PFX-DA-FILE-CONTENT"
                 }
             ]
         }"#;
 
         let batch = evaluate_import("psono", json, Some("export.json"), true, &HashSet::new()).unwrap();
-        assert_eq!(batch.total_parsed, 5);
+        assert_eq!(batch.total_parsed, 6);
 
         // JWK private key is preserved as compact JSON, not dropped
         let pk = &batch.items[0];
@@ -2285,5 +2292,13 @@ mod tests {
         let elster_no_cert = &batch.items[4];
         assert_eq!(elster_no_cert.status, "skipped");
         assert!(elster_no_cert.skip_reason.as_deref().unwrap().contains("senza payload"));
+
+        // An empty `certificate` alias must not shadow a populated `file_content`
+        let elster_alias = &batch.items[5];
+        assert_eq!(elster_alias.status, "ready");
+        assert_eq!(
+            elster_alias.fields.get("certificate").map(String::as_str),
+            Some("PFX-DA-FILE-CONTENT")
+        );
     }
 }
