@@ -8,20 +8,16 @@ import {
   createRootRoute,
 } from '@tanstack/react-router'
 
-import { createIsomorphicFn } from '@tanstack/react-start'
-
-import { getRequest } from '@tanstack/react-start/server'
-
-import { useTranslation } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 
 import { Toaster } from '@/components/ui/sonner'
 
 import { TooltipProvider } from '@/components/ui/tooltip'
 
-import {
-  applyServerLanguage,
+import i18n, {
   getLanguagePreference,
-  languageFromAcceptLanguage,
+  getRequestLanguage,
+  getSsrI18n,
   resolveLanguage,
   t,
 } from '@/lib/i18n'
@@ -29,12 +25,6 @@ import {
 import { ThemeProvider } from '@/lib/theme'
 
 import appCss from '@/styles/app.css?url'
-
-// Legge l'header Accept-Language solo durante la SSR; sul client il ramo
-// server viene rimosso dal bundler e la funzione ritorna null.
-const getAcceptLanguageHeader = createIsomorphicFn()
-  .server(() => getRequest().headers.get('accept-language'))
-  .client(() => null)
 
 const NO_TRANSITIONS_STYLE =
   'html.no-transitions *,html.no-transitions *::before,html.no-transitions *::after{transition:none!important}'
@@ -86,22 +76,22 @@ const initialLoadScript = (serverLang: string) => `(() => {
 })();`
 
 export const Route = createRootRoute({
-  beforeLoad: () => {
-    // Durante la SSR allinea la lingua al Accept-Language della request:
-    // server e browser renderizzano cosi' la stessa lingua al primo render.
-    if (typeof window === 'undefined') {
-      applyServerLanguage(languageFromAcceptLanguage(getAcceptLanguageHeader()))
-    }
-  },
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: t('root.title') },
-      {
-        name: 'description',
-        content: t('root.meta-description'),
-      },
+  head: () => {
+    // During SSR use the request-scoped language (Accept-Language) so each
+    // concurrent response gets its own locale; on the client use the live
+    // i18n instance language.
+    const lang =
+      typeof window === 'undefined' ? getRequestLanguage() : (i18n.language as 'it' | 'en')
+    const tt = i18n.getFixedT(lang)
+    return {
+      meta: [
+        { charSet: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { title: tt('root.title') },
+        {
+          name: 'description',
+          content: tt('root.meta-description'),
+        },
       { httpEquiv: 'Content-Security-Policy', content: CSP_POLICY },
       { name: 'referrer', content: 'strict-origin-when-cross-origin' },
     ],
@@ -118,12 +108,30 @@ export const Route = createRootRoute({
         href: 'https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wght@6..144,-10..0,1..1000&display=swap',
       },
     ],
-    styles: [{ children: NO_TRANSITIONS_STYLE }],
-  }),
+      styles: [{ children: NO_TRANSITIONS_STYLE }],
+    }
+  },
   component: RootDocument,
 })
 
+// During SSR, wrap the tree in an I18nextProvider backed by a per-request
+// cloned i18n instance so useTranslation() in every child component reads
+// the language of the current request (AsyncLocalStorage), never a shared
+// mutable global. This is what makes concurrent cold-start requests render
+// each in its own locale.
 function RootDocument() {
+  if (typeof window === 'undefined') {
+    const ssrI18n = getSsrI18n()
+    return (
+      <I18nextProvider i18n={ssrI18n}>
+        <RootHtml />
+      </I18nextProvider>
+    )
+  }
+  return <RootHtml />
+}
+
+function RootHtml() {
   // useTranslation() iscrive il root al cambio lingua: a ogni cambio
   // l'intero albero viene ri-renderizzato e tutti i t() si aggiornano.
   const { i18n: i18nInstance } = useTranslation()
