@@ -111,12 +111,13 @@ export function resolveLanguage(pref: LanguagePreference): LanguageCode {
 }
 
 export function setLanguagePreference(pref: LanguagePreference): void {
-  if (typeof window !== 'undefined') {
-    try {
-      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, pref)
-    } catch {
-      // ignore storage errors
-    }
+  // Client-only: mutating the shared i18n instance on the server would leak
+  // across concurrent SSR requests, so guard the whole body.
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, pref)
+  } catch {
+    // ignore storage errors
   }
   void i18n.changeLanguage(resolveLanguage(pref))
 }
@@ -160,9 +161,8 @@ function getInitialLanguage(): LanguageCode {
 
 const initialLanguage = getInitialLanguage()
 
-// initImmediate: false makes init synchronous (resources are bundled
-// statically), so the instance is ready before the first SSR request and
-// cloneInstance() below is also synchronous.
+// Resources are bundled inline, so i18next init (and cloneInstance below)
+// completes synchronously — the instance is ready before the first SSR request.
 void i18n.use(initReactI18next).init({
   resources: {
     it: { translation: it },
